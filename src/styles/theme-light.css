@@ -1,0 +1,221 @@
+/* ============================================================================
+ * LIGHT THEME — html[data-theme="light"], storefront and account pages only
+ * ============================================================================
+ * Selected with the theme toggle (src/lib/theme.ts). Customer Tap pages keep
+ * their own palettes and are unaffected: every rule is scoped to :has(.storefront).
+ *
+ * The tokens are re-declared on the same element as the dark ones (:root), so
+ * every derived token resolves against these values. Contrast (WCAG 2.x) on
+ * the page background #f6f3ec:
+ *   text #15130f 17.0 · secondary #3b3830 10.9 · tertiary #5c574e 6.6
+ *   accent (bronze, as text) #7a5f26 5.4 · error #b3261e 5.8 · success #1d7a4b 5.1
+ *   field edge rgba(21,19,15,.5) 3.2 (WCAG 1.4.11 needs 3)
+ * Buttons keep the gold fill with a dark label (9.1:1): gold is a fill colour
+ * here, bronze is the text colour. */
+
+html[data-theme='light']:has(.storefront) {
+  color-scheme: light;
+
+  --ds-color-text-primary: #15130f;
+  --ds-color-surface-base: #f6f3ec;
+  --ds-color-text-tertiary: #5c574e;
+  --ds-color-text-inverse: #3b3830;
+  --ds-color-surface-muted: #ffffff;
+  --ds-color-surface-strong: #c9b486;
+  --ds-color-text-on-light: #17140d;
+  --ds-color-state-error: #b3261e;
+  --ds-color-state-success: #1d7a4b;
+  --ds-color-state-warning: #8a5a00;
+  --ds-color-focus: #7a5f26;
+
+  --ds-text: #15130f;
+  --ds-text-secondary: #3b3830;
+  --ds-text-tertiary: #5c574e;
+  --ds-surface: #f6f3ec;
+  --ds-surface-raised: #ffffff;
+  --ds-action-bg: #c9b486;
+  --ds-action-bg-hover: #b89f6b;
+  --ds-action-fg: #17140d;
+  --ds-accent: #7a5f26;
+  --ds-accent-hover: #5e4818;
+  --ds-accent-soft: rgba(122, 95, 38, 0.1);
+  --ds-scrim: rgba(21, 19, 15, 0.42);
+  --ds-border: rgba(21, 19, 15, 0.12);
+  --ds-border-control: rgba(21, 19, 15, 0.26);
+  --ds-border-field: rgba(21, 19, 15, 0.5);
+  --ds-border-selected: #7a5f26;
+
+  --shygon-ink: #f6f3ec;
+  --shygon-ink-soft: #efeae0;
+  --shygon-surface: #ffffff;
+  --shygon-surface-raised: #ffffff;
+  --shygon-porcelain: #15130f;
+  --shygon-copy: #3b3830;
+  --shygon-muted: #5c574e;
+  --shygon-metal: #c9b486;
+  --shygon-metal-bright: #b89f6b;
+  --shygon-line: rgba(21, 19, 15, 0.12);
+  --shygon-line-strong: rgba(21, 19, 15, 0.26);
+  --shygon-line-field: rgba(21, 19, 15, 0.5);
+  --shygon-good: #1d7a4b;
+  --shygon-danger: #b3261e;
+  --shygon-shadow-deep: 0 30px 70px rgba(60, 48, 20, 0.16);
+  --shygon-shadow-soft: 0 14px 36px rgba(60, 48, 20, 0.1);
+}
+
+/* Sticky headers were a translucent ink; in light they are translucent paper. */
+html[data-theme='light'] body:has(.storefront) .store-header,
+html[data-theme='light'] body:has(.storefront) .product-header {
+  background: rgba(246, 243, 236, 0.86);
+}
+
+html[data-theme='light'] body:has(.storefront) .privacy-notice {
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(60, 48, 20, 0.18);
+}
+
+/* --- Surfaces the handoff sheet paints with literal dark colours --------- */
+html[data-theme='light'] body:has(.storefront) .app-topbar { background: rgba(246, 243, 236, 0.88); }
+html[data-theme='light'] body:has(.storefront) .toast { background: rgba(255, 255, 255, 0.97); }
+html[data-theme='light'] body:has(.storefront) .skeleton { background: linear-gradient(90deg, #ebe5d9, #f6f2ea, #ebe5d9); background-size: 200% 100%; }
+html[data-theme='light'] body:has(.storefront) .hero-chip { background: rgba(255, 255, 255, 0.9); border-color: rgba(21, 19, 15, 0.12); }
+html[data-theme='light'] body:has(.storefront) .product-card,
+html[data-theme='light'] body:has(.storefront) .store-product-card {
+  background: linear-gradient(155deg, #ffffff, #f3eee4 72%);
+}
+html[data-theme='light'] body:has(.storefront) .order-summary,
+html[data-theme='light'] body:has(.storefront) .product-configurator {
+  background: linear-gradient(150deg, rgba(201, 180, 134, 0.16), rgba(255, 255, 255, 0.7) 45%), #ffffff;
+}
+html[data-theme='light'] body:has(.storefront) .cart-drawer,
+html[data-theme='light'] body:has(.storefront) .product-detail-card,
+html[data-theme='light'] body:has(.storefront) .demo-modal > * {
+  background: linear-gradient(145deg, #ffffff, #f3eee4);
+}
+html[data-theme='light'] .store-sort option,
+html[data-theme='light'] body:has(.storefront) .select option { background: #ffffff; color: #15130f; }
+
+/* --- Dark islands ---------------------------------------------------------
+ * Product photography (dark studio backgrounds) and phone mock-ups stay dark
+ * in the light theme, like a display case. Inside them the dark-theme text
+ * tokens are restored, so their labels keep full contrast. */
+html[data-theme='light'] body:has(.storefront) :is(
+  .builder-product-stage,
+  .product-card-image,
+  .store-product-media,
+  .product-gallery-stage,
+  .product-showroom-stage,
+  .phone-frame,
+  .cinema-phone,
+  .demo-stage
+) {
+  --ds-text: #f3efe6;
+  --ds-text-secondary: #d0cbc1;
+  --ds-text-tertiary: #aaa49a;
+  --ds-accent: #c9b486;
+  --ds-surface: #090a0c;
+  --ds-surface-raised: #1c1f21;
+  --ds-border: rgba(243, 239, 230, 0.14);
+  --ds-border-control: rgba(243, 239, 230, 0.24);
+  --shygon-porcelain: #f3efe6;
+  --shygon-copy: #d0cbc1;
+  --shygon-muted: #aaa49a;
+  --shygon-line: rgba(243, 239, 230, 0.14);
+  --shygon-line-strong: rgba(243, 239, 230, 0.24);
+  --ink: #f3efe6;
+  --muted: #aaa49a;
+  color: #f3efe6;
+}
+
+/* --- Gold used as a TEXT colour becomes bronze (gold fails 4.5:1 on paper) - */
+html[data-theme='light'] body:has(.storefront) :is(
+  .eyebrow,
+  .hero-copy h1 .accent-line,
+  .eyebrow svg,
+  .hero-proof svg,
+  .app-nav-link[aria-current='page'],
+  .plan-switch button.active,
+  .material-row button.active,
+  .choice-button[aria-pressed='true'],
+  .choice-button.selected,
+  .product-option[aria-pressed='true']
+) {
+  color: var(--ds-accent);
+}
+
+/* ------------------------------------------------------------- the switch */
+
+.theme-toggle {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid var(--ds-border-control, rgba(243, 239, 230, 0.24));
+  background: transparent;
+  color: var(--ds-text, #f3efe6);
+  cursor: pointer;
+  overflow: visible;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+.theme-toggle:hover { border-color: var(--ds-accent); background: var(--ds-accent-soft); }
+.theme-toggle:active { transform: scale(0.92); }
+.theme-toggle-icon {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  transition: transform 0.7s cubic-bezier(0.34, 1.4, 0.5, 1), opacity 0.4s ease;
+}
+/* A soft ring leaves the button as the theme changes. */
+.theme-toggle::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid var(--ds-accent, #c9b486);
+  opacity: 0;
+  pointer-events: none;
+}
+html.theme-switching .theme-toggle::after,
+html.theme-fading .theme-toggle::after { animation: theme-ring 0.8s cubic-bezier(0.2, 0, 0, 1); }
+@keyframes theme-ring {
+  from { opacity: 0.8; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.9); }
+}
+/* Dark shows the sun (switch to light); light shows the moon. */
+.theme-toggle[data-theme-state='dark'] .theme-toggle-moon { transform: rotate(-90deg) scale(0.4); opacity: 0; }
+.theme-toggle[data-theme-state='light'] .theme-toggle-sun { transform: rotate(90deg) scale(0.4); opacity: 0; }
+
+/* View-transition reveal: the new theme grows from the button as a circle with
+   a feathered edge (a radial mask whose size is animated in lib/theme.ts). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  z-index: 2;
+  -webkit-mask-image: radial-gradient(circle closest-side, #000 72%, transparent 100%);
+  mask-image: radial-gradient(circle closest-side, #000 72%, transparent 100%);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 0 0;
+  mask-size: 0 0;
+}
+::view-transition-old(root) { z-index: 1; }
+/* No clicks land mid-switch. */
+html.theme-switching { pointer-events: none; }
+
+/* Fallback where view transitions are missing: a colour cross-fade on the
+   surfaces that carry the theme (not every element, which stutters). */
+html.theme-fading body,
+html.theme-fading :is(header, main, footer, section, aside, nav, article, .panel, .card, .product-card, .store-product-card, .order-summary, .product-configurator, .app-topbar, .store-header, .product-header, .btn, .button, .choice-button, .product-option, a, p, h1, h2, h3, h4, span, strong, small, li, dt, dd, label, input, textarea, select) {
+  transition: background-color 0.55s cubic-bezier(0.45, 0, 0.2, 1), color 0.55s cubic-bezier(0.45, 0, 0.2, 1),
+    border-color 0.55s cubic-bezier(0.45, 0, 0.2, 1), fill 0.55s ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle-icon { transition: none; }
+}

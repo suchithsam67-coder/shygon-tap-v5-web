@@ -1,0 +1,207 @@
+/* =============================================================================
+ * SHYGON storefront design tokens. See DESIGN_SYSTEM.md for the rules.
+ *
+ * Every name carries a `--ds-` prefix. The Tailwind theme already defines
+ * `--color-text-primary` (read by the app root that also wraps the public Tap),
+ * so the brief's names used verbatim would have collided with it.
+ *
+ * These are inert until the storefront mounts: the activation block below is
+ * scoped to `body:has(.storefront)`, and only AccountApp renders `.storefront`.
+ * The public Tap — the page a customer's card opens — never mounts it, so none
+ * of this reaches the product.
+ * ========================================================================== */
+
+:root {
+  /* --- Foundations: the brief's token names, the handoff palette ---------
+     Same values as the --shygon-* tokens in customer-experience.css.
+     Derived tokens (--ds-accent, --ds-scrim, ...) resolve here on :root, so
+     they must agree with that file or the page shows two different golds. */
+  --ds-color-text-primary: #f3efe6;  /* porcelain */
+  --ds-color-surface-base: #090a0c;  /* ink */
+  --ds-color-text-tertiary: #aaa49a; /* muted */
+  --ds-color-text-inverse: #d0cbc1;  /* copy */
+  --ds-color-surface-muted: #1c1f21; /* surface-raised */
+  --ds-color-surface-strong: #c9b486; /* metal */
+
+  --ds-font-size-xs: 12px;
+  --ds-font-size-sm: 13px;
+  --ds-font-size-md: 14px;
+  --ds-font-size-lg: 15px;
+  --ds-font-size-xl: 16px;
+  --ds-font-size-2xl: 20px;
+  --ds-font-size-3xl: 26px;
+  --ds-font-size-4xl: 40px;
+  --ds-font-size-base: 15px;
+  --ds-font-weight-base: 400;
+  --ds-line-height-base: 21px;
+
+  --ds-space-1: 16px;
+  --ds-space-2: 22.5px;
+  --ds-space-3: 23px;
+  --ds-space-4: 24px;
+  --ds-space-5: 28px;
+  --ds-space-6: 32px;
+  --ds-space-7: 40px;
+  --ds-space-8: 56px;
+
+  --ds-radius-xs: 4px;
+  --ds-radius-sm: 8px;
+
+  --ds-motion-duration-instant: 200ms;
+  --ds-motion-duration-fast: 300ms;
+
+  /* --- Additions: required by the brief's own rules, missing from it ------ */
+
+  /* The brief's typeface, Clarkson, is Squarespace's proprietary face and is
+     not licensed for other brands. Its own fallback stack is used instead;
+     Arial covers Windows, which has no Helvetica. */
+  --ds-font-family-stack: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  /* Headings and prices. Geist is the brand face (index.html loads both). */
+  --ds-font-family-display: 'Geist', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --ds-font-weight-strong: 600;
+  --ds-line-height-tight: 1.15; /* headings: 21px would collide at 26–40px */
+  /* 21px / 15px. The body uses the ratio, not the px value: a px line-height
+     is inherited as-is, so 26px text under it overlapped its own lines. */
+  --ds-line-height-body: 1.4;
+
+  /* Gold and cream surfaces need dark text; the brief lists none. */
+  --ds-color-text-on-light: #17140d;
+
+  /* Every component must have an error state; the brief defines no colour for
+     one. Each clears 4.5:1 on BOTH surface.base and surface.muted. */
+  --ds-color-state-error: #ff8980;   /* 8.62 on base, 7.21 on muted */
+  --ds-color-state-success: #83d8a5; /* 11.63 on base, 9.73 on muted */
+  --ds-color-state-warning: #fbbf24; /* 11.86 on base, 9.93 on muted */
+  --ds-color-focus: #e3d2ab;         /* metal-bright, 13.27:1 on base */
+
+  /* The spacing scale starts at 16px; component internals need smaller steps. */
+  --ds-space-0-25: 4px;
+  --ds-space-0-5: 8px;
+  --ds-space-0-75: 12px;
+
+  /* Circles and pills are shapes, not a point on the radius scale. */
+  --ds-radius-full: 999px;
+
+  --ds-motion-easing: cubic-bezier(0.2, 0, 0, 1);
+
+  /* --- Semantic roles: components use THESE, never a foundation directly -- */
+  /* Contrast figures below are measured against base #090a0c and muted
+     #1b1b1c (WCAG 2.x formula). Text needs 4.5:1, control edges 3:1. */
+  --ds-text: var(--ds-color-text-primary);              /* 17.26 / 14.44 */
+  --ds-text-secondary: var(--ds-color-text-inverse);    /* 12.25 / 10.25 */
+  --ds-text-tertiary: var(--ds-color-text-tertiary);    /*  8.00 /  6.70 */
+
+  --ds-surface: var(--ds-color-surface-base);
+  --ds-surface-raised: var(--ds-color-surface-muted);
+
+  /* Primary actions: gold fill, dark label (9.07; 12.32 on hover). */
+  --ds-action-bg: var(--ds-color-surface-strong);
+  --ds-action-bg-hover: #e3d2ab; /* metal-bright */
+  --ds-action-fg: var(--ds-color-text-on-light);
+
+  /* Accent: gold as text or icon colour (9.77 / 8.17). */
+  --ds-accent: var(--ds-color-surface-strong);
+  --ds-accent-hover: var(--ds-action-bg-hover);
+  --ds-accent-soft: rgba(201, 180, 134, 0.12); /* selected / hover wash */
+
+  /* Behind drawers and modals; the page underneath stays faintly visible. */
+  --ds-scrim: rgba(4, 5, 6, 0.76);
+
+  /* Dividers and card edges (--shygon-line, 1.38:1). Decoration only. */
+  --ds-border: rgba(243, 239, 230, 0.14);
+  /* Buttons and other controls whose label identifies them
+     (--shygon-line-strong, 1.94:1). Never the only edge of a text field or
+     a checkbox: those use --ds-border-field. */
+  --ds-border-control: rgba(243, 239, 230, 0.24);
+  /* Text fields and checkboxes: 3.43:1, meets WCAG 1.4.11 (3:1). */
+  --ds-border-field: rgba(243, 239, 230, 0.4);
+  --ds-border-selected: var(--ds-color-surface-strong);
+}
+
+/* =============================================================================
+ * Activation — storefront only
+ * ========================================================================== */
+
+html:has(.storefront),
+body:has(.storefront) {
+  background: var(--ds-surface);
+}
+
+body:has(.storefront) {
+  color: var(--ds-text);
+  font-family: var(--ds-font-family-stack);
+  font-size: var(--ds-font-size-base);
+  font-weight: var(--ds-font-weight-base);
+  line-height: var(--ds-line-height-body);
+
+  /* Legacy names still read by inline styles across the pages, re-pointed so
+     they resolve to the system instead of the old light theme. Blue was the
+     old brand accent; its role is now gold. */
+  --ink: var(--ds-text);
+  --muted: var(--ds-text-tertiary);
+  --line: var(--ds-border);
+  --paper: var(--ds-surface);
+  --white: var(--ds-surface);
+  --blue: var(--ds-accent);
+  --blue-dark: var(--ds-accent-hover);
+  --blue-soft: var(--ds-accent-soft);
+  --green: var(--ds-color-state-success);
+  --shadow: none;
+  --radius: var(--ds-radius-sm);
+  --aura-blue: var(--ds-text);
+  --aura-ink: var(--ds-text);
+  --aura-line: var(--ds-border);
+  --aura-shadow: none;
+  --aura-shadow-lg: none;
+  --app-radius: var(--ds-radius-sm);
+  --app-radius-lg: var(--ds-radius-sm);
+  --app-ring: 0 0 0 2px var(--ds-color-focus);
+  --app-lift: none;
+  --app-lift-sm: none;
+  --ease-out: var(--ds-motion-easing);
+
+  /* The Tailwind theme colours that storefront utilities read. */
+  --color-bg-primary: var(--ds-surface);
+  --color-bg-secondary: var(--ds-surface);
+  --color-bg-tertiary: var(--ds-surface-raised);
+  --color-text-primary: var(--ds-text);
+  --color-text-secondary: var(--ds-text-tertiary);
+  --color-text-muted: var(--ds-text-tertiary);
+  --color-glass: var(--ds-surface);
+  --color-glass-border: var(--ds-border);
+  --color-accent-blue: var(--ds-text);
+  --color-accent-cyan: var(--ds-text);
+  --color-accent-purple: var(--ds-text);
+  --color-accent-pink: var(--ds-text);
+}
+
+/* Focus must always be visible: 2px white ring, 19.8:1 on base. The previous
+   ring was 18%-alpha blue — close to invisible. */
+body:has(.storefront) :focus-visible {
+  outline: 2px solid var(--ds-color-focus);
+  outline-offset: 2px;
+}
+
+body:has(.storefront) ::selection {
+  background: var(--ds-action-bg);
+  color: var(--ds-action-fg);
+}
+
+body:has(.storefront) h1,
+body:has(.storefront) h2,
+body:has(.storefront) h3 {
+  font-family: var(--ds-font-family-display);
+  line-height: var(--ds-line-height-tight);
+}
+
+/* scrollbar-color is inherited and, where set, replaces the global
+   ::-webkit-scrollbar rules (light track, cyan-violet thumb). */
+html:has(.storefront) {
+  scrollbar-color: var(--ds-text-tertiary) var(--ds-surface);
+}
+
+/* The hero's NFC badge is product render: it keeps its own shape but reads
+   --blue, which is now gold, so its white glyph needs the dark label colour. */
+body:has(.storefront) .nfc-pulse {
+  color: var(--ds-action-fg);
+}

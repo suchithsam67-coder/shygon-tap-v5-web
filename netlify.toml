@@ -1,0 +1,249 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# ---------------------------------------------------------------------------
+# Pinned, not left to Netlify's rolling default.
+#
+# @supabase/supabase-js v2.112 constructs a RealtimeClient inside createClient,
+# which needs a native WebSocket — absent before Node 22. On Node 20 that throws
+# at construction, so adminClient() would fail and EVERY payment function would
+# return 500: no order creation, no verification, no webhook fulfilment.
+# ---------------------------------------------------------------------------
+[build.environment]
+  NODE_VERSION = "22"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# ---------------------------------------------------------------------------
+# Canonical host: shygontech.com
+#
+# The apex is the address printed on the cards (see src/lib/site.ts), so www is
+# folded into it rather than served as a second copy of the site. This rule is
+# inert until www.shygontech.com actually points at Netlify, so it is safe to
+# ship before DNS is finished.
+# ---------------------------------------------------------------------------
+[[redirects]]
+  from = "https://www.shygontech.com/*"
+  to = "https://shygontech.com/:splat"
+  status = 301
+  force = true
+
+# Once shygontech.com is verified in Netlify and serving, add the same fold for
+# the free Netlify host so search engines stop indexing the site twice:
+#
+#   [[redirects]]
+#     from = "https://shygon-tech.netlify.app/*"
+#     to = "https://shygontech.com/:splat"
+#     status = 301
+#     force = true
+#
+# It is deliberately NOT enabled yet. Until the custom domain resolves, that
+# rule would redirect the only working host to one that does not answer — i.e.
+# it would take the live site down. Deploy previews are unaffected either way;
+# they run on deploy-preview-N--shygon-tech.netlify.app, a different host.
+
+# ---------------------------------------------------------------------------
+# Page routing
+#
+# Every public page has its own prerendered HTML file (written at build by
+# the SEO plugin in vite.config.ts), whose <head> already carries that page's
+# title, description, canonical URL, share image and structured data. Search
+# engines and link previews read that without running JavaScript.
+#
+# Routes are listed explicitly rather than sent to index.html by a catch-all,
+# so an unknown address gets a real 404 status (with the app's own 404 page)
+# instead of a "soft 404" that search engines index as a duplicate home page.
+# The build fails if a prerendered page has no rule here.
+# ---------------------------------------------------------------------------
+
+# Forced: /index.html exists, and without force a file at the path wins.
+[[redirects]]
+  from = "/"
+  to = "/shygontap"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/shygontap"
+  to = "/shygontap.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store"
+  to = "/shygontap/store.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store/business"
+  to = "/shygontap/store/business.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store/restaurant"
+  to = "/shygontap/store/restaurant.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store/event"
+  to = "/shygontap/store/event.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store/google-review"
+  to = "/shygontap/store/google-review.html"
+  status = 200
+
+# The Design Collection.
+[[redirects]]
+  from = "/shygontap/store/obsidian-smoke"
+  to = "/shygontap/store/obsidian-smoke.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store/rose-marble"
+  to = "/shygontap/store/rose-marble.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store/carbon-aurum"
+  to = "/shygontap/store/carbon-aurum.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store/sandstone-jaali"
+  to = "/shygontap/store/sandstone-jaali.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store/sapphire-night"
+  to = "/shygontap/store/sapphire-night.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/store/aurora-glass"
+  to = "/shygontap/store/aurora-glass.html"
+  status = 200
+
+# Policy pages (prerendered).
+[[redirects]]
+  from = "/shygontap/privacy-policy"
+  to = "/shygontap/privacy-policy.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/terms"
+  to = "/shygontap/terms.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/cookie-policy"
+  to = "/shygontap/cookie-policy.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/refund-policy"
+  to = "/shygontap/refund-policy.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/shipping-policy"
+  to = "/shygontap/shipping-policy.html"
+  status = 200
+
+# Sign-in, checkout and the signed-in account: client-rendered, and kept out
+# of search results by robots.txt and their own noindex tag.
+
+[[redirects]]
+  from = "/shygontap/auth"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/account"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/tap"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/tiers"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/customize"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/qr"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/cards"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/customizations"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/checkout"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/orders"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/notifications"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/analytics"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/support"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/settings"
+  to = "/index.html"
+  status = 200
+
+# Customer Taps: the address printed on each card and encoded in its QR.
+# `/tap/` is kept so links shared before the change keep resolving.
+
+[[redirects]]
+  from = "/t/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/tap/*"
+  to = "/index.html"
+  status = 200
+
+# Anything else is a missing page.
+
+[[redirects]]
+  from = "/*"
+  to = "/404.html"
+  status = 404
