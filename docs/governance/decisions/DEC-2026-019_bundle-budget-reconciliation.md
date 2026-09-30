@@ -82,6 +82,8 @@ Which budget should the public Tap entry-JavaScript gate enforce? Doc 12 contain
 - Next action: the Accountable Owner decides before M1.2 starts. Separately (not part of this DEC), decide whether the local-only `.vite-source-tags.js` plugin should ever run in production builds.
 - Decision date: ________
 
+**Owner direction, 2026-09-30 (this is not the DEC decision):** the clean CI measurement is the authoritative current baseline: **88.55 kB gz, a 90 kB maximum, 1.45 kB remaining.** Do not change the 90 kB limit, and do not add SHYGON OS functionality to the public Tap bundle. The reconciliation question in this DEC stays open.
+
 **Current implementation (not the decision):** `scripts/check-bundle-size.mjs` enforces `JS_BUDGET_BYTES = 90_000`, which is Option A as instructed. Changing the constant requires this DEC to be APPROVED.
 
 ## Result (filled at review date)

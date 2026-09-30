@@ -5,6 +5,21 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M0.1 completion: audit gate resolved; M0.2 check (2026-09-30)
+**Changed**
+- `package-lock.json`: dev-only `brace-expansion` 1.1.18 → 1.1.21 and 5.0.9 → 5.0.12. This is DEC-2026-021 option A, approved by the owner, commit `c458a6f`.
+  - Lockfile only. `package.json`, the audit gate and the runtime are unchanged. No allowlist or suppression.
+  - The low `esbuild` advisory is deliberately left alone.
+
+**Verified:** on a fresh clean clone with no `.env`, every M0.1 gate passes, including `npm audit --audit-level=high` (0 high) and `npm run ci` (exit 0). The bundle is 88.55 kB of the 90 kB cap.
+
+**Governance**
+- DEC-2026-021 → IMPLEMENTED — VERIFYING.
+- DEC-2026-019 records the owner's direction: 88.55 kB is the current baseline and the cap is unchanged.
+- **DEC-2026-022 (new): the M0.3 scope conflict, OPEN — HUMAN DECISION REQUIRED.** Neither position has been implemented.
+
+**M0.2:** `supabase/baseline/000_live_baseline.sql` is still missing, so M0.2 stays BLOCKED. Nothing was inferred or created in its place.
+
 ### M0.1: CI & reproducibility scaffold (F8 / DEC-2026-007)
 **Added**
 - `.github/workflows/ci.yml`: runs these gates in order on every push and PR: `npm ci` → eslint → `tsc -b` → `vite build` → bundle check → `db:apply` (built-in idempotency pass) → `db:verify` → `rls-adversarial` → `test:payments` (outbound network denied) → gitleaks (full history, redacted) → `npm audit --audit-level=high`.

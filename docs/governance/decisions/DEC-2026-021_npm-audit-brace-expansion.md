@@ -16,7 +16,7 @@
 | Responsible (R) | Claude Code (would implement once approved) |
 | Consulted (C) | Security Owner (UNASSIGNED) |
 | Informed (I) | Release Owner (UNASSIGNED) |
-| State | **PROPOSED — HUMAN ACTION REQUIRED**. **This blocks M0.1 acceptance ("CI green").** |
+| State | **IMPLEMENTED — VERIFYING.** Option A was approved by the repository owner on 2026-09-30 and implemented in `c458a6f`. The gate is green on a clean local clone; the first GitHub CI run is pending the human push. The Engineering Owner (UNASSIGNED) should re-confirm once named. |
 
 ## Priority (G§13–15)
 | Impact 0–3 | Urgency 0–3 | Irreversibility 0–3 | Risk 0–3 | Score | Score → P | Matrix → P | **Final P** |
@@ -76,14 +76,27 @@ The CI gate `npm audit --audit-level=high` fails on the unchanged V5 lockfile. S
 - Irreversible? No.
 
 ## Decision
-- Decision: ________ (HUMAN ACTION REQUIRED)
+- **Decision:** Option A, the lockfile-only patch, exactly as tested in the scratch clone.
 - Expected outcome: `npm audit --audit-level=high` exits 0 in CI.
-- Required approvals: Engineering Owner (UNASSIGNED); Security Owner consulted
-- Blockers: role roster (OQ-16)
-- Next action: owner decision. If it is A, Claude Code applies the fix and reruns the full gate set.
-- Decision date: ________
+- Required approvals: the repository owner approved on 2026-09-30. Engineering Owner: UNASSIGNED, re-confirmation pending (HUMAN ACTION REQUIRED).
+- Blockers: none. The first GitHub CI run needs the human push.
+- Next action: the named Engineering Owner re-confirms.
+- Decision date: 2026-09-30
+
+**Implementation:** commit `c458a6f`, `build(deps): patch dev-only brace-expansion (DEC-2026-021)`.
+- `package-lock.json` only: 6 lines, `brace-expansion` 1.1.18 → 1.1.21 (parent requires `^1.1.7`) and 5.0.9 → 5.0.12 (parent requires `^5.0.5`).
+- `package.json` is unchanged.
+- No allowlist or suppression. The gate command is unchanged.
+- The remaining low `esbuild` advisory (GHSA-g7r4-m6w7-qqqr) is below the gate threshold. It was deliberately left alone (no unrelated upgrades).
 
 ## Result (filled at review date)
-- Observed result:
-- Reviewed on / by:
+- **Observed result (2026-09-30, fresh clean clone of `c458a6f`, no `.env`, Node 20.18):**
+  - `npm ci`, lint, `tsc -b`, build: pass.
+  - Bundle: 88.55 kB of 90 kB.
+  - `db:apply`: pass. `db:verify`: 23/23. `rls-adversarial`: 48/48. `verify-011`: 16/16.
+  - `test:payments:ci`: 15/15 and 13/13, with 1 check blocked on Node < 22.
+  - gitleaks: 5 commits, 0 findings.
+  - **`npm audit --audit-level=high`: exit 0** (1 low).
+  - `npm run ci`: exit 0.
+- Reviewed on / by: 2026-09-30, Claude Code (evidence). Human review pending.
 - Lesson for institutional memory: an audit gate can turn red with no code change, so treat it as a monitor as well as a gate.
