@@ -117,7 +117,7 @@ export type OrderStatus =
 
 export type EntitlementType = 'digital_plan' | 'lifetime' | 'card' | 'customization';
 
-export type ProductType = 'card' | 'digital_plan' | 'lifetime_plan' | 'customization';
+export type ProductType = 'card' | 'digital_plan' | 'lifetime_plan' | 'customization' | 'delivery';
 
 export type NotificationCategory =
   | 'order'
@@ -140,6 +140,23 @@ export type TapStatus = 'draft' | 'active' | 'paused' | 'archived';
 
 /** What a visitor's request for a public Tap resolved to. */
 export type PublicTapState = 'active' | 'paused' | 'unavailable';
+
+/**
+ * The look of the physical card a page was opened from — which design, in
+ * which material and finish. Drives the card's own opening animation.
+ */
+export interface CardLook {
+  design: string;
+  material?: string | null;
+  finish?: string | null;
+}
+
+/** What `get_public_card()` (migration 019) says about a tapped card. */
+export interface PublicCard extends Partial<CardLook> {
+  state: 'active' | 'not_activated' | 'inactive' | 'paused' | 'unavailable';
+  code?: string;
+  slug?: string;
+}
 
 export interface ProductRow {
   id: string;
@@ -327,6 +344,31 @@ export interface OrderRow {
   cancellation_reason?: string | null;
   refunded_at?: string | null;
   refund_amount_in_paise?: number | null;
+  // Checkout money (migration 020): cart value, promo discount and delivery.
+  subtotal_in_paise?: number | null;
+  discount_in_paise?: number | null;
+  delivery_fee_in_paise?: number | null;
+  promo_code?: string | null;
+  replaces_card_id?: string | null;
+  // Migration 023: GST at purchase time, billing address, cancellation request.
+  tax_in_paise?: number | null;
+  tax_rate_percent?: number | null;
+  tax_inclusive?: boolean | null;
+  tax_split?: string | null;
+  customer_gstin?: string | null;
+  billing_same_as_shipping?: boolean | null;
+  billing_name?: string | null;
+  billing_company?: string | null;
+  billing_address?: string | null;
+  billing_address_line2?: string | null;
+  billing_locality?: string | null;
+  billing_city?: string | null;
+  billing_state?: string | null;
+  billing_pincode?: string | null;
+  shipping_address_line2?: string | null;
+  shipping_locality?: string | null;
+  cancellation_requested_at?: string | null;
+  cancellation_request_reason?: string | null;
 }
 
 export interface OrderItemRow {
@@ -369,6 +411,15 @@ export interface CardRow {
   edition_serial?: number | null;
   edition_count?: number | null;
   edition_chapter_size?: number | null;
+  /** Permanent Card ID (migration 019): what the NFC chip's /c/<code> link carries. */
+  card_code?: string | null;
+  nickname?: string | null;
+  /** Set when the customer reported the card lost; the card is then `suspended`. */
+  lost_at?: string | null;
+  replaces_card_id?: string | null;
+  replaced_at?: string | null;
+  last_tapped_at?: string | null;
+  tap_count?: number | null;
   created_at: string;
 }
 

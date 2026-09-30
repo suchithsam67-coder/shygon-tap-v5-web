@@ -60,6 +60,10 @@ import { cardPriceIndex, fetchCatalog } from "../services/catalog";
 import { homeMeta, LEGAL_PAGES, productPath } from "../seo/meta";
 import { usePageMeta } from "../seo/usePageMeta";
 import { editionAvailability, useEditions } from "../lib/editions";
+import { CardOpening } from "../components/tap/CardOpening";
+import { useStoreEvent } from "../lib/funnel";
+import { needsCardDetails, readPendingOrder } from "../lib/cardDetails";
+import type { CardLook } from "../lib/database.types";
 
 const HOME_META = homeMeta(SITE_URL)
 
@@ -112,12 +116,15 @@ function useLivePrices() {
  * A signed-in customer goes straight to checkout; anyone else signs in first and
  * is returned there by the auth page, which reads the same pending selection.
  */
-async function continueToCheckout(navigate: (to: string) => void) {
+async function continueToCheckout(navigate: (to: string, options?: { state?: unknown }) => void) {
+  // A first card goes through the Card details step; checkout sends it there too.
+  const next = needsCardDetails(readPendingOrder()) ? '/shygontap/card-details' : '/shygontap/checkout'
   try {
     const { data } = await supabase.auth.getSession()
-    navigate(data.session ? '/shygontap/checkout' : '/shygontap/auth')
+    if (data.session) navigate(next)
+    else navigate('/shygontap/auth', { state: { from: next } })
   } catch {
-    navigate('/shygontap/auth')
+    navigate('/shygontap/auth', { state: { from: next } })
   }
 }
 
@@ -345,7 +352,7 @@ function ProductCollection({ onChoose, onDetails, prices }: { onChoose: (id: Pro
           <p>{siteContent.collection.description}</p>
         </div>
         <div className="product-grid">
-          {products.filter((item) => item.collection !== 'design').map((product, index) => (
+          {products.filter((item) => !item.collection || item.collection === 'core').map((product, index) => (
             <article id={`product-${product.id}`} className={`product-card product-card-${index + 1}`} key={product.id}>
               <div className="product-card-image">
                 <span className="product-index">0{index + 1}</span>
@@ -932,8 +939,12 @@ function Configurator({
     </div>
 
     <div>
-      <dt>Limited edition</dt>
-      <dd>{editionAvailability(editions, product.id) ?? 'Numbered, chapters of 100'}</dd>
+      <dt>{product.collection === 'custom' ? 'Edition' : 'Limited edition'}</dt>
+      <dd>
+        {product.collection === 'custom'
+          ? 'Made to order · your artwork'
+          : editionAvailability(editions, product.id) ?? 'Numbered, chapters of 100'}
+      </dd>
     </div>
 
     <div>
@@ -1028,11 +1039,17 @@ function PhoneProfile({ plan, immersive = false }: { plan: DigitalPlan; immersiv
   )
 }
 
-function PhoneFrame({ plan, compact = false }: { plan: DigitalPlan; compact?: boolean }) {
+function PhoneFrame({ plan, compact = false, opening, openingKey }: { plan: DigitalPlan; compact?: boolean; opening?: CardLook; openingKey?: number }) {
   return (
     <div className={`phone-frame ${compact ? 'phone-compact' : ''}`}>
       <div className="phone-speaker" />
       <PhoneProfile plan={plan} />
+      {/* The same card-tap opening a visitor sees on a real page (CardOpening), played inside the phone. */}
+      {opening && (
+        <div className="phone-opening" aria-hidden="true">
+          <CardOpening key={openingKey} card={opening} tier={plan.id} onDone={() => undefined} />
+        </div>
+      )}
       <div className="phone-button phone-button-one" /><div className="phone-button phone-button-two" />
     </div>
   )
@@ -1146,7 +1163,8 @@ function DigitalPlans({ selectedId, onSelect, onDemo }: { selectedId: DigitalPla
   )
 }
 
-function DemoModal({ plan, onClose, onSelect }: { plan: DigitalPlan; onClose: () => void; onSelect: (id: DigitalPlanId) => void }) {
+function DemoModal({ plan, card, onClose, onSelect }: { plan: DigitalPlan; card: CardLook; onClose: () => void; onSelect: (id: DigitalPlanId) => void }) {
+  const [openingKey, setOpeningKey] = useState(0)
   // Only GOAT has a tap-to-open sequence worth showing; every other experience
   // opens straight onto the profile, which is the point of them.
   const [stage, setStage] = useState<'ready' | 'scan' | 'connect' | 'profile'>(
@@ -1168,6 +1186,7 @@ function DemoModal({ plan, onClose, onSelect }: { plan: DigitalPlan; onClose: ()
         <p>{plan.description} Explore the buttons, tabs and scrolling profile inside the phone.</p>
         <div className="demo-instructions"><Smartphone size={18} /><span>Scroll and click inside the live phone preview.</span></div>
         <button className="button" onClick={() => { onSelect(plan.id); onClose(); scrollToId('builder') }}>Make this yours <ArrowRight size={17} /></button>
+        <button className="detail-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }} onClick={() => setOpeningKey((n) => n + 1)}><Play size={13} /> Replay card tap opening</button>
       </div>
       <div className={`demo-stage demo-stage-${stage}`}>
         {plan.id === 'goat' && stage !== 'profile' ? (
@@ -1179,7 +1198,7 @@ function DemoModal({ plan, onClose, onSelect }: { plan: DigitalPlan; onClose: ()
         ) : (
           <div className="live-phone-wrap">
             <span className="customer-sees">THIS IS WHAT YOUR CUSTOMERS SEE.</span>
-            <PhoneFrame plan={plan} />
+            <PhoneFrame plan={plan} opening={card} openingKey={openingKey} />
           </div>
         )}
       </div>
@@ -1373,6 +1392,7 @@ function CartDrawer({ onClose, passPrice }: { onClose: () => void; passPrice: nu
 }
 
 export default function ShygonApp() {
+  useStoreEvent('store_visit')
   // The builder restores the visitor's last configuration. Read in the state
   // initialisers rather than an effect, so the saved selection is what renders
   // first instead of the defaults flashing and then being replaced.
@@ -1447,7 +1467,7 @@ export default function ShygonApp() {
         <OrderButton product={product} material={material} tier={tier} plan={plan} physicalPrice={physicalPrice} total={total} />
       </div>}
       {hasCart && <button className="mobile-summary-bar" onClick={() => window.dispatchEvent(new Event('shygon-open-cart'))} aria-label="Open order summary"><span><small>YOUR TOTAL</small><strong>{currency(total)}{plan.priceSuffix}</strong></span><span>View cart <ArrowRight size={17} /></span></button>}
-      {demoPlan && <DemoModal plan={demoPlan} onClose={() => setDemoPlan(null)} onSelect={setPlanId} />}
+      {demoPlan && <DemoModal plan={demoPlan} card={{ design: productId, material, finish: tier }} onClose={() => setDemoPlan(null)} onSelect={setPlanId} />}
       {detailProduct && <ProductDetailModal product={detailProduct} onClose={() => setDetailProduct(null)} onChoose={setProductId} prices={prices} />}
       {cartOpen && <CartDrawer onClose={() => setCartOpen(false)} passPrice={prices.lifetime} />}
     </>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Check, Loader2, Plus, Sparkles } from 'lucide-react';
 import { AppShell } from '../components/app/AppShell';
 import { useAccount } from '../lib/account-context';
@@ -8,6 +8,8 @@ import { describeError } from '../lib/supabase';
 import { fetchCatalog, priceLabel, type Catalog } from '../services/catalog';
 import { CheckoutError, startCheckout } from '../services/payments';
 import { useAsync } from '../hooks/useAsync';
+import { buttonsFor } from '../lib/tierButtons';
+import { experienceRank, toExperience } from '../lib/database.types';
 
 /**
  * Paid customization add-ons — WhatsApp, Instagram, LinkedIn, website, and so
@@ -19,7 +21,7 @@ import { useAsync } from '../hooks/useAsync';
  * would happily accept, so already-owned items are simply not offered.
  */
 export default function Customizations() {
-  const { entitlements, loading: accountLoading, setupRequired, refresh } = useAccount();
+  const { entitlements, taps, loading: accountLoading, setupRequired, refresh } = useAccount();
   const toast = useToast();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -32,8 +34,18 @@ export default function Customizations() {
     reload: load,
   } = useAsync<Catalog>(fetchCatalog, { onError: (err) => describeError(err) });
 
+  // A button every one of the customer's pages already gets from its tier
+  // (migration 024) is not worth selling to them.
+  const includedEverywhere = useMemo(() => {
+    const tiers = (taps.length ? taps.map((t) => t.selected_ui_tier) : [entitlements.maxExperience]).map((t) =>
+      experienceRank(toExperience(t)) <= experienceRank(entitlements.maxExperience) ? toExperience(t) : entitlements.maxExperience,
+    );
+    const sets = tiers.map((t) => new Set(buttonsFor(t)));
+    return (key: string) => sets.every((set) => set.has(key));
+  }, [taps, entitlements.maxExperience]);
+
   const available = (catalog?.customizations ?? []).filter(
-    (item) => !entitlements.customizations.includes(item.key),
+    (item) => !entitlements.customizations.includes(item.key) && !includedEverywhere(item.key),
   );
 
   function toggle(sku: string) {
@@ -181,6 +193,11 @@ export default function Customizations() {
               style={{
                 position: 'sticky',
                 bottom: 16,
+                // Above the cards (their reveal animation makes a stacking layer) and opaque,
+                // so a card scrolling under the bar never shows through it.
+                zIndex: 20,
+                background: 'var(--ds-surface-raised, var(--ds-surface))',
+                boxShadow: '0 -8px 28px rgba(0,0,0,.28)',
                 marginTop: 20,
                 padding: '14px 20px',
                 display: 'flex',

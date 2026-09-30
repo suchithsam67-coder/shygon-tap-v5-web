@@ -69,7 +69,7 @@ export default function Tiers() {
     if (!user || !tap) return;
     setBusy(experience);
     try {
-      setTap(await saveTap(user.id, { selected_ui_tier: experience }));
+      setTap(await saveTap(tap.id, { selected_ui_tier: experience }));
       toast.success('Experience updated', `Your Tap now opens in ${EXPERIENCE_LABELS[experience]}.`);
     } catch (err) {
       toast.error('Could not switch experience', describeError(err));
@@ -95,7 +95,7 @@ export default function Tiers() {
       // experience id are the same string.
       await startCheckout({ orderType: 'digitalUpgrade', planId: experience });
       await refresh();
-      if (user) setTap(await saveTap(user.id, { selected_ui_tier: experience }));
+      if (tap) setTap(await saveTap(tap.id, { selected_ui_tier: experience }));
       toast.success('Upgrade complete', `Your Tap now opens in ${EXPERIENCE_LABELS[experience]}.`);
     } catch (err) {
       handleError(err, 'Upgrade');
@@ -144,6 +144,7 @@ export default function Tiers() {
       eyebrow="Digital experience"
       title="Choose how your Tap opens"
       description="Four experiences, one physical card. Upgrading changes the presentation of your Tap — you never buy another card. What your public Tap renders is decided by the server, not by this page."
+      pageScoped
     >
       {loading || accountLoading ? (
         <div className="tier-grid">

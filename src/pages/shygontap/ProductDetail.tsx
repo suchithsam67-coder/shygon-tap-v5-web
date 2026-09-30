@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useStoreEvent } from '../../lib/funnel';
+import { buttonsFor, listButtons } from '../../lib/tierButtons';
+import { noteViewed } from '../../lib/shop';
+import { QuantityStepper, RatingSummaryLink, ReviewsSection, SaveButton, ShareRow } from '../../components/shop/ShopParts';
 import BrandMark from '../../components/brand/BrandMark';
 import ThemeToggle from '../../components/ThemeToggle';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Check, ChevronRight, ShieldCheck, ShoppingCart, Truck, Zap } from 'lucide-react';
 import {
   cardArt,
@@ -43,16 +47,27 @@ export default function ProductDetail() {
 
 function ProductDetailView({ productId }: { productId?: string }) {
   const navigate = useNavigate();
+  useStoreEvent('product_view', productId ?? null, Boolean(productId));
 
   const product = useMemo(() => products.find((p) => p.id === productId), [productId]);
   usePageMeta(useMemo(() => (product ? productMeta(SITE_URL, product) : null), [product]));
 
-  const [material, setMaterial] = useState<MaterialId>('pvc');
-  const [tier, setTier] = useState<TierId>('standard');
+  // "Buy again" and shared links can preselect ?material=metal&finish=premium.
+  const [searchParams] = useSearchParams();
+  const [material, setMaterial] = useState<MaterialId>(() => {
+    const m = searchParams.get('material');
+    return m === 'metal' || m === 'transparent' ? m : 'pvc';
+  });
+  const [tier, setTier] = useState<TierId>(() => (searchParams.get('finish') === 'premium' ? 'premium' : 'standard'));
   const [planId, setPlanId] = useState(digitalPlans[0]?.id ?? 'essential');
   const [face, setFace] = useState<'front' | 'back'>('front');
   const editions = useEditions();
   const [added, setAdded] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+
+  useEffect(() => {
+    if (productId && products.some((p) => p.id === productId)) noteViewed(productId);
+  }, [productId]);
 
   // Display prices come from the catalog, with the static copy as a fallback.
   // The server prices the order again at checkout regardless.
@@ -83,7 +98,8 @@ function ProductDetailView({ productId }: { productId?: string }) {
   const physicalPrice = cardPrice(tier, material);
   const liveDigital = plan ? livePrices?.experiences.get(plan.id) : undefined;
   const digitalPrice = liveDigital === undefined ? (plan?.price ?? 0) : Math.round(liveDigital / 100);
-  const total = physicalPrice + digitalPrice;
+  // Each card is priced; the digital experience is bought once per order (as create-order prices it).
+  const total = physicalPrice * quantity + digitalPrice;
 
   const save = () => {
     const pendingOrder = {
@@ -92,6 +108,7 @@ function ProductDetailView({ productId }: { productId?: string }) {
       material,
       tier,
       planId,
+      quantity,
       physicalPrice,
       digitalPrice,
       total,
@@ -122,10 +139,12 @@ function ProductDetailView({ productId }: { productId?: string }) {
   // A signed-in customer skips the sign-in detour.
   async function goToCheckout() {
     try {
+      // Buy Now → Card details → Delivery → Payment; signing in returns to Card details.
       const { data } = await supabase.auth.getSession();
-      navigate(data.session ? '/shygontap/checkout' : '/shygontap/auth');
+      if (data.session) navigate('/shygontap/card-details');
+      else navigate('/shygontap/auth', { state: { from: '/shygontap/card-details' } });
     } catch {
-      navigate('/shygontap/auth');
+      navigate('/shygontap/auth', { state: { from: '/shygontap/card-details' } });
     }
   }
 
@@ -216,7 +235,9 @@ function ProductDetailView({ productId }: { productId?: string }) {
                 </p>
                 <h1 className="mt-3">{product.name}</h1>
                 <p className="edition-note mt-4">
-                  Limited edition · {editionAvailability(editions, product.id) ?? 'numbered in chapters of 100'}
+                  {product.collection === 'custom'
+                    ? 'Made to order · send your artwork after you order'
+                    : `Limited edition · ${editionAvailability(editions, product.id) ?? 'numbered in chapters of 100'}`}
                 </p>
                 <p className="text-[var(--ds-text-secondary)] text-lg mt-5 leading-relaxed">{product.description}</p>
 
@@ -238,9 +259,10 @@ function ProductDetailView({ productId }: { productId?: string }) {
             <div>
               <p className="product-price text-4xl">₹{total}</p>
               <p className="text-sm text-[var(--ds-text-tertiary)] mt-2">
-                ₹{physicalPrice} card
+                ₹{physicalPrice} card{quantity > 1 ? ` × ${quantity}` : ''}
                 {digitalPrice > 0 ? ` + ₹${digitalPrice} digital experience` : ' · Essential digital experience included'}
               </p>
+              <RatingSummaryLink productId={product.id} />
 
               <Field label="Material">
                 {MATERIALS.map((m) => (
@@ -289,6 +311,22 @@ function ProductDetailView({ productId }: { productId?: string }) {
                   />
                 ))}
               </Field>
+              <p className="price-explainer text-sm">
+                {plan?.name ?? 'Essential'} page buttons: {listButtons(buttonsFor(planId))}.
+              </p>
+
+              <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-xs font-bold tracking-[0.14em] uppercase text-[var(--ds-text-tertiary)] mb-2">Quantity</p>
+                  <QuantityStepper value={quantity} onChange={(n) => choose(() => setQuantity(n))} />
+                </div>
+                <SaveButton productId={product.id} name={product.name} />
+              </div>
+              {quantity > 1 && product.collection !== 'custom' && (
+                <p className="price-explainer text-sm">
+                  Each card gets its own Card ID and its own page; the experience is charged once.
+                </p>
+              )}
 
               <div className="product-actions">
                 <button
@@ -316,6 +354,8 @@ function ProductDetailView({ productId }: { productId?: string }) {
               )}
             </div>
 
+            <ShareRow title={product.name} url={`${SITE_URL}${productPath(product)}`} />
+
             <div className="product-trust mt-5 text-sm">
               <p className="flex gap-2.5">
                 <Truck size={17} className="text-[var(--ds-accent)] shrink-0 mt-0.5" aria-hidden="true" />
@@ -329,6 +369,8 @@ function ProductDetailView({ productId }: { productId?: string }) {
             </div>
           </aside>
         </div>
+
+        <ReviewsSection productId={product.id} productName={product.name} />
 
         <section className="product-related" aria-labelledby="product-related-title">
           <h2 id="product-related-title">More cards</h2>

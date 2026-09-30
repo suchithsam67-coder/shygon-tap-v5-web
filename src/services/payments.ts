@@ -38,7 +38,15 @@ interface RazorpayOptions {
   prefill?: { name?: string; email?: string; contact?: string };
   notes?: Record<string, string>;
   theme?: { color?: string };
-  modal?: { ondismiss?: () => void; escape?: boolean };
+  modal?: { ondismiss?: () => void; escape?: boolean; confirm_close?: boolean };
+  retry?: { enabled: boolean; max_count?: number };
+  config?: {
+    display: {
+      blocks?: Record<string, { name: string; instruments: { method: string }[] }>;
+      sequence?: string[];
+      preferences?: { show_default_blocks: boolean };
+    };
+  };
   handler: (response: RazorpayResponse) => void | Promise<void>;
 }
 
@@ -96,8 +104,10 @@ function loadRazorpayScript(): Promise<void> {
   });
 }
 
+import type { CardProfileDetails } from '../lib/cardDetails';
+
 /** Everything the server needs to price and validate a purchase. */
-export type PurchaseIntent =
+export type PurchaseIntent = (
   | {
       orderType: 'physical';
       productId: string;
@@ -105,6 +115,10 @@ export type PurchaseIntent =
       tier: string;
       planId?: string;
       quantity?: number;
+      /** A replacement for one of the customer's cards: same design, same page. */
+      replacesCardId?: string;
+      /** The Card details page; the server copies it into the new page once paid. */
+      profile?: CardProfileDetails;
       shipping: {
         name: string;
         phone: string;
@@ -112,11 +126,37 @@ export type PurchaseIntent =
         city: string;
         state: string;
         pincode: string;
+        email?: string;
+        line2?: string;
+        locality?: string;
+        country?: string;
       };
     }
   | { orderType: 'digitalUpgrade'; planId: string }
   | { orderType: 'lifetimeCustomization' }
-  | { orderType: 'customization'; customizationSkus: string[] };
+  | { orderType: 'customization'; customizationSkus: string[] }
+) & {
+  /** A promo code. The server checks it and decides the discount; this is only the code. */
+  promoCode?: string;
+  /** Billing details. GST is worked out by the server from its own settings. */
+  billing?: BillingDetails;
+};
+
+export interface BillingDetails {
+  sameAsShipping: boolean;
+  name?: string;
+  company?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  line2?: string;
+  locality?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+  gstin?: string;
+}
 
 interface CreateOrderResponse {
   order_id: string;
@@ -226,7 +266,23 @@ export async function startCheckout(
         contact: options.customerPhone,
       },
       theme: { color: '#c9b486' },
+      // Card first, in Razorpay's own secure window: the customer types the
+      // cardholder name, number, expiry and CVV into Razorpay's fields, which
+      // never touch this page, our functions or our database. UPI, netbanking
+      // and wallets stay available below it.
+      config: {
+        display: {
+          blocks: {
+            card: { name: 'Pay by card', instruments: [{ method: 'card' }] },
+          },
+          sequence: ['block.card'],
+          preferences: { show_default_blocks: true },
+        },
+      },
+      // A declined card can be retried in the same window without a new order.
+      retry: { enabled: true, max_count: 4 },
       modal: {
+        confirm_close: true,
         ondismiss: () =>
           settle(() =>
             reject(

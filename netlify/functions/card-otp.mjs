@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { drainEmailOutbox, emailProvider, sendOtpEmail } from '../lib/email.mjs';
+import { afterResponse } from '../lib/after-response.mjs';
 
 /**
  * POST /api/card-otp — OTP-confirmed card activation and deactivation.
@@ -23,10 +25,11 @@ import crypto from 'node:crypto';
  * it also runs on Node 20 in local development.
  *
  * SMS: set SMS_PROVIDER to "msg91" or "twilio" with that provider's variables
- * (see the README section in PRODUCTION.md). Without one, requests fail with a
- * clear 503 — no code is ever pretended to be sent. For local testing only,
- * OTP_DEV_MODE=true returns the code in the response; it is ignored whenever
- * Netlify's CONTEXT is "production".
+ * (see the README section in PRODUCTION.md). When SMS is not set up but email
+ * is (netlify/lib/email.mjs), the code goes to the account's email address
+ * instead. With neither, requests fail with a clear 503 — no code is ever
+ * pretended to be sent. For local testing only, OTP_DEV_MODE=true returns the
+ * code in the response; it is ignored whenever Netlify's CONTEXT is "production".
  */
 
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -102,6 +105,22 @@ function toE164(raw) {
 
 /** "+91 ••••• 06633": enough to recognise the number, not enough to reuse it. */
 const masked = (e164) => `${e164.slice(0, 3)} ••••• ${e164.slice(-5)}`;
+
+/** "a•••••@gmail.com". */
+const maskedEmail = (email) => {
+  const [local, domain] = String(email).split('@');
+  return `${local.slice(0, 1)}•••••@${domain ?? ''}`;
+};
+
+/** Whether an SMS provider is fully configured (not merely named). */
+function smsConfigured() {
+  const provider = (env('SMS_PROVIDER') ?? '').toLowerCase();
+  if (provider === 'msg91') return Boolean(env('MSG91_AUTH_KEY') && env('MSG91_TEMPLATE_ID'));
+  if (provider === 'twilio') {
+    return Boolean(env('TWILIO_ACCOUNT_SID') && env('TWILIO_AUTH_TOKEN') && (env('TWILIO_FROM') || env('TWILIO_MESSAGING_SERVICE_SID')));
+  }
+  return false;
+}
 
 function hashCode(secret, challengeId, code) {
   return crypto.createHmac('sha256', secret).update(`${challengeId}:${code}`).digest('hex');
@@ -209,9 +228,12 @@ async function requestCode(cfg, user, body, request) {
     return json({ error: 'This card is not active.' }, 409);
   }
 
+  // SMS to the account's mobile number when SMS is set up; otherwise email to
+  // the account's (verified sign-in) address.
+  const channel = !smsConfigured() && emailProvider() && user.email ? 'email' : 'sms';
   const [profile] = await rest(cfg, `profiles?id=eq.${user.id}&select=phone`);
-  const phone = toE164(profile?.phone);
-  if (!phone) {
+  const phone = channel === 'sms' ? toE164(profile?.phone) : null;
+  if (channel === 'sms' && !phone) {
     return json(
       { error: 'Add your mobile number in Settings first. The code is sent to that number.', needsPhone: true },
       422,
@@ -236,23 +258,35 @@ async function requestCode(cfg, user, body, request) {
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
-  await rest(cfg, 'card_otp_challenges', {
-    method: 'POST',
-    prefer: 'return=minimal',
-    body: {
-      id: challengeId,
-      user_id: user.id,
-      card_id: card.id,
-      action,
-      code_hash: hashCode(cfg.secret, challengeId, code),
-      phone_last4: phone.slice(-4),
-      expires_at: expiresAt,
-    },
-  });
+  const challenge = {
+    id: challengeId,
+    user_id: user.id,
+    card_id: card.id,
+    action,
+    code_hash: hashCode(cfg.secret, challengeId, code),
+    phone_last4: phone ? phone.slice(-4) : null,
+    expires_at: expiresAt,
+  };
+  try {
+    await rest(cfg, 'card_otp_challenges', {
+      method: 'POST',
+      prefer: 'return=minimal',
+      body: { ...challenge, channel },
+    });
+  } catch (error) {
+    // Before migration 019 there is no channel column.
+    if (error.code !== 'PGRST204' && error.code !== '42703') throw error;
+    await rest(cfg, 'card_otp_challenges', { method: 'POST', prefer: 'return=minimal', body: challenge });
+  }
 
   let delivery;
   try {
-    delivery = await sendSms(phone, code, action, request);
+    if (channel === 'email') {
+      await sendOtpEmail({ to: user.email, code, action });
+      delivery = { sent: true };
+    } else {
+      delivery = await sendSms(phone, code, action, request);
+    }
   } catch (error) {
     // The code never reached the customer: retire it at once.
     await rest(cfg, `card_otp_challenges?id=eq.${challengeId}`, {
@@ -260,20 +294,25 @@ async function requestCode(cfg, user, body, request) {
       prefer: 'return=minimal',
       body: { consumed_at: new Date().toISOString() },
     }).catch(() => undefined);
-    return json({ error: error.message }, error.status ?? 502);
+    const message = channel === 'email' && !error.status ? 'We could not send the email. Please try again.' : error.message;
+    return json({ error: message }, error.status ?? 502);
   }
 
+  const destination = channel === 'email' ? maskedEmail(user.email) : masked(phone);
   return json({
     challengeId,
     expiresAt,
-    phone: masked(phone),
+    channel,
+    destination,
+    // Kept for clients that read the older field name.
+    phone: destination,
     resendAfter: RESEND_COOLDOWN_MS / 1000,
     // Local testing only; never in production (see devModeAllowed).
     ...(delivery.dev ? { devCode: code, devNote: 'Development mode: no SMS was sent.' } : {}),
   });
 }
 
-async function verifyCode(cfg, user, body) {
+async function verifyCode(cfg, user, body, context) {
   const challengeId = String(body?.challengeId ?? '');
   const code = String(body?.code ?? '').replace(/\D/g, '');
   if (!UUID.test(challengeId)) return json({ error: 'Request a new code.' }, 400);
@@ -314,6 +353,8 @@ async function verifyCode(cfg, user, body) {
       method: 'POST',
       body: { p_user_id: user.id, p_card_id: challenge.card_id, p_action: challenge.action },
     });
+    // The activation / deactivation email the database just queued.
+    await afterResponse(context, drainEmailOutbox({ limit: 5, budgetMs: 3000 }));
     return json({ card, action: challenge.action });
   } catch (error) {
     const message =
@@ -322,7 +363,7 @@ async function verifyCode(cfg, user, body) {
   }
 }
 
-export default async (request) => {
+export default async (request, context) => {
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
   const cfg = config();
   if (!cfg) return json({ error: 'The server is not configured.' }, 500);
@@ -333,7 +374,7 @@ export default async (request) => {
 
     const body = await request.json().catch(() => ({}));
     if (body?.step === 'request') return await requestCode(cfg, user, body, request);
-    if (body?.step === 'verify') return await verifyCode(cfg, user, body);
+    if (body?.step === 'verify') return await verifyCode(cfg, user, body, context);
     return json({ error: 'Unknown step.' }, 400);
   } catch {
     return json({ error: 'Something went wrong. Please try again.' }, 500);

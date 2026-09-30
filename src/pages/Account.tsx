@@ -9,8 +9,10 @@ import {
   ExternalLink,
   Eye,
   LifeBuoy,
+  Nfc,
   Package,
   QrCode as QrCodeIcon,
+  ReceiptText,
   Share2,
   Sparkles,
   TrendingUp,
@@ -48,7 +50,7 @@ const PENDING_KEY = 'shygon_pending_order';
 export default function Account() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { profile, tap, entitlements, editState, loading, setupRequired, error, refresh } =
+  const { profile, tap, taps, entitlements, editState, loading, setupRequired, error, refresh } =
     useAccount();
   const toast = useToast();
 
@@ -150,6 +152,7 @@ export default function Account() {
       eyebrow="Your account"
       title={`Hello, ${firstName}`}
       description="Your Tap, your experience and everything behind it."
+      pageScoped
     >
       {hasPending && (
         <section className="panel panel-warning" style={{ marginBottom: 18 }}>
@@ -234,7 +237,7 @@ export default function Account() {
                 }}
               >
                 <div style={{ minWidth: 0, flex: '1 1 260px' }}>
-                  <p className="mini-label">Your Tap</p>
+                  <p className="mini-label">{taps.length > 1 ? `Your Tap · page ${taps.findIndex((t) => t.id === tap?.id) + 1} of ${taps.length}` : 'Your Tap'}</p>
                   <div
                     style={{
                       display: 'flex',
@@ -432,10 +435,22 @@ export default function Account() {
             }}
           >
             <QuickAction
+              icon={<Nfc size={19} />}
+              title="My cards"
+              description="Card IDs, activation, lost cards and replacements."
+              onClick={() => navigate('/shygontap/cards')}
+            />
+            <QuickAction
               icon={<Package size={19} />}
               title="Orders"
               description="Track payment, packing and delivery."
               onClick={() => navigate('/shygontap/orders')}
+            />
+            <QuickAction
+              icon={<ReceiptText size={19} />}
+              title="Billing"
+              description="Every payment and its e-bill."
+              onClick={() => navigate('/shygontap/billing')}
             />
             <QuickAction
               icon={<TrendingUp size={19} />}

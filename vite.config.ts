@@ -195,7 +195,7 @@ export default defineConfig(async ({ command, mode }) => {
     // Absent is the normal case. The build does not depend on it.
   }
 
-  const env = loadEnv(mode, process.cwd(), ['VITE_', 'NEXT_PUBLIC_']);
+  const env = loadEnv(mode, import.meta.dirname ?? process.cwd(), ['VITE_', 'NEXT_PUBLIC_']);
 
   // Only on `vite build` — the dev server is free to point wherever it likes.
   if (command === 'build' && !process.env.ALLOW_LOCAL_SITE_URL) {
@@ -207,7 +207,8 @@ export default defineConfig(async ({ command, mode }) => {
   plugins.push(seoPages(/^https?:\/\//i.test(rawSite) ? rawSite : `https://${rawSite}`));
   if (command === 'serve') {
     // Every .env key, but only for the dev-time function runner above.
-    const all = loadEnv(mode, process.cwd(), '');
+    // The project folder, not wherever the dev server happened to be started from.
+    const all = loadEnv(mode, import.meta.dirname ?? process.cwd(), '');
     const serverOnly = Object.fromEntries(
       Object.entries(all).filter(([key]) => !key.startsWith('VITE_') && !key.startsWith('NEXT_PUBLIC_')),
     );

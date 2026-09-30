@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "db:apply": "node supabase/tests/apply.mjs",
-    "db:verify": "node supabase/tests/verify.mjs",
+    "db:verify": "node supabase/tests/verify.mjs && node supabase/tests/verify-cards-promos-emails.mjs",
+    "test:functions": "node netlify/tests/checkout-flow.mjs && node netlify/tests/functions-security.mjs && node netlify/tests/email-templates.mjs",
     "db:bundle": "node supabase/tests/bundle.mjs",
     "db:push": "node supabase/tests/apply-remote.mjs",
     "brand": "node scripts/brand/generate.mjs"
@@ -24,6 +25,7 @@
     "@tailwindcss/vite": "^4.2.1",
     "framer-motion": "^12.35.0",
     "lucide-react": "^0.577.0",
+    "nodemailer": "^10.0.12",
     "qrcode-generator": "^2.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

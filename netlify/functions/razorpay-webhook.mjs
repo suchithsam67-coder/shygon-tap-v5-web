@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { adminClient, json, MissingSecretError, requireEnv } from '../lib/supabase.mjs';
 import { fulfilOrder, markPaymentFailed, recordPayment } from '../lib/fulfilment.mjs';
+import { drainEmailOutbox } from '../lib/email.mjs';
 
 /**
  * POST /api/razorpay-webhook
@@ -11,7 +12,8 @@ import { fulfilOrder, markPaymentFailed, recordPayment } from '../lib/fulfilment
  *
  * Configure in Razorpay Dashboard > Settings > Webhooks:
  *   URL    https://<your-site>/api/razorpay-webhook
- *   Events payment.captured, order.paid, payment.failed
+ *   Events payment.captured, order.paid, payment.failed,
+ *          refund.processed, refund.failed
  *   Secret must match RAZORPAY_WEBHOOK_SECRET
  */
 
@@ -77,6 +79,20 @@ export default async (request) => {
     // retry would be dismissed as a duplicate and the customer never fulfilled.
     claimedEventId = eventId;
 
+    // Refunds (the admin-refund function starts them; Razorpay confirms them).
+    const refundEntity = payload?.payload?.refund?.entity;
+    if ((eventType === 'refund.processed' || eventType === 'refund.failed') && refundEntity?.payment_id) {
+      const { error: refundError } = await admin.rpc('orders_refund_from_webhook', {
+        p_razorpay_payment_id: refundEntity.payment_id,
+        p_refund_id: refundEntity.id,
+        p_amount: typeof refundEntity.amount === 'number' ? refundEntity.amount : null,
+        p_status: eventType === 'refund.processed' ? 'processed' : 'failed',
+      });
+      if (refundError) throw new Error(`Refund sync failed: ${refundError.message}`);
+      await drainEmailOutbox({ limit: 5, budgetMs: 4000 });
+      return json({ success: true, eventId, message: `Refund ${eventType.split('.')[1]}` });
+    }
+
     const paymentEntity = payload?.payload?.payment?.entity;
     const orderEntity = payload?.payload?.order?.entity;
     const razorpayOrderId = paymentEntity?.order_id || orderEntity?.id;
@@ -100,6 +116,27 @@ export default async (request) => {
     }
 
     if (eventType === 'payment.captured' || eventType === 'order.paid') {
+      // The amount Razorpay captured must be the amount this order was priced
+      // at (after any promo code, with delivery). The signature proves the
+      // event is Razorpay's; this proves it pays for this order in full.
+      const paidAmount = paymentEntity?.amount ?? orderEntity?.amount_paid;
+      const currency = paymentEntity?.currency ?? orderEntity?.currency;
+      if (
+        (typeof paidAmount === 'number' && typeof order.amount_in_paise === 'number' && paidAmount !== order.amount_in_paise) ||
+        (currency && currency !== 'INR')
+      ) {
+        console.error('razorpay-webhook: amount mismatch — not fulfilling', order.id, paidAmount, order.amount_in_paise, currency);
+        await admin.from('admin_notifications').insert({
+          category: 'payment',
+          severity: 'critical',
+          title: 'Payment amount does not match the order',
+          body: `Razorpay reported ${paidAmount} ${currency ?? ''} for an order priced at ${order.amount_in_paise} paise. It was not fulfilled; check it in the Razorpay dashboard.`,
+          link: `/orders/${order.id}`,
+          metadata: { order_id: order.id, razorpay_order_id: razorpayOrderId, razorpay_payment_id: razorpayPaymentId, paid: paidAmount },
+        });
+        return json({ success: true, eventId, message: 'Amount mismatch; held for review' });
+      }
+
       if (razorpayPaymentId) {
         await admin
           .from('orders')
@@ -116,7 +153,10 @@ export default async (request) => {
       }
 
       const result = await fulfilOrder(admin, order.id);
-      return json({ success: true, eventId, newlyFulfilled: result.newlyFulfilled });
+      // Razorpay waits for the answer, so this is simply awaited: a few seconds
+      // for the confirmation email is well inside its timeout.
+      const emails = await drainEmailOutbox({ limit: 10, budgetMs: 6000 });
+      return json({ success: true, eventId, newlyFulfilled: result.newlyFulfilled, emailsSent: emails.sent });
     }
 
     if (eventType === 'payment.failed' && razorpayPaymentId) {
@@ -135,6 +175,8 @@ export default async (request) => {
         .eq('id', order.id)
         .neq('payment_status', 'paid');
 
+      // The "payment failed" email is held for ten minutes (see email.mjs):
+      // Razorpay lets the customer retry in the same checkout.
       return json({ success: true, eventId });
     }
 

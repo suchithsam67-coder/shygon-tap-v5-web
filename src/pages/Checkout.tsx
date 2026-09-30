@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { trackStoreEvent, useStoreEvent } from '../lib/funnel';
+import { needsCardDetails, type CardProfileDetails } from '../lib/cardDetails';
+import { CheckoutSteps } from './CardDetails';
+import { BUTTON_LABELS } from '../lib/tierButtons';
 import BrandMark from '../components/brand/BrandMark';
 import ThemeToggle from '../components/ThemeToggle';
 import { Link, useNavigate } from 'react-router-dom';
@@ -12,6 +16,10 @@ import {
   Truck,
   BadgeCheck,
   RefreshCw,
+  TicketPercent,
+  Receipt,
+  X,
+  Sparkles,
 } from 'lucide-react';
 import { supabase, describeError } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
@@ -26,6 +34,7 @@ import {
   type Catalog,
 } from '../services/catalog';
 import { CheckoutError, startCheckout, type PurchaseIntent } from '../services/payments';
+import { checkPromoCode } from '../services/promo';
 import PaymentProgress, { type PaymentStage } from '../components/app/PaymentProgress';
 import EBill from '../components/app/EBill';
 import { useAsync } from '../hooks/useAsync';
@@ -52,12 +61,20 @@ interface PendingOrder {
   quantity?: number;
   customizationSkus?: string[];
   productName?: string;
+  /** Set by My cards when the order replaces a card (same design, same page). */
+  replacesCardId?: string;
+  replacesCardCode?: string | null;
+  /** Filled on the Card details step (first cards only). */
+  profile?: CardProfileDetails;
 }
 
 interface ShippingForm {
   name: string;
   phone: string;
+  email: string;
   address: string;
+  line2: string;
+  locality: string;
   city: string;
   state: string;
   pincode: string;
@@ -66,11 +83,38 @@ interface ShippingForm {
 const EMPTY_SHIPPING: ShippingForm = {
   name: '',
   phone: '',
+  email: '',
   address: '',
+  line2: '',
+  locality: '',
   city: '',
   state: '',
   pincode: '',
 };
+
+interface BillingForm extends ShippingForm {
+  company: string;
+}
+
+const EMPTY_BILLING: BillingForm = { ...EMPTY_SHIPPING, company: '' };
+
+/** The GST settings checkout shows (migration 023). The server charges from the same row. */
+interface TaxSettings {
+  enabled: boolean;
+  rate_percent: number;
+  prices_include_tax: boolean;
+  seller_state: string;
+}
+
+async function fetchTaxSettings(): Promise<TaxSettings | null> {
+  const { data, error } = await supabase
+    .from('tax_settings')
+    .select('enabled, rate_percent, prices_include_tax, seller_state')
+    .limit(1)
+    .maybeSingle();
+  if (error) return null;
+  return data ? { ...(data as TaxSettings), rate_percent: Number((data as TaxSettings).rate_percent) } : null;
+}
 
 function readPending(): PendingOrder | null {
   try {
@@ -89,6 +133,13 @@ export default function Checkout() {
 
   const [pending] = useState<PendingOrder | null>(readPending);
   const [shipping, setShipping] = useState<ShippingForm>(EMPTY_SHIPPING);
+  // Billing: the same as shipping unless the customer says otherwise.
+  const [billingSame, setBillingSame] = useState(true);
+  const [billing, setBilling] = useState<BillingForm>(EMPTY_BILLING);
+  const [billingErrors, setBillingErrors] = useState<Partial<Record<keyof BillingForm, string>>>({});
+  const [gstin, setGstin] = useState('');
+  const [gstinError, setGstinError] = useState('');
+  const { data: taxSettings } = useAsync<TaxSettings | null>(fetchTaxSettings, {});
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ShippingForm, string>>>({});
   const [paying, setPaying] = useState(false);
   // Order consent: never pre-ticked; required before payment (Consumer
@@ -109,6 +160,14 @@ export default function Checkout() {
 
   const orderType = pending?.orderType ?? 'physical';
   const isPhysical = orderType === 'physical';
+  useStoreEvent('checkout_started', orderType, Boolean(pending));
+  const isReplacement = isPhysical && Boolean(pending?.replacesCardId);
+
+  // Promo code: checked by the database for display; charged by the server.
+  const [promoInput, setPromoInput] = useState('');
+  const [promo, setPromo] = useState<{ code: string; percent?: number; discountInPaise: number } | null>(null);
+  const [promoMessage, setPromoMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
 
   const {
     data: catalog,
@@ -122,6 +181,8 @@ export default function Checkout() {
 
   useEffect(() => {
     if (!pending) navigate('/shygontap', { replace: true });
+    // Every way into checkout (Buy Now, cart, account) passes the Card details step first.
+    else if (needsCardDetails(pending) && !pending.profile?.displayName) navigate('/shygontap/card-details', { replace: true });
   }, [pending, navigate]);
 
   // Prefill the delivery form from the account record, once it arrives.
@@ -134,6 +195,7 @@ export default function Checkout() {
       ...current,
       name: current.name || profile.full_name || '',
       phone: current.phone || profile.phone || '',
+      email: current.email || profile.email || '',
     }));
   }
 
@@ -224,12 +286,16 @@ export default function Checkout() {
       const quantity = Math.max(1, Number(pending.quantity ?? 1));
       if (variant) {
         items.push({
-          label: variant.name,
-          detail: quantity > 1 ? `Quantity ${quantity}` : undefined,
-          paise: variant.priceInPaise * quantity,
+          label: isReplacement ? `${variant.name} (replacement)` : variant.name,
+          detail: isReplacement
+            ? `Replaces card ${pending.replacesCardCode ?? ''} · opens the same page`.replace('  ', ' ')
+            : quantity > 1
+              ? `Quantity ${quantity}`
+              : undefined,
+          paise: variant.priceInPaise * (isReplacement ? 1 : quantity),
         });
       }
-      if (pending.planId && pending.planId !== 'essential') {
+      if (!isReplacement && pending.planId && pending.planId !== 'essential') {
         const experience = experiencePrice(catalog, toExperience(pending.planId));
         if (experience && experience.priceInPaise > 0) {
           items.push({
@@ -264,9 +330,53 @@ export default function Checkout() {
     }
 
     return items;
-  }, [catalog, pending, orderType]);
+  }, [catalog, pending, orderType, isReplacement]);
 
-  const total = lines.reduce((sum, line) => sum + line.paise, 0);
+  /** Cart value: what a promo code is a percentage of. Delivery is added after. */
+  const subtotal = lines.reduce((sum, line) => sum + line.paise, 0);
+  const deliveryPaise = isPhysical && lines.length > 0 ? (catalog?.deliveryInPaise ?? 0) : 0;
+  const discountPaise = promo ? Math.min(promo.discountInPaise, subtotal) : 0;
+  const beforeTax = subtotal - discountPaise + deliveryPaise;
+  // Display only: /api/create-order works the GST out again from the same
+  // settings and charges that, whatever this page shows.
+  const taxRate = taxSettings?.enabled ? taxSettings.rate_percent : 0;
+  const taxInclusive = taxSettings ? taxSettings.prices_include_tax : true;
+  const taxPaise =
+    taxRate > 0
+      ? taxInclusive
+        ? Math.round(beforeTax - (beforeTax * 100) / (100 + taxRate))
+        : Math.round((beforeTax * taxRate) / 100)
+      : 0;
+  const total = taxInclusive ? beforeTax : beforeTax + taxPaise;
+  const supplyState = (isPhysical ? shipping.state : billing.state).trim().toLowerCase();
+  const intraState = supplyState !== '' && supplyState === (taxSettings?.seller_state ?? 'Karnataka').toLowerCase();
+
+  async function applyPromo() {
+    const code = promoInput.trim().toUpperCase();
+    if (!code || promoBusy) return;
+    setPromoBusy(true);
+    setPromoMessage(null);
+    try {
+      const result = await checkPromoCode(code, subtotal, orderType);
+      if (result.ok && typeof result.discountInPaise === 'number') {
+        setPromo({ code: result.code ?? code, percent: result.percent, discountInPaise: result.discountInPaise });
+        setPromoMessage({ tone: 'ok', text: result.message });
+        setPromoInput('');
+      } else {
+        setPromo(null);
+        setPromoMessage({ tone: 'error', text: result.message });
+      }
+    } catch (err) {
+      setPromoMessage({ tone: 'error', text: describeError(err, 'We could not check that code.') });
+    } finally {
+      setPromoBusy(false);
+    }
+  }
+
+  function removePromo() {
+    setPromo(null);
+    setPromoMessage(null);
+  }
 
   function validate(): boolean {
     if (!isPhysical) return true;
@@ -281,9 +391,24 @@ export default function Checkout() {
     else if (!/^[1-9]\d{5}$/.test(shipping.pincode.trim())) next.pincode = 'Enter a valid 6-digit PIN code.';
     else if (delivery.status === 'invalid') next.pincode = delivery.message ?? 'This PIN code could not be verified.';
     else if (delivery.status === 'checking') next.pincode = 'Still checking this PIN code — one moment.';
+    if (shipping.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shipping.email.trim())) next.email = 'Enter a valid email address.';
+
+    const nextBilling: Partial<Record<keyof BillingForm, string>> = {};
+    if (!billingSame) {
+      if (!billing.name.trim()) nextBilling.name = 'Enter the billing name.';
+      if (!billing.address.trim()) nextBilling.address = 'Enter the billing address.';
+      if (!billing.city.trim()) nextBilling.city = 'Enter a city.';
+      if (!billing.state.trim()) nextBilling.state = 'Enter a state.';
+      if (!/^[1-9]\d{5}$/.test(billing.pincode.trim())) nextBilling.pincode = 'Enter a valid 6-digit PIN code.';
+      if (billing.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billing.email.trim())) nextBilling.email = 'Enter a valid email address.';
+    }
+    const gstinValue = gstin.trim().toUpperCase();
+    const gstinBad = gstinValue !== '' && !/^[0-9]{2}[A-Z0-9]{13}$/.test(gstinValue);
+    setGstinError(gstinBad ? 'A GSTIN is 15 characters, e.g. 29ABCDE1234F1Z5.' : '');
 
     setFieldErrors(next);
-    return Object.keys(next).length === 0;
+    setBillingErrors(nextBilling);
+    return Object.keys(next).length === 0 && Object.keys(nextBilling).length === 0 && !gstinBad;
   }
 
   async function pay() {
@@ -326,15 +451,17 @@ export default function Checkout() {
         if (profileError) console.warn('Profile save failed', profileError.message);
       }
 
-      const intent: PurchaseIntent =
+      const base: PurchaseIntent =
         orderType === 'physical'
           ? {
               orderType: 'physical',
               productId: pending.productId!,
               material: pending.material!,
               tier: pending.tier!,
-              planId: pending.planId,
-              quantity: Math.max(1, Number(pending.quantity ?? 1)),
+              planId: isReplacement ? undefined : pending.planId,
+              quantity: isReplacement ? 1 : Math.max(1, Number(pending.quantity ?? 1)),
+              ...(isReplacement ? { replacesCardId: pending.replacesCardId } : {}),
+              ...(!isReplacement && pending.profile ? { profile: pending.profile } : {}),
               shipping: {
                 name: shipping.name.trim(),
                 phone: shipping.phone.trim(),
@@ -342,6 +469,10 @@ export default function Checkout() {
                 city: shipping.city.trim(),
                 state: shipping.state.trim(),
                 pincode: shipping.pincode.trim(),
+                email: shipping.email.trim() || undefined,
+                line2: shipping.line2.trim() || undefined,
+                locality: shipping.locality.trim() || undefined,
+                country: 'India',
               },
             }
           : orderType === 'digitalUpgrade'
@@ -349,17 +480,45 @@ export default function Checkout() {
             : orderType === 'lifetimeCustomization'
               ? { orderType: 'lifetimeCustomization' }
               : { orderType: 'customization', customizationSkus: pending.customizationSkus ?? [] };
+      const billingDetails = isPhysical
+        ? billingSame
+          ? { sameAsShipping: true, company: billing.company.trim() || undefined, gstin: gstin.trim().toUpperCase() || undefined }
+          : {
+              sameAsShipping: false,
+              name: billing.name.trim(),
+              company: billing.company.trim() || undefined,
+              phone: billing.phone.trim() || undefined,
+              email: billing.email.trim() || undefined,
+              address: billing.address.trim(),
+              line2: billing.line2.trim() || undefined,
+              locality: billing.locality.trim() || undefined,
+              city: billing.city.trim(),
+              state: billing.state.trim(),
+              pincode: billing.pincode.trim(),
+              country: 'India',
+              gstin: gstin.trim().toUpperCase() || undefined,
+            }
+        : gstin.trim()
+          ? { sameAsShipping: false, gstin: gstin.trim().toUpperCase() }
+          : undefined;
+      const withBilling: PurchaseIntent = billingDetails ? { ...base, billing: billingDetails } : base;
+      const intent: PurchaseIntent = promo ? { ...withBilling, promoCode: promo.code } : withBilling;
 
       const result = await startCheckout(intent, {
         customerName: shipping.name.trim() || profile?.full_name || undefined,
         customerEmail: user.email ?? undefined,
         customerPhone: shipping.phone.trim() || profile?.phone || undefined,
-        onStage: setStage,
+        onStage: (next) => {
+          setStage(next);
+          if (next === 'awaiting-payment') trackStoreEvent('payment_opened', orderType);
+        },
       });
 
       // The server has verified the signature, marked the order paid and
       // written the entitlement rows. Re-read them rather than assuming.
       setCheckoutResult({ orderId: result.shygonOrderId, paymentId: result.razorpayPaymentId });
+      trackStoreEvent('payment_success', orderType);
+      trackStoreEvent('purchase_completed', orderType);
       localStorage.removeItem(PENDING_KEY);
       window.dispatchEvent(new Event('shygon-cart-updated'));
       await refresh();
@@ -387,10 +546,12 @@ export default function Checkout() {
             break;
           case 'cancelled':
             // Not an error. Nothing was charged and the selection is still here.
+            trackStoreEvent('payment_cancelled', orderType);
             setError('');
             toast.info('Payment cancelled', "You haven't been charged. Your selection is saved.");
             break;
           case 'failed':
+            trackStoreEvent('payment_failed', orderType);
             setError(`${err.message} You have not been charged — you can try again or use another method.`);
             break;
           case 'verification':
@@ -524,16 +685,11 @@ export default function Checkout() {
         </div>
       </header>
 
-      <div style={{ width: 'min(1320px, calc(100% - 40px))', margin: '0 auto', padding: '20px 0 0' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, maxWidth: 720 }}>
-          {['Delivery', 'Review', 'Secure payment'].map((step, index) => (
-            <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ width: 28, height: 28, flex: '0 0 auto', borderRadius: 999, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800, background: index === 0 ? 'var(--ds-action-bg)' : 'var(--ds-surface-raised)', color: index === 0 ? 'var(--ds-action-fg)' : 'var(--ds-text-tertiary)' }}>{index + 1}</span>
-              <span style={{ fontSize: 12, fontWeight: 750, color: index === 0 ? 'var(--ink)' : 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{step}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {isPhysical && !isReplacement ? (
+        <CheckoutSteps active={1} />
+      ) : (
+        <CheckoutSteps active={0} steps={['Delivery', 'Review', 'Secure payment']} />
+      )}
 
       <div className="app-body checkout-body">
         <main className="app-main page-enter">
@@ -547,13 +703,45 @@ export default function Checkout() {
 
           <div className="app-page-head">
             <p className="eyebrow" style={{ margin: 0 }}>Checkout</p>
-            <h1>{isPhysical ? 'Delivery details' : 'Confirm your upgrade'}</h1>
+            <h1>{isReplacement ? 'Replacement card' : isPhysical ? 'Delivery details' : 'Confirm your upgrade'}</h1>
             <p>
-              {isPhysical
+              {isReplacement
+                ? 'A new card with a new Card ID that opens the same page as the one it replaces. Tell us where to send it — payment is handled by Razorpay.'
+                : isPhysical
                 ? 'Tell us where to send your SHYGON Tap card. Payment is handled by Razorpay — we never see your card details.'
                 : 'Review what you are buying, then pay securely through Razorpay.'}
             </p>
           </div>
+
+          {isPhysical && !isReplacement && pending?.profile?.displayName && (
+            <section className="panel">
+              <div className="panel-head">
+                <Sparkles size={19} />
+                <div>
+                  <h2>Card details</h2>
+                  <p>Your new page is created with these the moment your payment is confirmed.</p>
+                </div>
+                <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => navigate('/shygontap/card-details')}>
+                  Edit
+                </button>
+              </div>
+              <div className="panel-body" style={{ display: 'grid', gap: 6, fontSize: 14 }}>
+                <strong style={{ fontSize: 16 }}>{pending.profile.displayName}</strong>
+                {(pending.profile.designation || pending.profile.company) && (
+                  <span style={{ color: 'var(--muted)' }}>
+                    {[pending.profile.designation, pending.profile.company].filter(Boolean).join(' · ')}
+                  </span>
+                )}
+                <span style={{ color: 'var(--muted)' }}>
+                  Buttons:{' '}
+                  {(['phone', 'email', 'whatsapp', 'instagram', 'linkedin', 'website', 'location', 'youtube'] as const)
+                    .filter((key) => pending.profile?.[key])
+                    .map((key) => BUTTON_LABELS[key])
+                    .join(', ') || 'none yet'}
+                </span>
+              </div>
+            </section>
+          )}
 
           {isPhysical && (
             <section className="panel">
@@ -581,6 +769,15 @@ export default function Checkout() {
                   inputMode="tel"
                   placeholder="9876543210"
                 />
+                <Field
+                  label="Email"
+                  value={shipping.email}
+                  error={fieldErrors.email}
+                  onChange={(v) => setShipping((s) => ({ ...s, email: v }))}
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="you@example.com"
+                />
                 <label className="field">
                   <span>Address</span>
                   <textarea
@@ -594,6 +791,22 @@ export default function Checkout() {
                   />
                   {fieldErrors.address && <p className="field-error">{fieldErrors.address}</p>}
                 </label>
+                <div className="field-row">
+                  <Field
+                    label="Address line 2 (optional)"
+                    value={shipping.line2}
+                    onChange={(v) => setShipping((s) => ({ ...s, line2: v }))}
+                    autoComplete="address-line2"
+                    placeholder="Floor, landmark"
+                  />
+                  <Field
+                    label="Locality / area"
+                    value={shipping.locality}
+                    onChange={(v) => setShipping((s) => ({ ...s, locality: v }))}
+                    autoComplete="address-level3"
+                    placeholder="Indiranagar"
+                  />
+                </div>
                 {/* PIN first: once verified it fills City and State below. */}
                 <Field
                   label="PIN code"
@@ -643,9 +856,79 @@ export default function Checkout() {
                     autoComplete="address-level1"
                   />
                 </div>
+                <p className="field-hint" style={{ margin: '-4px 0 0' }}>Country: India</p>
               </div>
             </section>
           )}
+
+          {/* --------------------------------------------------------- billing */}
+          <section className="panel">
+            <div className="panel-head">
+              <Receipt size={19} />
+              <div>
+                <h2>Billing details</h2>
+                <p>Printed on your GST invoice (e-bill).</p>
+              </div>
+            </div>
+            <div className="panel-body">
+              {isPhysical && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, fontWeight: 650, marginBottom: billingSame ? 14 : 18, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={billingSame}
+                    onChange={(e) => setBillingSame(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: 'var(--ds-accent)' }}
+                  />
+                  Billing address same as delivery address
+                </label>
+              )}
+              {isPhysical && !billingSame && (
+                <>
+                  <div className="field-row">
+                    <Field label="Billing name" value={billing.name} error={billingErrors.name} onChange={(v) => setBilling((b) => ({ ...b, name: v }))} autoComplete="billing name" />
+                    <Field label="Company (optional)" value={billing.company} onChange={(v) => setBilling((b) => ({ ...b, company: v }))} autoComplete="billing organization" />
+                  </div>
+                  <div className="field-row">
+                    <Field label="Phone" value={billing.phone} onChange={(v) => setBilling((b) => ({ ...b, phone: v }))} autoComplete="billing tel" inputMode="tel" />
+                    <Field label="Email" value={billing.email} error={billingErrors.email} onChange={(v) => setBilling((b) => ({ ...b, email: v }))} autoComplete="billing email" inputMode="email" />
+                  </div>
+                  <Field label="Address line 1" value={billing.address} error={billingErrors.address} onChange={(v) => setBilling((b) => ({ ...b, address: v }))} autoComplete="billing address-line1" />
+                  <div className="field-row">
+                    <Field label="Address line 2 (optional)" value={billing.line2} onChange={(v) => setBilling((b) => ({ ...b, line2: v }))} autoComplete="billing address-line2" />
+                    <Field label="Locality / area" value={billing.locality} onChange={(v) => setBilling((b) => ({ ...b, locality: v }))} autoComplete="billing address-level3" />
+                  </div>
+                  <div className="field-row">
+                    <Field label="City" value={billing.city} error={billingErrors.city} onChange={(v) => setBilling((b) => ({ ...b, city: v }))} autoComplete="billing address-level2" />
+                    <Field label="State" value={billing.state} error={billingErrors.state} onChange={(v) => setBilling((b) => ({ ...b, state: v }))} autoComplete="billing address-level1" />
+                  </div>
+                  <Field
+                    label="PIN code"
+                    value={billing.pincode}
+                    error={billingErrors.pincode}
+                    onChange={(v) => setBilling((b) => ({ ...b, pincode: v.replace(/\D/g, '').slice(0, 6) }))}
+                    autoComplete="billing postal-code"
+                    inputMode="numeric"
+                  />
+                  <p className="field-hint" style={{ margin: '-4px 0 12px' }}>Country: India</p>
+                </>
+              )}
+              {isPhysical && billingSame && (
+                <Field
+                  label="Company (optional)"
+                  value={billing.company}
+                  onChange={(v) => setBilling((b) => ({ ...b, company: v }))}
+                  autoComplete="organization"
+                />
+              )}
+              <Field
+                label="GSTIN (optional, for a business invoice)"
+                value={gstin}
+                error={gstinError}
+                onChange={(v) => setGstin(v.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 15))}
+                placeholder="29ABCDE1234F1Z5"
+              />
+            </div>
+          </section>
         </main>
 
         <aside className="checkout-summary">
@@ -699,6 +982,110 @@ export default function Checkout() {
                       </strong>
                     </div>
                   ))}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
+                    <div style={{ fontWeight: 650, fontSize: 13.5 }}>Subtotal</div>
+                    <strong style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{rupees(subtotal)}</strong>
+                  </div>
+                  {deliveryPaise > 0 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 14,
+                        padding: '10px 0',
+                        borderBottom: '1px solid var(--line)',
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 650, fontSize: 13.5 }}>Shipping</div>
+                        <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 3 }}>Anywhere in India</div>
+                      </div>
+                      <strong style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        {rupees(deliveryPaise)}
+                      </strong>
+                    </div>
+                  )}
+
+                  {/* ------------------------------------------------ promo code */}
+                  <div style={{ padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
+                    {promo ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, fontSize: 13.5, fontWeight: 650 }}>
+                          <TicketPercent size={16} color="var(--ds-color-state-success)" />
+                          {promo.code}
+                          {promo.percent ? ` · ${promo.percent}% off` : ''}
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            onClick={removePromo}
+                            aria-label={`Remove promo code ${promo.code}`}
+                            style={{ width: 26, height: 26 }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </span>
+                        <strong style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: 'var(--ds-color-state-success)' }}>
+                          −{rupees(discountPaise)}
+                        </strong>
+                      </div>
+                    ) : (
+                      <form
+                        style={{ display: 'flex', gap: 8 }}
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          void applyPromo();
+                        }}
+                      >
+                        <input
+                          className="input"
+                          value={promoInput}
+                          onChange={(e) => setPromoInput(e.target.value.toUpperCase().slice(0, 32))}
+                          placeholder="Promo code"
+                          aria-label="Promo code"
+                          autoCapitalize="characters"
+                          style={{ padding: '9px 12px', fontSize: 14 }}
+                        />
+                        <button
+                          type="submit"
+                          className="btn btn-ghost btn-sm"
+                          disabled={promoBusy || !promoInput.trim()}
+                          style={{ flex: '0 0 auto' }}
+                        >
+                          {promoBusy ? <Loader2 size={14} className="spin" /> : 'Apply'}
+                        </button>
+                      </form>
+                    )}
+                    {promoMessage && (
+                      <p
+                        role={promoMessage.tone === 'error' ? 'alert' : 'status'}
+                        style={{
+                          margin: '8px 0 0',
+                          fontSize: 12,
+                          color: promoMessage.tone === 'ok' ? 'var(--ds-color-state-success)' : 'var(--ds-color-state-error)',
+                        }}
+                      >
+                        {promoMessage.text}
+                      </p>
+                    )}
+                  </div>
+
+                  {taxRate > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 650, fontSize: 13.5 }}>
+                          GST {taxRate}%{taxInclusive ? ' (included)' : ''}
+                        </div>
+                        <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 3 }}>
+                          {supplyState === '' ? 'CGST + SGST or IGST, by delivery state' : intraState ? `CGST ${taxRate / 2}% + SGST ${taxRate / 2}%` : `IGST ${taxRate}%`}
+                        </div>
+                      </div>
+                      <strong style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        {taxInclusive ? '' : '+'}
+                        {rupees(taxPaise)}
+                      </strong>
+                    </div>
+                  )}
 
                   <div
                     style={{
@@ -784,14 +1171,18 @@ export default function Checkout() {
                   >
                     {paying ? (
                       <>
-                        <Loader2 size={16} className="spin" /> Opening Razorpay…
+                        <Loader2 size={16} className="spin" /> Opening secure payment…
                       </>
                     ) : (
                       <>
-                        <Lock size={15} /> Pay {rupees(total)}
+                        <Lock size={15} /> Pay {rupees(total)} Securely
                       </>
                     )}
                   </button>
+                  <p style={{ margin: '10px 0 0', fontSize: 12, lineHeight: 1.55, color: 'var(--muted)' }}>
+                    Pay by card, UPI or netbanking in Razorpay&rsquo;s secure window. Card details go straight to
+                    Razorpay — SHYGON never sees or stores your card number or CVV.
+                  </p>
 
                   <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
                     <p style={{ display: 'flex', alignItems: 'center', gap: 7, margin: 0, color: 'var(--muted)', fontSize: 12 }}><ShieldCheck size={14} /> Secure Razorpay payment · server verification</p>

@@ -64,7 +64,15 @@ export interface Catalog {
   customizations: CustomizationProduct[];
   /** The one-time ₹999 Customization Pass. */
   pass: PassProduct | null;
+  /** The delivery charge on every order with a physical card (migration 020). */
+  deliveryInPaise: number;
 }
+
+/**
+ * What checkout shows for delivery when the catalogue has no delivery row yet.
+ * Display only — /api/create-order applies the same fallback server-side.
+ */
+export const DELIVERY_FALLBACK_IN_PAISE = 4900;
 
 const PRODUCT_COLUMNS =
   'id, sku, name, category, material, tier, ui_tier, price, price_in_paise, ' +
@@ -211,7 +219,10 @@ async function loadCatalog(): Promise<Catalog> {
       shortDescription: row.short_description,
     }));
 
-  return { cards, experiences, customizations, pass };
+  const deliveryRow = priced.find((row) => row.sku === 'delivery-standard');
+  const deliveryInPaise = deliveryRow?.price_in_paise ?? DELIVERY_FALLBACK_IN_PAISE;
+
+  return { cards, experiences, customizations, pass, deliveryInPaise };
 }
 
 /**

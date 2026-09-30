@@ -72,6 +72,10 @@
       "destination": "/shygontap/store/aurora-glass.html"
     },
     {
+      "source": "/shygontap/store/custom",
+      "destination": "/shygontap/store/custom.html"
+    },
+    {
       "source": "/shygontap/privacy-policy",
       "destination": "/shygontap/privacy-policy.html"
     },
@@ -148,11 +152,23 @@
       "destination": "/index.html"
     },
     {
+      "source": "/shygontap/billing",
+      "destination": "/index.html"
+    },
+    {
       "source": "/t/:path*",
       "destination": "/index.html"
     },
     {
       "source": "/tap/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/c/:path*",
       "destination": "/index.html"
     }
   ],
@@ -169,6 +185,12 @@
           "value": "strict-origin-when-cross-origin"
         }
       ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/send-emails",
+      "schedule": "0 3 * * *"
     }
   ]
 }

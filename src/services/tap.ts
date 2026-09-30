@@ -79,24 +79,31 @@ export function themeOf(tap: TapProfileRow | null): TapTheme {
   };
 }
 
+/**
+ * Every page the customer owns, oldest first. Since migration 019 each card
+ * gets its own page, so a customer with three cards has three.
+ */
+export async function fetchMyTaps(userId: string): Promise<TapProfileRow[]> {
+  const run = (columns: string) =>
+    supabase
+      .from('tap_profiles')
+      .select(columns)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true });
+
+  let { data, error } = await run(TAP_COLUMNS);
+  if (error && isMissingColumn(error)) ({ data, error } = await run(TAP_COLUMNS_BASE));
+  if (error) throw error;
+  return ((data ?? []) as unknown as Record<string, unknown>[])
+    .map((row) => normaliseTap(row))
+    .filter((row): row is TapProfileRow => row !== null);
+}
+
+/** The customer's first page — what "your Tap" meant before pages per card. */
 export async function fetchMyTap(userId: string): Promise<TapProfileRow | null> {
-  const { data, error } = await supabase
-    .from('tap_profiles')
-    .select(TAP_COLUMNS)
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (!error) return normaliseTap(data as Record<string, unknown> | null);
-  if (!isMissingColumn(error)) throw error;
-
-  const fallback = await supabase
-    .from('tap_profiles')
-    .select(TAP_COLUMNS_BASE)
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (fallback.error) throw fallback.error;
-  return normaliseTap(fallback.data as Record<string, unknown> | null);
+  const taps = await fetchMyTaps(userId);
+  return taps[0] ?? null;
 }
 
 /** Fields a customer is allowed to edit on their own Tap. */
@@ -149,11 +156,12 @@ function stripPost004(draft: TapDraft): TapDraft {
   return out as TapDraft;
 }
 
-export async function saveTap(userId: string, draft: TapDraft): Promise<TapProfileRow> {
+/** Saves one page. RLS still limits the update to the caller's own rows. */
+export async function saveTap(tapId: string, draft: TapDraft): Promise<TapProfileRow> {
   const { data, error } = await supabase
     .from('tap_profiles')
     .update(draft)
-    .eq('user_id', userId)
+    .eq('id', tapId)
     .select(TAP_COLUMNS)
     .single();
 
@@ -163,7 +171,7 @@ export async function saveTap(userId: string, draft: TapDraft): Promise<TapProfi
   const fallback = await supabase
     .from('tap_profiles')
     .update(stripPost004(draft))
-    .eq('user_id', userId)
+    .eq('id', tapId)
     .select(TAP_COLUMNS_BASE)
     .single();
 
@@ -176,11 +184,11 @@ export async function saveTap(userId: string, draft: TapDraft): Promise<TapProfi
  * the legacy `published` boolean in step, and the database refuses to make a
  * Tap live without a public address.
  */
-export async function setTapStatus(userId: string, status: TapStatus): Promise<TapProfileRow> {
+export async function setTapStatus(tapId: string, status: TapStatus): Promise<TapProfileRow> {
   const { data, error } = await supabase
     .from('tap_profiles')
     .update({ status })
-    .eq('user_id', userId)
+    .eq('id', tapId)
     .select(TAP_COLUMNS)
     .single();
 
@@ -193,7 +201,7 @@ export async function setTapStatus(userId: string, status: TapStatus): Promise<T
   const fallback = await supabase
     .from('tap_profiles')
     .update({ published: status === 'active' })
-    .eq('user_id', userId)
+    .eq('id', tapId)
     .select(TAP_COLUMNS_BASE)
     .single();
 
@@ -201,11 +209,23 @@ export async function setTapStatus(userId: string, status: TapStatus): Promise<T
   return normaliseTap(fallback.data as unknown as Record<string, unknown>)!;
 }
 
+/** PostgREST's "no function with these arguments": the migration is not applied. */
+function isMissingFunction(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === 'PGRST202' || code === '42883';
+}
+
 /**
- * Claims a public address. Runs server-side so uniqueness is checked without
- * granting the caller read access to anyone else's Tap.
+ * Claims or changes the public address of one page. Runs server-side so
+ * uniqueness is checked without granting the caller read access to anyone
+ * else's Tap. Changing an address keeps the old one working (migration 019).
  */
-export async function claimSlug(slug: string): Promise<string> {
+export async function claimSlug(slug: string, tapId?: string): Promise<string> {
+  if (tapId) {
+    const { data, error } = await supabase.rpc('claim_tap_slug', { p_slug: slug, p_tap_id: tapId });
+    if (!error) return data as string;
+    if (!isMissingFunction(error)) throw error;
+  }
   const { data, error } = await supabase.rpc('claim_tap_slug', { p_slug: slug });
   if (error) throw error;
   return data as string;
@@ -216,7 +236,16 @@ export async function claimSlug(slug: string): Promise<string> {
  * decided entirely by the database. The editor renders this; the trigger on
  * `tap_profiles` is what actually enforces it.
  */
-export async function fetchEditState(): Promise<TapEditStateRow | null> {
+export async function fetchEditState(tapId?: string): Promise<TapEditStateRow | null> {
+  if (tapId) {
+    // Per page since migration 019: each page has its own 14-day window.
+    const { data, error } = await supabase.rpc('tap_page_edit_state', { p_tap_id: tapId });
+    if (!error) {
+      const rows = (data ?? []) as TapEditStateRow[];
+      return rows.length > 0 ? rows[0]! : null;
+    }
+    if (!isMissingFunction(error)) throw error;
+  }
   const { data, error } = await supabase.rpc('tap_edit_state');
   if (error) throw error;
   const rows = (data ?? []) as TapEditStateRow[];
@@ -274,7 +303,28 @@ export async function fetchEventTheme(): Promise<EventTheme | null> {
  * `lib/site.ts` for the override used by staging.
  */
 export function tapUrl(slug: string): string {
-  return `${SITE_URL}/t/${slug}`;
+  return `${SITE_URL}/shygontap/${slug}`;
+}
+
+/**
+ * A card's own address — what a new card's NFC chip carries (migration 019).
+ * It opens whichever page the card belongs to, counts the tap against the
+ * card, and stops working the moment the card is deactivated or reported
+ * lost, without affecting the page's other cards or its QR.
+ */
+export function cardUrl(code: string): string {
+  return `${SITE_URL}/c/${code}`;
+}
+
+/** "K7M4Q9XD" -> "K7M4-Q9XD", for reading aloud or typing. */
+export function formatCardCode(code: string | null | undefined): string {
+  if (!code) return '';
+  return code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+}
+
+/** A short name for a page in a list: its address, or its name before it has one. */
+export function tapLabel(tap: Pick<TapProfileRow, 'slug' | 'display_name' | 'id'>): string {
+  return tap.slug ? `/shygontap/${tap.slug}` : tap.display_name || `Page ${tap.id.slice(0, 6)}`;
 }
 
 /** Suggests a slug from a display name; the server validates the final value. */

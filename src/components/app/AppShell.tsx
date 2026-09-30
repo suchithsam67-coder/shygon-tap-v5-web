@@ -13,6 +13,7 @@ import {
   Package,
   Palette,
   QrCode,
+  ReceiptText,
   Settings,
   Sparkles,
   TrendingUp,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../lib/auth-context';
 import { useAccount } from '../../lib/account-context';
+import { TapPagePicker } from './TapPagePicker';
 
 /**
  * The signed-in chrome: brand bar, account navigation and page frame.
@@ -37,9 +39,10 @@ const LINKS = [
   { to: '/shygontap/tiers', label: 'Digital experience', icon: Sparkles },
   { to: '/shygontap/customize', label: 'Customize', icon: Palette },
   { to: '/shygontap/qr', label: 'QR code', icon: QrCode },
-  { to: '/shygontap/cards', label: 'Cards', icon: Nfc },
+  { to: '/shygontap/cards', label: 'My cards', icon: Nfc },
   { to: '/shygontap/customizations', label: 'Add-ons', icon: CreditCard },
   { to: '/shygontap/orders', label: 'Orders', icon: Package },
+  { to: '/shygontap/billing', label: 'Billing', icon: ReceiptText },
   { to: '/shygontap/analytics', label: 'Analytics', icon: TrendingUp },
   { to: '/shygontap/notifications', label: 'Notifications', icon: Bell },
   { to: '/shygontap/support', label: 'Support', icon: LifeBuoy },
@@ -62,12 +65,15 @@ export function AppShell({
   eyebrow,
   description,
   actions,
+  pageScoped = false,
   children,
 }: {
   title: string;
   eyebrow?: string;
   description?: string;
   actions?: ReactNode;
+  /** The screen works on one page: show the page switcher when there are several. */
+  pageScoped?: boolean;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -173,6 +179,7 @@ export function AppShell({
             {eyebrow && <p className="eyebrow" style={{ margin: 0 }}>{eyebrow}</p>}
             <h1>{title}</h1>
             {description && <p>{description}</p>}
+            {pageScoped && <TapPagePicker />}
             {actions && (
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
                 {actions}

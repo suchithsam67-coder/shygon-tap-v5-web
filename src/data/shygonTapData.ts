@@ -14,6 +14,7 @@ export type ProductId =
   | 'sandstone-jaali'
   | 'sapphire-night'
   | 'aurora-glass'
+  | 'custom'
 /**
  * The four digital experiences. These ids match `products.sku` (`plan-<id>`),
  * the entitlement key and the value stored on the Tap — one vocabulary, set by
@@ -30,8 +31,12 @@ export interface Product {
   features: string[]
   images: Record<MaterialId, string>
   pricing: Record<TierId, Record<MaterialId, number>>
-  /** 'design' marks the Design Collection; the rest are the use-case cards. */
-  collection?: 'core' | 'design'
+  /**
+   * 'design' marks the Design Collection; 'custom' is the made-to-order card
+   * with the customer's own artwork (not a numbered edition); the rest are the
+   * use-case cards.
+   */
+  collection?: 'core' | 'design' | 'custom'
 }
 
 export interface DigitalPlan {
@@ -123,7 +128,11 @@ export const cardDesignNames: Record<ProductId, string> = {
   'sandstone-jaali': 'Sandstone Jaali',
   'sapphire-night': 'Sapphire Night',
   'aurora-glass': 'Aurora Glass',
+  custom: 'Your artwork',
 }
+
+// CHANGE THIS TO UPDATE THE CUSTOM CARD PRICE (products.price_in_paise wins).
+export const CUSTOM_CARD_PRICE = 799
 
 export function cardArt(
   product: Pick<Product, 'id'>,
@@ -332,6 +341,25 @@ export const products: Product[] = [
     },
     collection: 'design',
   },
+  {
+    id: 'custom',
+    name: 'Shygon Tap Custom',
+    eyebrow: 'YOUR DESIGN · MADE TO ORDER',
+    description:
+      'Your logo, your artwork, your colours — printed edge to edge on a SHYGON Tap card. One flat price in PVC, metal or transparent. Send us your artwork after you order and we share a proof before printing.',
+    shortDescription: 'Your own artwork, printed edge to edge. One flat price.',
+    features: ['Your own design, front and back', 'Proof before printing', 'Same NFC chip and digital page'],
+    images: {
+      pvc: '/assets/cards/custom-pvc.svg',
+      metal: '/assets/cards/custom-metal.svg',
+      transparent: '/assets/cards/custom-transparent.svg',
+    },
+    pricing: {
+      standard: { pvc: CUSTOM_CARD_PRICE, metal: CUSTOM_CARD_PRICE, transparent: CUSTOM_CARD_PRICE },
+      premium: { pvc: CUSTOM_CARD_PRICE, metal: CUSTOM_CARD_PRICE, transparent: CUSTOM_CARD_PRICE },
+    },
+    collection: 'custom',
+  },
 ]
 
 /**
@@ -349,7 +377,7 @@ export const digitalPlans: DigitalPlan[] = [
     price: 0,
     description: 'Clean, simple and professional — included free with every Shygon Tap.',
     style: 'Minimal · Fast · Clean',
-    features: ['Name and profile photo', 'Phone and email', 'Instant open, no animation', 'Responsive mobile design'],
+    features: ['Name and profile photo', 'Call, email and WhatsApp buttons', 'Instant open, no animation', 'Responsive mobile design'],
     accent: '#4d83e6',
     demoLabel: 'Try live demo',
   },
@@ -359,7 +387,7 @@ export const digitalPlans: DigitalPlan[] = [
     price: 299,
     description: 'Business-focused digital profile with your role, location and contact routes.',
     style: 'Professional · Informative · Trusted',
-    features: ['Everything in Essential', 'Business information block', 'Website and social links', 'Professional opening animation'],
+    features: ['Everything in Essential', '+ Instagram, LinkedIn and website buttons', 'Business information block', 'Professional opening animation'],
     accent: '#2563c9',
     demoLabel: 'Try live demo',
   },
@@ -369,7 +397,7 @@ export const digitalPlans: DigitalPlan[] = [
     price: 599,
     description: 'Premium presentation with a cinematic opening and a wider palette.',
     style: 'Modern · Animated · Premium',
-    features: ['Everything in Business', 'Cinematic opening animation', 'Premium card surface', '8 colour palettes'],
+    features: ['Everything in Business', '+ Location, YouTube and custom link buttons', 'Cinematic opening animation', 'Premium card surface', '8 colour palettes'],
     accent: '#163f93',
     demoLabel: 'Try live demo',
   },
@@ -380,7 +408,7 @@ export const digitalPlans: DigitalPlan[] = [
     price: 999,
     description: 'Greatest of all time. The most advanced Shygon Tap experience.',
     style: 'Adaptive · Dimensional · Cinematic',
-    features: ['Everything in Premium', 'Signature opening animation', 'All 12 colour palettes', 'A UI that adapts to you'],
+    features: ['Everything in Premium', '+ Photo gallery — every button unlocked', 'Signature opening animation', 'All 12 colour palettes', 'A UI that adapts to you'],
     accent: '#0d2e73',
     demoLabel: 'Enter GOAT demo',
   },

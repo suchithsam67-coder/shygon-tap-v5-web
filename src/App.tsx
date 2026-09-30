@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop';
 import PublicTap from './pages/PublicTap';
 import BrandLoader from './components/BrandLoader';
@@ -27,6 +27,41 @@ function AppFallback() {
   return <BrandLoader label="Loading SHYGON Tap…" />;
 }
 
+function AccountAppRoute() {
+  return (
+    <Suspense fallback={<AppFallback />}>
+      <AccountApp />
+    </Suspense>
+  );
+}
+
+/**
+ * The app's own screens under /shygontap/. Anything else there is a customer's
+ * page: shygontech.com/shygontap/<name>. The database reserves these names
+ * (tap_slug_reserved, migration 019), so no page can take one.
+ */
+const APP_SCREENS = new Set([
+  'auth', 'store', 'account', 'tap', 'tiers', 'customize', 'qr', 'cards', 'customizations',
+  'checkout', 'orders', 'notifications', 'analytics', 'support', 'settings', 'billing',
+  'privacy-policy', 'terms', 'cookie-policy', 'refund-policy', 'shipping-policy', 'card-details',
+]);
+
+/**
+ * Decided here, on the catch-all, rather than with a `/shygontap/:username`
+ * route: the app's own <Routes> are nested inside this element, and nested
+ * routes match relative to their parent — under `/shygontap/:username` they
+ * would have seen an empty path and every /shygontap/ screen would break.
+ */
+function ShygonTapPath() {
+  const { pathname } = useLocation();
+  const page = /^\/shygontap\/([^/]+)\/?$/.exec(pathname)?.[1];
+  return page && !APP_SCREENS.has(page.toLowerCase()) ? (
+    <PublicTap slug={decodeURIComponent(page)} />
+  ) : (
+    <AccountAppRoute />
+  );
+}
+
 export default function App() {
   return (
     <div className="relative min-h-screen bg-bg-primary text-text-primary">
@@ -38,14 +73,10 @@ export default function App() {
         */}
         <Route path="/t/:username" element={<PublicTap />} />
         <Route path="/tap/:username" element={<PublicTap />} />
-        <Route
-          path="*"
-          element={
-            <Suspense fallback={<AppFallback />}>
-              <AccountApp />
-            </Suspense>
-          }
-        />
+        {/* A card's own link, written to the NFC chip of every new card. */}
+        <Route path="/c/:code" element={<PublicTap />} />
+        {/* Everything else, including a page's address: /shygontap/<name>. */}
+        <Route path="*" element={<ShygonTapPath />} />
       </Routes>
     </div>
   );

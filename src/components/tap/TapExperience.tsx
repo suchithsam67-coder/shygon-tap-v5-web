@@ -13,10 +13,12 @@ import {
   Phone,
   Share2,
   Sparkles,
+  UserPlus,
   Youtube,
 } from 'lucide-react';
-import type { Experience, PublicProfile } from '../../lib/database.types';
+import type { CardLook, Experience, PublicProfile } from '../../lib/database.types';
 import { ExperienceIntro } from './ExperienceIntro';
+import { CardOpening } from './CardOpening';
 import { hasOpeningAnimation } from './intro-rules';
 import { TapDepthField } from './TapDepthField';
 import { paletteOf } from './palettes';
@@ -71,6 +73,43 @@ function useDynamicAccent(experience: Experience, profile: PublicProfile) {
   }, [experience, profile.company]);
 }
 
+/**
+ * "Save contact": a vCard 3.0 of exactly what this page shows, built in the
+ * browser (no request), which phones open straight into "Add to contacts".
+ */
+function saveContact(data: PublicProfile) {
+  const esc = (value: string) => value.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1');
+  const name = data.displayName?.trim() || 'SHYGON Tap contact';
+  const parts = name.split(/\s+/);
+  const last = parts.length > 1 ? parts.pop()! : '';
+  const lines = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${esc(name)}`,
+    `N:${esc(last)};${esc(parts.join(' '))};;;`,
+    data.company && `ORG:${esc(data.company)}`,
+    (data.designation || data.headline) && `TITLE:${esc(data.designation || data.headline || '')}`,
+    data.phone && `TEL;TYPE=CELL:${data.phone}`,
+    data.whatsapp && data.whatsapp !== data.phone && `TEL;TYPE=WORK:${data.whatsapp}`,
+    data.email && `EMAIL;TYPE=INTERNET:${data.email}`,
+    data.website && `URL:${href(data.website)}`,
+    data.location && `ADR;TYPE=WORK:;;${esc(data.location)};;;;`,
+    data.linkedin && `X-SOCIALPROFILE;TYPE=linkedin:${href(data.linkedin)}`,
+    data.instagram && `X-SOCIALPROFILE;TYPE=instagram:${href(data.instagram)}`,
+    `NOTE:${esc(`SHYGON Tap · ${window.location.origin}/shygontap/${data.slug}`)}`,
+    'END:VCARD',
+  ].filter(Boolean);
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${name.replace(/[^\w\- ]+/g, '').trim() || 'contact'}.vcf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function href(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
@@ -84,12 +123,18 @@ export function TapExperience({
   preview = false,
   /** Replays the opening animation; the preview uses it as a key. */
   introKey,
+  /**
+   * The physical card this page was opened from. When set, the card design
+   * plays its own opening in place of the experience's.
+   */
+  card,
 }: {
   data: PublicProfile;
   onLinkClick?: (key: string) => void;
   onShare?: () => void;
   preview?: boolean;
   introKey?: string | number;
+  card?: CardLook | null;
 }) {
   const experience = data.experience;
   const theme = data.theme;
@@ -102,10 +147,13 @@ export function TapExperience({
    * re-run its initialiser, so the intro would play again over an
    * already-revealed card.
    */
-  const introToken = `${experience}:${theme.animation}:${introKey ?? ''}`;
+  // A card opening plays whatever the experience, unless the owner turned
+  // openings off; without a card the experience decides, as before.
+  const cardOpening = card && theme.animation !== 'none' ? card : null;
+  const introToken = `${experience}:${theme.animation}:${cardOpening?.design ?? ''}:${introKey ?? ''}`;
   const [revealedFor, setRevealedFor] = useState<string | null>(null);
   const introDone =
-    !hasOpeningAnimation(experience, theme.animation) || revealedFor === introToken;
+    (!cardOpening && !hasOpeningAnimation(experience, theme.animation)) || revealedFor === introToken;
 
   const palette = paletteOf(theme.palette);
   const dynamic = useDynamicAccent(experience, data);
@@ -180,12 +228,21 @@ export function TapExperience({
         <div className="tap-goat-grid" aria-hidden="true" />
       )}
 
-      <ExperienceIntro
-        key={introToken}
-        experience={experience}
-        animation={theme.animation}
-        onDone={() => setRevealedFor(introToken)}
-      />
+      {cardOpening ? (
+        <CardOpening
+          key={introToken}
+          card={cardOpening}
+          tier={experience}
+          onDone={() => setRevealedFor(introToken)}
+        />
+      ) : (
+        <ExperienceIntro
+          key={introToken}
+          experience={experience}
+          animation={theme.animation}
+          onDone={() => setRevealedFor(introToken)}
+        />
+      )}
 
       <div className="tap-stage">
         <div className="tap-column">
@@ -248,6 +305,18 @@ export function TapExperience({
                   >
                     <MessageCircle size={17} /> WhatsApp
                   </a>
+                )}
+                {(data.phone || data.email || whatsapp) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      track('save_contact')();
+                      saveContact(data);
+                    }}
+                    className="tap-action tap-action-save"
+                  >
+                    <UserPlus size={17} /> Save contact
+                  </button>
                 )}
               </div>
 

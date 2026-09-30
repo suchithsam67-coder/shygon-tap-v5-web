@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import { adminClient, getRequestUser, json, MissingSecretError, requireEnv } from '../lib/supabase.mjs';
 import { fulfilOrder, recordPayment } from '../lib/fulfilment.mjs';
+import { drainEmailOutbox } from '../lib/email.mjs';
+import { afterResponse } from '../lib/after-response.mjs';
 
 /**
  * POST /api/verify-payment
@@ -12,7 +14,7 @@ import { fulfilOrder, recordPayment } from '../lib/fulfilment.mjs';
  * The browser no longer marks anything paid; that now happens here, behind a
  * verified signature, using the service-role key.
  */
-export default async (request) => {
+export default async (request, context) => {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   try {
@@ -81,6 +83,10 @@ export default async (request) => {
     });
 
     const result = await fulfilOrder(admin, order.id);
+
+    // The order confirmation and e-bill (queued by the database when the order
+    // turned paid) go out now rather than on the next scheduled run.
+    await afterResponse(context, drainEmailOutbox({ limit: 5, budgetMs: 4000 }));
 
     return json({
       success: true,
