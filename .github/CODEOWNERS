@@ -33,3 +33,11 @@
 /catalog/                                @role-principal-architect
 /scripts/ops/                            @role-security-owner @role-release-owner
 /docs/governance/                        @role-product-owner
+
+# Added in M0.1 (not in the pack example): these files are security controls.
+# A .gitleaksignore line bypasses secret scanning for one finding, and the
+# network guard keeps tests away from live services. Each needs specialist review.
+/.gitleaksignore                         @role-security-owner
+/scripts/ci/                             @role-security-owner @role-release-owner
+/scripts/check-bundle-size.mjs           @role-principal-architect
+/.nvmrc                                  @role-release-owner

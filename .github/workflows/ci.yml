@@ -1,0 +1,97 @@
+# CI gate set (doc 12 §3 M0.1; doc 14 §3.5). It runs on every push and pull request.
+#
+# Rules for this workflow (owner instruction, 2026-09-30):
+#   - No secrets and no production. It references no `secrets.*`, deploys
+#     nothing and mutates nothing. test:payments runs with outbound network
+#     denied (scripts/ci/deny-network.mjs), so it cannot reach Supabase,
+#     Razorpay or any other service.
+#   - Read-only token. `permissions: contents: read`, and checkout does not
+#     persist the token.
+#   - Reproducible. Node comes from .nvmrc, dependencies from `npm ci`
+#     (lockfile), actions are pinned by commit and gitleaks by version and
+#     SHA-256.
+#   - Fail-closed. Every gate stops the job, and no security gate has
+#     continue-on-error.
+#
+# Keep the step order identical to the `ci` script in package.json, which runs
+# the same gates locally.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (full history, for the secret scan)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: eslint
+        run: npm run lint
+
+      - name: tsc -b
+        run: npx tsc -b
+
+      - name: build
+        run: npx vite build
+
+      - name: bundle check (public Tap entry JS <= 90 kB gz; DEC-2026-019)
+        run: npm run test:bundle
+
+      # apply.mjs already runs every migration a second time to prove
+      # idempotency, so one invocation is the "db:apply twice" gate.
+      - name: db:apply (with the built-in idempotency pass)
+        run: npm run db:apply
+
+      - name: db:verify
+        run: npm run db:verify
+
+      - name: rls-adversarial
+        run: node supabase/tests/rls-adversarial.mjs
+
+      - name: test:payments (outbound network denied)
+        run: npm run test:payments:ci
+
+      - name: Install gitleaks (pinned version, SHA-256 verified)
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          # From the official gitleaks_8.30.1_checksums.txt release asset.
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          tarball="$RUNNER_TEMP/gitleaks.tar.gz"
+          curl -fsSL --retry 3 -o "$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${tarball}" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          tar -xzf "$tarball" -C "$RUNNER_TEMP/gitleaks" gitleaks
+          echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
+
+      - name: gitleaks (full history, values redacted)
+        run: npm run test:secrets
+
+      - name: npm audit (high and above)
+        run: npm audit --audit-level=high

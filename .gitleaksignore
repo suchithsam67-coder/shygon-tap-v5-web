@@ -1,0 +1,7 @@
+# gitleaks exceptions: exact finding fingerprints only (commit:file:rule:line).
+# Each line needs an APPROVED DEC record. Never list a real secret here:
+# rotate it instead (doc 13 PB-4). Values are never recorded in this file.
+#
+# DEC-2026-020: Web3Forms access key, public by vendor design, in dead code
+# (src/components/ProjectConsultation.tsx), as committed in v5-baseline.
+8becea30cd584ba636dce662df59a95247f5443c:src/components/ProjectConsultation.tsx:generic-api-key:75

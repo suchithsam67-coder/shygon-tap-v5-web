@@ -5,6 +5,23 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M0.1: CI & reproducibility scaffold (F8 / DEC-2026-007)
+**Added**
+- `.github/workflows/ci.yml`: runs these gates in order on every push and PR: `npm ci` → eslint → `tsc -b` → `vite build` → bundle check → `db:apply` (built-in idempotency pass) → `db:verify` → `rls-adversarial` → `test:payments` (outbound network denied) → gitleaks (full history, redacted) → `npm audit --audit-level=high`.
+  - Read-only token and no secrets.
+  - Actions pinned by commit; gitleaks 8.30.1 pinned by SHA-256.
+  - Node from `.nvmrc`.
+- `.nvmrc`: `22`.
+- `scripts/check-bundle-size.mjs`: fails when the public Tap entry JS exceeds 90 kB gz (DEC-2026-019). CSS is reported only.
+- `scripts/ci/deny-network.mjs`: fetch guard so tests cannot contact live services (IMP-003).
+- `scripts/ci/secret-scan.mjs`: a fail-closed gitleaks wrapper that never prints matched text.
+- `.gitleaksignore`: one fingerprint (DEC-2026-020).
+- New `package.json` scripts: `ci`, `test:db`, `test:bundle`, `test:payments:ci`, `test:secrets`. Existing scripts are unchanged.
+
+**Changed**
+- `.github/CODEOWNERS`: owners (placeholders) for the new control files.
+- `docs/DECISIONS.md`: implementation notes IMP-001…007.
+
 ### M0.0: Governance bootstrap (G0)
 **Added**
 - `docs/shygon-os/`: the approved SHYGON OS planning pack. All 34 files, verified byte-identical to `shygon-os-architecture-docs.zip`.

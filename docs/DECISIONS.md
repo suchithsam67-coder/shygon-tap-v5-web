@@ -48,6 +48,19 @@ This is the index of every decision record (DEC). Doc 13 §4 and §11 define the
 | GAP-1 … GAP-12 | Gaps in the governance spec (doc 13 §13), each with a proposed resolution | Product Owner / Founder (UNASSIGNED) | — | HUMAN ACTION REQUIRED |
 | Other OQs | The remaining open questions in doc 11 Part D | per doc 11 | per doc 11 | HUMAN ACTION REQUIRED |
 
+## Implementation notes for M0.0 / M0.1 (L0, PROPOSED; doc 12 §0 rule 8)
+These record *how* the milestones were implemented where the spec left a choice. None changes product behaviour, migration semantics, RLS, payments or auth.
+
+| ID | Note |
+|---|---|
+| IMP-001 | **Byte-exact baseline.** The repository uses `core.autocrlf=false` (repo-local), so committed bytes equal the working tree as found (most files are LF; 59 of 417 contain CR). CI therefore sees exactly the bytes that were tested. Commits use a repo-local agent identity, "Claude Code (agent)", in the spirit of doc 14 §3.9 (separate agent identity). The global git config is untouched. |
+| IMP-002 | **`db:apply` runs once in CI.** `supabase/tests/apply.mjs` already applies every migration a second time ("idempotency: running every migration a second time"), so one invocation is the spec's "db:apply (twice)". Migration semantics are unchanged. |
+| IMP-003 | **`test:payments` runs with outbound network denied** (`npm run test:payments:ci`, preloading `scripts/ci/deny-network.mjs`). What an inspection on 2026-09-30 found: `payments-and-sms.mjs` replaces `fetch` with a scripted fake, so it never reaches Razorpay or an SMS provider. `functions-security.mjs` drives the real handlers and reads non-secret settings from `.env`, so a local `.env` would give it the live `SUPABASE_URL`. None of its paths calls Supabase before failing closed (missing key → 503; no bearer token → 401 before `auth.getUser`). However, **`check-delivery` makes real calls to public PIN-code directories** (`api.postalpincode.in`, `api.pincodeapi.in`), and Shiprocket only when its credentials are set. The guard makes those calls fail like a dead network. The handler then falls back offline, and the test still asserts behaviour. The server code uses no `http`/`https`/`net`/`tls`/`dns` imports, so guarding `fetch` is sufficient. No credentials are set in CI. The original `test:payments` script is unchanged. |
+| IMP-004 | **Secret scanning.** gitleaks is pinned to 8.30.1 and verified against the official release checksums. It uses its default rules over the full history (`--log-opts=--all`) with `--redact=100`, and the output lists only rule, file, line and commit. There is no `.gitleaks.toml` allowlist, because the fake fixtures in `netlify/tests` do not match the default rules. The only exception is one `.gitleaksignore` fingerprint (DEC-2026-020). A missing or wrong-version binary fails the gate. |
+| IMP-005 | **Bundle gate measurement.** It counts the JS that `dist/index.html` loads (module script + modulepreload) plus its static-import closure, gzip-sized as Vite reports it (zlib default level, 1 kB = 1000 B). The cap is 90,000 B and may be raised only by an APPROVED DEC-2026-019. CSS is reported but not gated. |
+| IMP-006 | **Node.** CI uses Node 22 (`.nvmrc`, which matches `NODE_VERSION = "22"` in `netlify.toml`). The local environment on 2026-09-30 was Node 20.18.0 and was not changed. Vite warns there (it wants ≥ 20.19), and one check in `functions-security.mjs` (verify-payment refuses an unauthenticated caller) reports BLOCKED on Node < 22. That check runs in CI. |
+| IMP-007 | **CODEOWNERS** uses `@role-*` placeholders until the Founder supplies GitHub handles (DEC-2026-018). M0.1 adds owners for `.gitleaksignore`, `scripts/ci/`, the bundle script and `.nvmrc`. |
+
 ## Open human-only steps for governance stage G0 (doc 12 M0.0; Claude Code does not perform these)
 1. Name the role holders (DEC-2026-018).
 2. Create the out-of-band incident channel (OQ-17).
