@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PLACEHOLDERS: the @role-* handles below are NOT real GitHub users or teams.
+# Every governance role is UNASSIGNED (HUMAN ACTION REQUIRED; OQ-16, tracked as
+# DEC-2026-018). The repository owner will supply the real GitHub mapping.
+# Until then this file only records who SHOULD review each path. It grants
+# nothing and requests no reviews.
+# Source: docs/shygon-os/templates/github/CODEOWNERS.example (doc 13 §3.2),
+# unchanged below apart from this banner.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Replace @role-* with real GitHub users/teams from ROLE_ROSTER.md.
+# Level-3 paths (doc 13 §3.2) need specialist approval; branch protection must require CODEOWNER review.
+
+*                                        @role-engineering-owner
+/src/                                    @role-engineering-owner
+/supabase/migrations/                    @role-data-owner @role-security-owner
+/supabase/baseline/                      @role-data-owner @role-security-owner
+/supabase/functions/admin-refund/        @role-security-owner
+/netlify/functions/create-order.mjs      @role-security-owner
+/netlify/functions/verify-payment.mjs    @role-security-owner
+/netlify/functions/razorpay-webhook.mjs  @role-security-owner
+/netlify/lib/razorpay.mjs                @role-security-owner
+/netlify/lib/fulfilment.mjs              @role-security-owner
+/netlify/functions/card-otp.mjs          @role-security-owner
+/netlify/functions/otp.mjs               @role-security-owner
+/netlify/lib/otp.mjs                     @role-security-owner
+/netlify/functions/resolve.mjs           @role-security-owner @role-principal-architect
+/src/lib/auth.tsx                        @role-security-owner
+/src/lib/publicTapClient.ts              @role-principal-architect
+/netlify.toml                            @role-security-owner @role-release-owner
+/vercel.json                             @role-security-owner @role-release-owner
+/.github/                                @role-release-owner @role-security-owner
+/catalog/                                @role-principal-architect
+/scripts/ops/                            @role-security-owner @role-release-owner
+/docs/governance/                        @role-product-owner

@@ -29,3 +29,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Never enter git: archives can carry .env files (SEC-1 / DEC-2026-001),
+# and local agent settings are per-machine.
+*.zip
+.claude/settings.local.json
