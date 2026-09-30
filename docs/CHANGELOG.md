@@ -22,6 +22,10 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 - `.github/CODEOWNERS`: owners (placeholders) for the new control files.
 - `docs/DECISIONS.md`: implementation notes IMP-001…007.
 
+**Verification records (added after the clean-clone CI run)**
+- DEC-2026-021 (new, PROPOSED): the `npm audit` high gate fails on dev-tooling `brace-expansion` advisories that were published 2026-09-29. A lockfile-only fix was verified in a scratch clone but **not applied**; it is waiting for the owner's decision.
+- DEC-2026-019 corrected: CI measures **88.55 kB** (clean build). The 89.57 kB figure came from a working folder that includes the local-only `.vite-source-tags.js` plugin.
+
 ### M0.0: Governance bootstrap (G0)
 **Added**
 - `docs/shygon-os/`: the approved SHYGON OS planning pack. All 34 files, verified byte-identical to `shygon-os-architecture-docs.zip`.
