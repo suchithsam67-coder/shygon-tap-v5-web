@@ -1,0 +1,623 @@
+/*
+ * SHYGON TAP V5 — customer experience styling handoff
+ *
+ * This is an integration stylesheet, not a standalone theme. See
+ * SHYGON_V5_CLAUDE_HANDOFF.md for the verified component hooks to add to the
+ * existing React markup. It does not contain product data or purchase logic.
+ */
+
+:root {
+  --shygon-ink: #090a0c;
+  --shygon-ink-soft: #0e1012;
+  --shygon-surface: #141618;
+  --shygon-surface-raised: #1c1f21;
+  --shygon-porcelain: #f3efe6;
+  --shygon-copy: #d0cbc1;
+  --shygon-muted: #aaa49a;
+  --shygon-metal: #c9b486;
+  --shygon-metal-bright: #e3d2ab;
+  --shygon-line: rgba(243, 239, 230, 0.14);
+  --shygon-line-strong: rgba(243, 239, 230, 0.24);
+  /* Integration change: text-field edge. line-strong measures 1.94:1 on ink;
+     WCAG 1.4.11 needs 3:1 for a field's boundary. This is 3.43:1. */
+  --shygon-line-field: rgba(243, 239, 230, 0.4);
+  --shygon-good: #83d8a5;
+  --shygon-danger: #ff8980;
+  --shygon-shadow-deep: 0 34px 90px rgba(0, 0, 0, 0.46);
+  --shygon-shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.28);
+  --shygon-radius-card: 22px;
+  --shygon-radius-panel: 18px;
+  --shygon-radius-control: 12px;
+  --shygon-ease: cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+/* The hidden storefront marker is mounted only by AccountApp. Public NFC Tap
+   routes do not load this theme. Keep this scope when importing the file. */
+body:has(.storefront) {
+  color-scheme: dark;
+  --ds-color-text-primary: var(--shygon-porcelain);
+  --ds-color-text-inverse: var(--shygon-copy);
+  --ds-color-text-tertiary: var(--shygon-muted);
+  --ds-color-surface-base: var(--shygon-ink);
+  --ds-color-surface-muted: var(--shygon-surface-raised);
+  --ds-color-surface-strong: var(--shygon-metal);
+  --ds-color-text-on-light: #17140d;
+  --ds-color-state-success: var(--shygon-good);
+  --ds-color-state-error: var(--shygon-danger);
+  --ds-color-focus: var(--shygon-metal-bright);
+  --ds-text: var(--shygon-porcelain);
+  --ds-text-secondary: var(--shygon-copy);
+  --ds-text-tertiary: var(--shygon-muted);
+  --ds-surface: var(--shygon-ink);
+  --ds-surface-raised: var(--shygon-surface-raised);
+  --ds-border: var(--shygon-line);
+  --ds-border-control: var(--shygon-line-strong);
+  --ds-border-selected: var(--shygon-metal);
+  --ds-action-bg: var(--shygon-metal);
+  --ds-action-bg-hover: var(--shygon-metal-bright);
+  --ds-action-fg: #17140d;
+  color: var(--shygon-porcelain);
+  background: var(--shygon-ink);
+  font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body:has(.storefront) ::selection {
+  color: var(--shygon-ink);
+  background: var(--shygon-metal-bright);
+}
+
+body:has(.storefront) :focus-visible {
+  outline: 2px solid var(--shygon-metal-bright);
+  outline-offset: 3px;
+}
+
+/* Shared customer account and checkout shell. These hooks already exist in
+   AppShell.tsx, Checkout.tsx, and the shared app stylesheet. */
+body:has(.storefront) .app {
+  min-height: 100svh;
+  color: var(--shygon-porcelain);
+  background:
+    radial-gradient(780px 520px at 84% -12%, rgba(201, 180, 134, 0.1), transparent 67%),
+    var(--shygon-ink);
+}
+
+body:has(.storefront) .app-topbar {
+  border-color: var(--shygon-line);
+  background: rgba(9, 10, 12, 0.84);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(22px) saturate(1.12);
+}
+
+body:has(.storefront) .app-nav,
+body:has(.storefront) .panel,
+body:has(.storefront) .modal {
+  border: 1px solid var(--shygon-line);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+  box-shadow: var(--shygon-shadow-soft);
+}
+
+body:has(.storefront) .app-nav-link {
+  border-radius: 11px;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+body:has(.storefront) .app-nav-link:hover {
+  transform: translateX(2px);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+body:has(.storefront) .app-nav-link[aria-current="page"] {
+  color: var(--shygon-metal-bright);
+  background: rgba(201, 180, 134, 0.12);
+  box-shadow: inset 2px 0 var(--shygon-metal);
+}
+
+body:has(.storefront) .app-page-head h1 {
+  color: var(--shygon-porcelain);
+  letter-spacing: -0.045em;
+}
+
+body:has(.storefront) .panel {
+  border-radius: var(--shygon-radius-panel);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+body:has(.storefront) .panel-head,
+body:has(.storefront) .panel-row {
+  border-color: var(--shygon-line);
+}
+
+body:has(.storefront) .btn {
+  min-height: 46px;
+  border-radius: 999px;
+  letter-spacing: 0.035em;
+  transition: transform 180ms var(--shygon-ease), background 180ms ease, border-color 180ms ease;
+}
+
+body:has(.storefront) .btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+body:has(.storefront) .btn-blue {
+  color: #17140d;
+  background: var(--shygon-metal);
+  border-color: var(--shygon-metal);
+}
+
+body:has(.storefront) .btn-blue:hover:not(:disabled) {
+  color: #17140d;
+  background: var(--shygon-metal-bright);
+  border-color: var(--shygon-metal-bright);
+}
+
+body:has(.storefront) .btn-ghost {
+  color: var(--shygon-porcelain);
+  background: rgba(255, 255, 255, 0.035);
+  border-color: var(--shygon-line-strong);
+}
+
+body:has(.storefront) .btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.085);
+}
+
+body:has(.storefront) .field .input,
+body:has(.storefront) .field .textarea,
+body:has(.storefront) .input,
+body:has(.storefront) .textarea {
+  min-height: 46px;
+  color: var(--shygon-porcelain);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--shygon-line-field);
+  border-radius: var(--shygon-radius-control);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+body:has(.storefront) .field .input:focus,
+body:has(.storefront) .field .textarea:focus,
+body:has(.storefront) .input:focus,
+body:has(.storefront) .textarea:focus {
+  border-color: var(--shygon-metal);
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 0 3px rgba(201, 180, 134, 0.15);
+}
+
+/* Integration change: the `border` shorthand above would otherwise hide the
+   error edge that Checkout, Settings and the Tap editor set via aria-invalid. */
+body:has(.storefront) .input[aria-invalid="true"],
+body:has(.storefront) .textarea[aria-invalid="true"] {
+  border-color: var(--shygon-danger);
+}
+
+body:has(.storefront) .field-error { color: var(--shygon-danger); }
+body:has(.storefront) .state {
+  border: 1px dashed rgba(201, 180, 134, 0.34);
+  border-radius: var(--shygon-radius-card);
+  background: radial-gradient(ellipse at 50% 0%, rgba(201, 180, 134, 0.08), transparent 70%);
+}
+
+body:has(.storefront) .skeleton {
+  background: linear-gradient(100deg, #17191b 20%, #26282a 38%, #17191b 58%);
+  background-size: 220% 100%;
+}
+
+body:has(.storefront) .toast {
+  border: 1px solid var(--shygon-line-strong);
+  border-radius: 16px;
+  background: rgba(20, 22, 24, 0.96);
+  box-shadow: var(--shygon-shadow-deep);
+  backdrop-filter: blur(20px);
+}
+
+/* Marketing home: preserve its authored hero and working pointer-driven card.
+   These refinements add material and depth without replacing its interactions. */
+body:has(.storefront) .hero {
+  background:
+    radial-gradient(ellipse at 77% 44%, rgba(201, 180, 134, 0.1), transparent 38%),
+    var(--shygon-ink);
+}
+
+body:has(.storefront) .hero-grid {
+  opacity: 0.22;
+  background-size: 88px 88px;
+}
+
+body:has(.storefront) .hero-copy h1 {
+  letter-spacing: -0.065em;
+}
+
+body:has(.storefront) .hero-copy h1 .accent-line,
+body:has(.storefront) .eyebrow svg,
+body:has(.storefront) .hero-proof svg {
+  color: var(--shygon-metal-bright);
+}
+
+body:has(.storefront) .hero-product {
+  perspective: 1500px;
+  transform-style: preserve-3d;
+}
+
+body:has(.storefront) .hero-card-float {
+  filter: drop-shadow(0 38px 40px rgba(0, 0, 0, 0.48));
+}
+
+body:has(.storefront) .tilt-card-inner {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 30px 76px rgba(0, 0, 0, 0.36);
+  transition: transform 260ms var(--shygon-ease), box-shadow 260ms ease;
+}
+
+body:has(.storefront) .card-shine {
+  background: radial-gradient(260px circle at var(--shine-x, 50%) var(--shine-y, 50%), rgba(255, 255, 255, 0.22), transparent 68%);
+  mix-blend-mode: screen;
+  opacity: 0.7;
+}
+
+body:has(.storefront) .hero-chip {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(17, 19, 20, 0.78);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px);
+}
+
+body:has(.storefront) .button:not(.button-secondary) {
+  color: #17140d;
+  background: var(--shygon-metal);
+  border-color: var(--shygon-metal);
+}
+
+body:has(.storefront) .button:not(.button-secondary):hover {
+  color: #17140d;
+  background: var(--shygon-metal-bright);
+}
+
+body:has(.storefront) .button-secondary {
+  color: var(--shygon-porcelain);
+  background: rgba(255, 255, 255, 0.035);
+  border-color: var(--shygon-line-strong);
+}
+
+body:has(.storefront) .product-card {
+  border-color: var(--shygon-line);
+  border-radius: var(--shygon-radius-card);
+  background: linear-gradient(155deg, #17191b, #0e1012 72%);
+  box-shadow: var(--shygon-shadow-soft);
+}
+
+body:has(.storefront) .product-card:hover {
+  border-color: rgba(201, 180, 134, 0.48);
+  box-shadow: 0 28px 74px rgba(0, 0, 0, 0.4);
+}
+
+body:has(.storefront) .product-card-image {
+  background: radial-gradient(ellipse at 50% 52%, rgba(201, 180, 134, 0.12), transparent 44%), #111315;
+}
+
+body:has(.storefront) .product-card-image::before {
+  border-color: rgba(201, 180, 134, 0.2);
+  box-shadow: 0 0 0 22px rgba(201, 180, 134, 0.025), 0 0 70px rgba(201, 180, 134, 0.08);
+}
+
+body:has(.storefront) .product-card-copy {
+  background: transparent;
+  border-color: var(--shygon-line);
+}
+
+body:has(.storefront) .plan-switch,
+body:has(.storefront) .material-row {
+  border-color: var(--shygon-line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+body:has(.storefront) .plan-switch button,
+body:has(.storefront) .material-row button,
+body:has(.storefront) .choice-button {
+  color: var(--shygon-copy);
+  border-color: var(--shygon-line);
+  background: rgba(255, 255, 255, 0.025);
+  transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+body:has(.storefront) .plan-switch button.active,
+body:has(.storefront) .material-row button.active,
+body:has(.storefront) .choice-button[aria-pressed="true"] {
+  color: var(--shygon-metal-bright);
+  border-color: rgba(201, 180, 134, 0.7);
+  background: rgba(201, 180, 134, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(201, 180, 134, 0.1);
+}
+
+body:has(.storefront) .builder-product-stage {
+  border-color: var(--shygon-line);
+  border-radius: 28px;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(201, 180, 134, 0.13), transparent 35%),
+    radial-gradient(ellipse at 50% 100%, rgba(121, 132, 139, 0.1), transparent 45%),
+    #101214;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.055), var(--shygon-shadow-soft);
+}
+
+body:has(.storefront) .order-summary {
+  border: 1px solid var(--shygon-line);
+  border-radius: var(--shygon-radius-card);
+  background: linear-gradient(150deg, rgba(201, 180, 134, 0.1), rgba(255, 255, 255, 0.025) 45%), #121416;
+  box-shadow: var(--shygon-shadow-soft);
+}
+
+body:has(.storefront) .cart-overlay,
+body:has(.storefront) .product-detail-modal,
+body:has(.storefront) .demo-modal {
+  background: rgba(4, 5, 6, 0.76);
+  backdrop-filter: blur(14px) saturate(0.78);
+}
+
+body:has(.storefront) .cart-drawer,
+body:has(.storefront) .product-detail-card,
+body:has(.storefront) .demo-modal > * {
+  border-color: var(--shygon-line);
+  background: linear-gradient(145deg, #191b1d, #0e1012);
+  box-shadow: var(--shygon-shadow-deep);
+}
+
+body:has(.storefront) .cart-checkout,
+body:has(.storefront) .mobile-summary-bar > span:last-child {
+  color: #17140d;
+  background: var(--shygon-metal);
+  border-color: var(--shygon-metal);
+}
+
+/* Catalog and standalone product detail currently use Tailwind-heavy markup.
+   Add these explicit hooks to the corresponding JSX nodes; do not use
+   Tailwind utility names as permanent design selectors. */
+body:has(.storefront) .store-page,
+body:has(.storefront) .product-page {
+  min-height: 100svh;
+  color: var(--shygon-porcelain);
+  background:
+    radial-gradient(900px 540px at 82% -8%, rgba(201, 180, 134, 0.11), transparent 65%),
+    radial-gradient(700px 520px at -12% 45%, rgba(91, 105, 116, 0.1), transparent 65%),
+    var(--shygon-ink);
+}
+
+body:has(.storefront) .store-header,
+body:has(.storefront) .product-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--shygon-line);
+  background: rgba(9, 10, 12, 0.82);
+  backdrop-filter: blur(22px) saturate(1.15);
+}
+
+body:has(.storefront) .store-main,
+body:has(.storefront) .product-main {
+  width: min(1320px, calc(100% - 56px));
+  margin-inline: auto;
+  padding-block: clamp(34px, 5vw, 72px) clamp(76px, 9vw, 128px);
+}
+
+body:has(.storefront) .store-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+body:has(.storefront) .store-toolbar h1,
+body:has(.storefront) .product-copy h1 {
+  max-width: 14ch;
+  margin: 0;
+  color: var(--shygon-porcelain);
+  font-size: clamp(2.6rem, 5.5vw, 5.6rem);
+  font-weight: 560;
+  line-height: 0.98;
+  letter-spacing: -0.065em;
+}
+
+body:has(.storefront) .store-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  align-items: start;
+  gap: 28px;
+}
+
+body:has(.storefront) .store-filter-panel {
+  position: sticky;
+  top: 92px;
+  overflow: hidden;
+  border: 1px solid var(--shygon-line);
+  border-radius: var(--shygon-radius-panel);
+  background: rgba(255, 255, 255, 0.028);
+}
+
+body:has(.storefront) .store-product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+body:has(.storefront) .store-product-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--shygon-line);
+  border-radius: var(--shygon-radius-card);
+  color: var(--shygon-porcelain);
+  background: linear-gradient(155deg, rgba(255,255,255,.065), rgba(255,255,255,.018) 58%), #101214;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.18);
+  transition: transform 300ms var(--shygon-ease), border-color 250ms ease, box-shadow 300ms ease;
+}
+
+body:has(.storefront) .store-product-media,
+body:has(.storefront) .product-gallery-stage {
+  position: relative;
+  display: grid;
+  min-height: 300px;
+  overflow: hidden;
+  place-items: center;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 50% 48%, rgba(201, 180, 134, 0.18), transparent 36%),
+    radial-gradient(ellipse at 50% 100%, rgba(102, 115, 122, 0.12), transparent 48%),
+    #111315;
+}
+
+body:has(.storefront) .store-product-media::before,
+body:has(.storefront) .product-gallery-stage::before {
+  position: absolute;
+  z-index: -1;
+  width: min(72%, 350px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(201, 180, 134, 0.19);
+  border-radius: 50%;
+  box-shadow: 0 0 0 24px rgba(201, 180, 134, 0.025), 0 0 84px rgba(201, 180, 134, 0.08);
+  content: "";
+}
+
+body:has(.storefront) .store-product-media img,
+body:has(.storefront) .product-gallery-stage img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: auto;
+  max-width: min(78%, 520px);
+  max-height: 78%;
+  object-fit: contain;
+  filter: drop-shadow(0 32px 28px rgba(0, 0, 0, 0.55));
+  transform: perspective(1000px) rotateX(4deg) rotateY(-8deg);
+  transition: transform 480ms var(--shygon-ease), filter 480ms ease;
+}
+
+body:has(.storefront) .store-product-info {
+  display: flex;
+  min-height: 230px;
+  flex-direction: column;
+  padding: 22px;
+}
+
+body:has(.storefront) .store-product-info h2,
+body:has(.storefront) .store-product-info h3 {
+  margin: 7px 0 0;
+  color: var(--shygon-porcelain);
+  font-size: clamp(1.25rem, 2vw, 1.8rem);
+  font-weight: 560;
+  letter-spacing: -0.04em;
+}
+
+body:has(.storefront) .store-card-footer {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--shygon-line);
+}
+
+body:has(.storefront) .product-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(330px, 0.72fr);
+  align-items: start;
+  gap: clamp(28px, 5vw, 76px);
+}
+
+body:has(.storefront) .product-gallery-stage {
+  min-height: clamp(380px, 52vw, 660px);
+  border: 1px solid var(--shygon-line);
+  border-radius: 28px;
+  box-shadow: inset 0 1px rgba(255,255,255,.045), var(--shygon-shadow-soft);
+  perspective: 1400px;
+}
+
+body:has(.storefront) .product-configurator {
+  position: sticky;
+  top: 92px;
+  padding: clamp(20px, 2.5vw, 32px);
+  border: 1px solid var(--shygon-line);
+  border-radius: var(--shygon-radius-card);
+  background: linear-gradient(155deg, rgba(201,180,134,.09), rgba(255,255,255,.025) 43%), #111315;
+  box-shadow: var(--shygon-shadow-soft);
+}
+
+body:has(.storefront) .product-option {
+  min-height: 54px;
+  padding: 12px 14px;
+  border: 1px solid var(--shygon-line-strong);
+  border-radius: var(--shygon-radius-control);
+  color: var(--shygon-copy);
+  background: rgba(255,255,255,.025);
+  text-align: left;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+body:has(.storefront) .product-option:hover { transform: translateY(-1px); }
+body:has(.storefront) .product-option[aria-pressed="true"] {
+  color: var(--shygon-metal-bright);
+  border-color: var(--shygon-metal);
+  background: rgba(201,180,134,.11);
+  box-shadow: inset 0 0 0 1px rgba(201,180,134,.1);
+}
+
+body:has(.storefront) .product-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+body:has(.storefront) .product-trust {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--shygon-line);
+  border-radius: var(--shygon-radius-panel);
+  color: var(--shygon-muted);
+  background: rgba(255,255,255,.025);
+}
+
+/* Intentional pointer-only lift. Touch and keyboard users get the same content
+   and selection feedback without hover being required. */
+@media (hover: hover) and (pointer: fine) {
+  body:has(.storefront) .store-product-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(201, 180, 134, 0.46);
+    box-shadow: 0 28px 66px rgba(0, 0, 0, 0.34);
+  }
+
+  body:has(.storefront) .store-product-card:hover .store-product-media img {
+    filter: drop-shadow(0 42px 34px rgba(0, 0, 0, 0.64));
+    transform: perspective(1000px) rotateX(0deg) rotateY(-2deg) translateY(-4px) scale(1.035);
+  }
+}
+
+@media (max-width: 980px) {
+  body:has(.storefront) .store-layout { grid-template-columns: 1fr; }
+  body:has(.storefront) .store-filter-panel { position: static; }
+  body:has(.storefront) .product-detail-layout { grid-template-columns: minmax(0, 1fr) minmax(300px, .82fr); gap: 24px; }
+}
+
+@media (max-width: 700px) {
+  body:has(.storefront) .store-main,
+  body:has(.storefront) .product-main { width: min(100% - 32px, 560px); padding-block: 28px 88px; }
+  body:has(.storefront) .store-toolbar { align-items: stretch; flex-direction: column; gap: 18px; }
+  body:has(.storefront) .store-product-grid { grid-template-columns: 1fr; gap: 14px; }
+  body:has(.storefront) .store-product-media { min-height: 270px; }
+  body:has(.storefront) .product-detail-layout { grid-template-columns: 1fr; }
+  body:has(.storefront) .product-gallery-stage { min-height: 330px; border-radius: 22px; }
+  body:has(.storefront) .product-configurator { position: static; padding: 20px; }
+  body:has(.storefront) .app-main { padding-inline: 16px; }
+  body:has(.storefront) .app-nav { max-width: 100%; }
+  body:has(.storefront) .field-row { grid-template-columns: 1fr; gap: 0; }
+  body:has(.storefront) .cart-drawer { width: 100%; padding: 20px 18px max(20px, env(safe-area-inset-bottom)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(.storefront) *,
+  body:has(.storefront) *::before,
+  body:has(.storefront) *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

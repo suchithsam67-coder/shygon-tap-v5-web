@@ -1,0 +1,172 @@
+/* =============================================================================
+ * SHYGON storefront design tokens. See DESIGN_SYSTEM.md for the rules.
+ *
+ * Every name carries a `--ds-` prefix. The Tailwind theme already defines
+ * `--color-text-primary` (read by the app root that also wraps the public Tap),
+ * so the brief's names used verbatim would have collided with it.
+ *
+ * These are inert until the storefront mounts: the activation block below is
+ * scoped to `body:has(.storefront)`, and only AccountApp renders `.storefront`.
+ * The public Tap — the page a customer's card opens — never mounts it, so none
+ * of this reaches the product.
+ * ========================================================================== */
+
+:root {
+  /* --- Foundations: from the design brief, verbatim ----------------------- */
+  --ds-color-text-primary: #f7f3ea;
+  --ds-color-surface-base: #090a0c;
+  --ds-color-text-tertiary: #a8a29a;
+  --ds-color-text-inverse: #ded8cd;
+  --ds-color-surface-muted: #1b1b1c;
+  --ds-color-surface-strong: #d8c49a;
+
+  --ds-font-size-xs: 12px;
+  --ds-font-size-sm: 13px;
+  --ds-font-size-md: 14px;
+  --ds-font-size-lg: 15px;
+  --ds-font-size-xl: 16px;
+  --ds-font-size-2xl: 20px;
+  --ds-font-size-3xl: 26px;
+  --ds-font-size-4xl: 40px;
+  --ds-font-size-base: 15px;
+  --ds-font-weight-base: 400;
+  --ds-line-height-base: 21px;
+
+  --ds-space-1: 16px;
+  --ds-space-2: 22.5px;
+  --ds-space-3: 23px;
+  --ds-space-4: 24px;
+  --ds-space-5: 28px;
+  --ds-space-6: 32px;
+  --ds-space-7: 40px;
+  --ds-space-8: 56px;
+
+  --ds-radius-xs: 4px;
+  --ds-radius-sm: 8px;
+
+  --ds-motion-duration-instant: 200ms;
+  --ds-motion-duration-fast: 300ms;
+
+  /* --- Additions: required by the brief's own rules, missing from it ------ */
+
+  /* The brief's typeface, Clarkson, is Squarespace's proprietary face and is
+     not licensed for other brands. Its own fallback stack is used instead;
+     Arial covers Windows, which has no Helvetica. */
+  --ds-font-family-stack: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --ds-font-weight-strong: 600;
+  --ds-line-height-tight: 1.15; /* headings: 21px would collide at 26–40px */
+
+  /* White and #d9d9d9 surfaces need dark text; the brief lists none. */
+  --ds-color-text-on-light: #000000;
+
+  /* Every component must have an error state; the brief defines no colour for
+     one. Each clears 4.5:1 on BOTH surface.base and surface.muted. */
+  --ds-color-state-error: #ff6b6b;   /* 7.57 on base, 4.82 on muted */
+  --ds-color-state-success: #4ade80; /* 12.05 on base, 7.68 on muted */
+  --ds-color-state-warning: #fbbf24; /* 12.58 on base, 8.02 on muted */
+  --ds-color-focus: #ffffff;         /* 21:1 on base */
+
+  /* The spacing scale starts at 16px; component internals need smaller steps. */
+  --ds-space-0-25: 4px;
+  --ds-space-0-5: 8px;
+  --ds-space-0-75: 12px;
+
+  /* Circles and pills are shapes, not a point on the radius scale. */
+  --ds-radius-full: 999px;
+
+  --ds-motion-easing: cubic-bezier(0.2, 0, 0, 1);
+
+  /* --- Semantic roles: components use THESE, never a foundation directly -- */
+  --ds-text: var(--ds-color-text-primary);
+  /* #ddd — passes on base (15.5) and muted (9.9). */
+  --ds-text-secondary: var(--ds-color-text-inverse);
+  /* #898989 — base ONLY (6.0). On muted it is 3.83: an AA failure. */
+  --ds-text-tertiary: var(--ds-color-text-tertiary);
+
+  --ds-surface: var(--ds-color-surface-base);
+  --ds-surface-raised: var(--ds-color-surface-muted);
+
+  --ds-action-bg: var(--ds-color-surface-strong);
+  --ds-action-bg-hover: #ead9af;
+  --ds-action-fg: var(--ds-color-text-on-light);
+
+  /* #2f2f2f is 1.57:1 on black — decoration only, never a control's edge. */
+  --ds-border: var(--ds-color-surface-muted);
+  /* #898989 is 6.0:1 — meets WCAG 1.4.11 (3:1) for control boundaries. */
+  --ds-border-control: var(--ds-color-text-tertiary);
+  --ds-border-selected: var(--ds-color-text-primary);
+}
+
+/* =============================================================================
+ * Activation — storefront only
+ * ========================================================================== */
+
+html:has(.storefront),
+body:has(.storefront) {
+  background: var(--ds-surface);
+}
+
+body:has(.storefront) {
+  color: var(--ds-text);
+  font-family: var(--ds-font-family-stack);
+  font-size: var(--ds-font-size-base);
+  font-weight: var(--ds-font-weight-base);
+  line-height: var(--ds-line-height-base);
+
+  /* Legacy names still read by inline styles across the pages, re-pointed so
+     they resolve to the system instead of the old light theme. */
+  --ink: var(--ds-text);
+  --muted: var(--ds-text-tertiary);
+  --line: var(--ds-border);
+  --paper: var(--ds-surface);
+  --white: var(--ds-surface);
+  --blue: var(--ds-text);
+  --blue-dark: var(--ds-color-surface-strong);
+  --blue-soft: var(--ds-surface-raised);
+  --green: var(--ds-color-state-success);
+  --shadow: none;
+  --radius: var(--ds-radius-sm);
+  --aura-blue: var(--ds-text);
+  --aura-ink: var(--ds-text);
+  --aura-line: var(--ds-border);
+  --aura-shadow: none;
+  --aura-shadow-lg: none;
+  --app-radius: var(--ds-radius-sm);
+  --app-radius-lg: var(--ds-radius-sm);
+  --app-ring: 0 0 0 2px var(--ds-color-focus);
+  --app-lift: none;
+  --app-lift-sm: none;
+  --ease-out: var(--ds-motion-easing);
+
+  /* The Tailwind theme colours that storefront utilities read. */
+  --color-bg-primary: var(--ds-surface);
+  --color-bg-secondary: var(--ds-surface);
+  --color-bg-tertiary: var(--ds-surface-raised);
+  --color-text-primary: var(--ds-text);
+  --color-text-secondary: var(--ds-text-tertiary);
+  --color-text-muted: var(--ds-text-tertiary);
+  --color-glass: var(--ds-surface);
+  --color-glass-border: var(--ds-border);
+  --color-accent-blue: var(--ds-text);
+  --color-accent-cyan: var(--ds-text);
+  --color-accent-purple: var(--ds-text);
+  --color-accent-pink: var(--ds-text);
+}
+
+/* Focus must always be visible: 2px white ring, 21:1 on black. The previous
+   ring was 18%-alpha blue — close to invisible. */
+body:has(.storefront) :focus-visible {
+  outline: 2px solid var(--ds-color-focus);
+  outline-offset: 2px;
+}
+
+body:has(.storefront) ::selection {
+  background: var(--ds-action-bg);
+  color: var(--ds-action-fg);
+}
+
+body:has(.storefront) h1,
+body:has(.storefront) h2,
+body:has(.storefront) h3 {
+  line-height: var(--ds-line-height-tight);
+}

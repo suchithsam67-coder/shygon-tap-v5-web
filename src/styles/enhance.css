@@ -1,0 +1,369 @@
+/* ============================================================================
+ * Brand, card art and interaction polish (storefront and account)
+ * ============================================================================
+ * Loaded after theme-light.css and motion.css. */
+
+:root { --brand-gold: #d4ab66; }
+html[data-theme='light'] { --brand-gold: #9a7437; }
+
+/* ------------------------------------------------------------ the logo --- */
+
+.brand-logo-mark { display: block; height: 100%; width: auto; overflow: visible; }
+
+.brand-mark.brand-mark-logo {
+  width: auto;
+  height: 40px;
+  transform: none;
+  clip-path: none;
+  background: none;
+  color: var(--brand-gold);
+  display: grid;
+  place-items: center;
+}
+.brand-mark.brand-mark-logo::after { content: none; }
+.brand-mark-logo .brand-logo-mark {
+  height: 38px;
+  filter: drop-shadow(0 4px 12px rgba(212, 171, 102, 0.22));
+  transition: transform 0.5s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+.brand:hover .brand-mark-logo .brand-logo-mark,
+.brand:focus-visible .brand-mark-logo .brand-logo-mark { transform: rotate(-6deg) scale(1.06); }
+
+.store-brand { display: inline-flex; align-items: center; gap: 10px; }
+.store-brand-mark {
+  height: 30px;
+  flex: 0 0 auto;
+  color: var(--brand-gold);
+  transition: transform 0.5s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+.store-brand:hover .store-brand-mark { transform: rotate(-6deg) scale(1.06); }
+
+.tap-footnote-mark { display: inline-block; height: 14px; margin-right: 5px; vertical-align: -2px; color: currentColor; opacity: 0.85; }
+.ebill-brand { display: flex; align-items: center; gap: 10px; }
+.ebill-mark { height: 30px; color: #b08a4e; }
+.pay-card-brand { display: inline-flex; align-items: center; gap: 6px; }
+.pay-card-mark { height: 15px; color: #d4ab66; }
+
+/* The loading screen's logo is drawn in index.html; this keeps React's copy
+   the same size once the stylesheet has loaded. */
+.boot-logo { width: 32px; height: 60px; }
+
+/* ------------------------------------------------------------ card art --- */
+/* The cards are transparent cut-outs with their own rounded corners: no frame,
+   a real shadow, and the shine clipped to the card's corner radius. */
+
+body:has(.storefront) .tilt-card-inner:has(> img[src*='/assets/cards/']) {
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+  border-radius: 3.8% / 6%;
+}
+.tilt-card img[src*='/assets/cards/'],
+.product-gallery-stage img[src*='/assets/cards/'],
+.store-product-media img[src*='/assets/cards/'],
+.cinema-card img[src*='/assets/cards/'] {
+  filter: drop-shadow(0 22px 26px rgba(0, 0, 0, 0.42)) drop-shadow(0 5px 9px rgba(0, 0, 0, 0.28));
+}
+.product-card-image .tilt-card img[src*='/assets/cards/'] { width: min(100%, 460px); max-height: 100%; }
+
+.dock-thumb img,
+.cart-item-image img,
+.product-thumb img,
+.product-detail-thumbs img,
+.product-related img { object-fit: contain; }
+.dock-thumb { display: grid; place-items: center; padding: 3px; }
+
+/* Turning a card over, and switching material or finish. */
+.card-flip {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  perspective: 1200px;
+}
+.card-flip:focus-visible { outline: 2px solid var(--ds-color-focus); outline-offset: 6px; border-radius: 18px; }
+.card-art-swap { animation: card-art-swap 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes card-art-swap {
+  from { opacity: 0; transform: rotateY(-22deg) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+.product-gallery-stage { position: relative; }
+.product-gallery-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  margin: 0;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(9, 10, 12, 0.62);
+  color: #e9e4da;
+  font-size: 12px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+.product-gallery-caption strong { color: #e6c98c; }
+@media (max-width: 640px) { .product-gallery-caption span { display: none; } }
+
+.product-thumb-back { position: relative; }
+.product-thumb-back span,
+.product-detail-thumbs button span { font-size: 11px; }
+.product-thumb-back span {
+  position: absolute;
+  inset: auto 4px 3px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.04em;
+  color: var(--ds-text-secondary);
+}
+
+/* ------------------------------------------------------ pricing clarity --- */
+
+.price-explainer {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--ds-border);
+  background: var(--ds-accent-soft, rgba(201, 180, 134, 0.1));
+  color: var(--ds-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.price-explainer strong { display: block; margin-top: 3px; color: var(--ds-text); }
+
+/* "Selected" on a paid experience turns into "Remove" under the pointer. */
+.tier-deck-select .tier-remove-label { display: none; }
+.tier-deck-select .tier-selected-label,
+.tier-deck-select .tier-remove-label { align-items: center; gap: 6px; }
+.tier-deck-select .tier-selected-label { display: inline-flex; }
+.tier-deck-select.is-selected:hover .tier-selected-label,
+.tier-deck-select.is-selected:focus-visible .tier-selected-label { display: none; }
+.tier-deck-select.is-selected:hover .tier-remove-label,
+.tier-deck-select.is-selected:focus-visible .tier-remove-label { display: inline-flex; }
+
+/* --------------------------------------------------------- how it works --- */
+
+.steps-list article { display: block; min-height: 0; padding: 0; }
+.steps-list .step-toggle {
+  width: 100%;
+  min-height: 145px;
+  padding: 24px 10px;
+  display: grid;
+  grid-template-columns: 70px 55px 1fr 1.4fr 34px;
+  align-items: center;
+  gap: 22px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.steps-list .step-toggle:focus-visible { outline: 2px solid var(--ds-color-focus); outline-offset: -2px; border-radius: 12px; }
+.steps-list .step-arrow {
+  color: var(--ds-text-tertiary);
+  transition: transform 0.45s cubic-bezier(0.34, 1.4, 0.5, 1), color 0.2s ease;
+}
+.steps-list article:hover .step-arrow { color: var(--ds-text); transform: translate(3px, 3px); }
+.steps-list article.is-open .step-arrow { color: var(--ds-accent); transform: rotate(180deg); }
+.steps-list article.is-open { background: var(--ds-accent-soft, rgba(201, 180, 134, 0.08)); }
+.step-more {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 0 44px 26px calc(70px + 55px + 44px + 10px);
+  animation: step-open 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.step-more[hidden] { display: none; }
+.steps-list .step-more > * { grid-column: 1 / -1; }
+.step-more p { margin: 0; max-width: 68ch; color: var(--ds-text-secondary); font-size: var(--ds-font-size-md, 16px); line-height: 1.65; }
+@keyframes step-open { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 1100px) {
+  .steps-list .step-toggle { grid-template-columns: 50px 48px 1fr 28px; gap: 12px; }
+  .steps-list .step-toggle p { grid-column: 3 / 5; }
+  .steps-list .step-toggle .step-arrow { grid-column: 4; grid-row: 1; }
+  .step-more { padding: 0 20px 22px calc(50px + 48px + 24px + 10px); }
+}
+@media (max-width: 640px) {
+  .steps-list .step-toggle { min-height: 0; padding: 22px 5px; grid-template-columns: 35px 42px 1fr 22px; }
+  .steps-list .step-toggle p { grid-column: 2 / 5; }
+  .step-more { padding: 0 8px 22px 8px; }
+}
+
+/* ------------------------------------------------ account menu scrolling --- */
+
+.scroll-rail { position: relative; }
+.scroll-rail-arrow { display: none; }
+
+@media (min-width: 1025px) {
+  /* The sidebar: a short screen scrolls the list instead of cutting it off. */
+  .app-nav .app-nav-list {
+    max-height: calc(100vh - 210px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ds-border-control) transparent;
+  }
+}
+
+@media (max-width: 1024px) {
+  .scroll-rail-arrow:not([hidden]) {
+    position: absolute;
+    top: 50%;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--ds-border-control);
+    background: var(--ds-surface-raised);
+    color: var(--ds-text);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    animation: rail-arrow-in 0.25s ease-out both;
+  }
+  .scroll-rail-arrow.is-left { left: 6px; }
+  .scroll-rail-arrow.is-right { right: 6px; }
+  .scroll-rail-arrow:hover { border-color: var(--ds-accent); background: var(--ds-surface); transform: translateY(-50%) scale(1.08); }
+  .scroll-rail-arrow:active { transform: translateY(-50%) scale(0.94); }
+
+  .scroll-rail .app-nav-list { scroll-behavior: auto; }
+  .scroll-rail[data-more-left] .app-nav-list {
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 64px);
+    mask-image: linear-gradient(90deg, transparent 0, #000 64px);
+  }
+  .scroll-rail[data-more-right] .app-nav-list {
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 64px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 64px), transparent);
+  }
+  .scroll-rail[data-more-left][data-more-right] .app-nav-list {
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 64px, #000 calc(100% - 64px), transparent);
+    mask-image: linear-gradient(90deg, transparent 0, #000 64px, #000 calc(100% - 64px), transparent);
+  }
+}
+@keyframes rail-arrow-in { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-art-swap,
+  .step-more,
+  .scroll-rail-arrow { animation: none !important; }
+  .brand-mark-logo .brand-logo-mark,
+  .store-brand-mark,
+  .steps-list .step-arrow { transition: none; }
+}
+
+/* ------------------------------------------------ the customer's cards --- */
+
+.card-list-art {
+  width: 86px;
+  flex: 0 0 auto;
+  display: block;
+  border-radius: 9px;
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+.card-list-art img { display: block; width: 100%; height: auto; filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.35)); }
+.card-list-art-off,
+.card-list-art-idle { filter: grayscale(0.85); opacity: 0.72; }
+.card-list-design { font-size: 13px; color: var(--ds-text-secondary); }
+
+/* --------------------------------------------------- limited editions --- */
+
+.card-edition,
+.edition-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ds-accent);
+}
+.ebill-edition { display: block; margin-top: 3px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #7a5f26; }
+.edition-note {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ds-accent) 45%, transparent);
+  background: var(--ds-accent-soft, rgba(201, 180, 134, 0.1));
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+.edition-note::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); }
+
+/* ------------------------------------------------- the design collection --- */
+
+.design-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+}
+.design-tile {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ds-border);
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--ds-surface-raised, rgba(255, 255, 255, 0.03));
+  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1), border-color 0.25s ease, box-shadow 0.35s ease;
+}
+.design-tile:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--ds-accent) 50%, transparent); box-shadow: 0 24px 50px rgba(0, 0, 0, 0.28); }
+.design-tile-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 34px 26px;
+  background: radial-gradient(circle at 50% 35%, #34373d, #0b0c0e 72%);
+}
+.design-tile-art img {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: auto;
+  transform: rotate(-3deg);
+  filter: drop-shadow(0 18px 22px rgba(0, 0, 0, 0.5));
+  transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+/* Hover turns the PVC card into its premium metal twin. */
+.design-tile-art .design-tile-alt { opacity: 0; transform: rotate(3deg) scale(0.96); }
+.design-tile:hover .design-tile-art img:first-child,
+.design-tile-art:focus-visible img:first-child { opacity: 0; transform: rotate(-6deg) scale(0.96); }
+.design-tile:hover .design-tile-alt,
+.design-tile-art:focus-visible .design-tile-alt { opacity: 1; transform: rotate(-2deg); }
+.design-tile-art:focus-visible { outline: 2px solid var(--ds-color-focus); outline-offset: -4px; }
+.design-tile-copy { display: grid; gap: 8px; padding: 20px 22px 22px; }
+.design-tile-copy h3 { margin: 4px 0 0; font-size: var(--ds-font-size-xl, 22px); color: var(--ds-text); }
+.design-tile-copy > p:not(.edition-note) { margin: 0; color: var(--ds-text-secondary); font-size: 14px; line-height: 1.55; }
+.design-tile-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; color: var(--ds-text); font-weight: 700; font-size: 14px; }
+
+@media (max-width: 980px) { .design-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; } }
+@media (max-width: 620px) { .design-grid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) {
+  .design-tile, .design-tile-art img { transition: none; }
+}
+
+/* ------------------------------------------------------------ checkout --- */
+
+.checkout-sms-note { margin: -6px 0 4px; font-size: 12px; color: var(--ds-text-tertiary); }
+.checkout-test-mode {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--ds-color-state-warning, #c58a1c);
+  color: var(--ds-text);
+  background: color-mix(in srgb, var(--ds-color-state-warning, #c58a1c) 12%, transparent);
+  font-size: 12px;
+  font-weight: 600;
+}

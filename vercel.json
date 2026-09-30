@@ -1,0 +1,190 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/shygontap",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.shygontech.com"
+        }
+      ],
+      "destination": "https://shygontech.com/:path*",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/shygontap",
+      "destination": "/shygontap.html"
+    },
+    {
+      "source": "/shygontap/store",
+      "destination": "/shygontap/store.html"
+    },
+    {
+      "source": "/shygontap/store/business",
+      "destination": "/shygontap/store/business.html"
+    },
+    {
+      "source": "/shygontap/store/restaurant",
+      "destination": "/shygontap/store/restaurant.html"
+    },
+    {
+      "source": "/shygontap/store/event",
+      "destination": "/shygontap/store/event.html"
+    },
+    {
+      "source": "/shygontap/store/google-review",
+      "destination": "/shygontap/store/google-review.html"
+    },
+    {
+      "source": "/shygontap/store/obsidian-smoke",
+      "destination": "/shygontap/store/obsidian-smoke.html"
+    },
+    {
+      "source": "/shygontap/store/rose-marble",
+      "destination": "/shygontap/store/rose-marble.html"
+    },
+    {
+      "source": "/shygontap/store/carbon-aurum",
+      "destination": "/shygontap/store/carbon-aurum.html"
+    },
+    {
+      "source": "/shygontap/store/sandstone-jaali",
+      "destination": "/shygontap/store/sandstone-jaali.html"
+    },
+    {
+      "source": "/shygontap/store/sapphire-night",
+      "destination": "/shygontap/store/sapphire-night.html"
+    },
+    {
+      "source": "/shygontap/store/aurora-glass",
+      "destination": "/shygontap/store/aurora-glass.html"
+    },
+    {
+      "source": "/shygontap/privacy-policy",
+      "destination": "/shygontap/privacy-policy.html"
+    },
+    {
+      "source": "/shygontap/terms",
+      "destination": "/shygontap/terms.html"
+    },
+    {
+      "source": "/shygontap/cookie-policy",
+      "destination": "/shygontap/cookie-policy.html"
+    },
+    {
+      "source": "/shygontap/refund-policy",
+      "destination": "/shygontap/refund-policy.html"
+    },
+    {
+      "source": "/shygontap/shipping-policy",
+      "destination": "/shygontap/shipping-policy.html"
+    },
+    {
+      "source": "/shygontap/auth",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/account",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/tap",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/tiers",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/customize",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/qr",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/cards",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/customizations",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/checkout",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/orders",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/notifications",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/analytics",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/support",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/settings",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/t/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/tap/:path*",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://checkout.razorpay.com https://*.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.razorpay.com; frame-src https://*.razorpay.com; media-src 'self' blob: https:; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), browsing-topics=(), payment=(self \"https://api.razorpay.com\")"
+        }
+      ]
+    }
+  ]
+}

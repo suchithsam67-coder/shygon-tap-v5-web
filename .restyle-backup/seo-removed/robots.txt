@@ -1,0 +1,22 @@
+# shygontech.com
+
+User-agent: *
+Allow: /
+
+# Signed-in surfaces. These are client-routed, so a crawler only ever receives
+# the empty app shell -- indexing them would publish a dozen identical blank
+# pages under the domain.
+Disallow: /shygontap/account
+Disallow: /shygontap/tap
+Disallow: /shygontap/tiers
+Disallow: /shygontap/customize
+Disallow: /shygontap/qr
+Disallow: /shygontap/customizations
+Disallow: /shygontap/checkout
+Disallow: /shygontap/orders
+Disallow: /shygontap/notifications
+Disallow: /shygontap/analytics
+Disallow: /shygontap/support
+Disallow: /shygontap/settings
+
+Sitemap: https://shygontech.com/sitemap.xml

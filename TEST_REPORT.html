@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Independent production-readiness test report for the SHYGON Tap V5 customer web application.">
+<meta name="robots" content="noindex">
+<style>
+  html { color-scheme: light dark; }
+  body { margin: 0; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+<title>SHYGON Tap V5 Readiness Audit</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#F7F8FB;
+    --surface:#FFFFFF;
+    --sunken:#EEF1F7;
+    --ink:#0E1420;
+    --ink-2:#3A4457;
+    --ink-3:#6B7689;
+    --rule:#DCE1EB;
+    --rule-2:#C6CDDB;
+    --accent:#2563EB;
+    --accent-soft:#E7EEFD;
+    --pass:#0F7B52;   --pass-bg:#E3F3EB;
+    --fail:#C0392F;   --fail-bg:#FBE8E6;
+    --block:#9A6206;  --block-bg:#FBF0DC;
+    --part:#6D4AB8;   --part-bg:#EFEAFA;
+    --none:#6B7689;   --none-bg:#E9ECF3;
+    --shadow:0 1px 2px rgba(14,20,32,.06),0 8px 24px -12px rgba(14,20,32,.18);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#0B0F18; --surface:#131926; --sunken:#0F1522;
+      --ink:#EEF1F7; --ink-2:#AFB9CB; --ink-3:#7C8799;
+      --rule:#232C3D; --rule-2:#313C52;
+      --accent:#6B9BFF; --accent-soft:#16233D;
+      --pass:#54C495; --pass-bg:#10281F;
+      --fail:#F4837A; --fail-bg:#2C1614;
+      --block:#E0AE5C; --block-bg:#2A1F0D;
+      --part:#AE93F0; --part-bg:#1E1733;
+      --none:#8B95A7; --none-bg:#1A2130;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0B0F18; --surface:#131926; --sunken:#0F1522;
+    --ink:#EEF1F7; --ink-2:#AFB9CB; --ink-3:#7C8799;
+    --rule:#232C3D; --rule-2:#313C52;
+    --accent:#6B9BFF; --accent-soft:#16233D;
+    --pass:#54C495; --pass-bg:#10281F;
+    --fail:#F4837A; --fail-bg:#2C1614;
+    --block:#E0AE5C; --block-bg:#2A1F0D;
+    --part:#AE93F0; --part-bg:#1E1733;
+    --none:#8B95A7; --none-bg:#1A2130;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.7);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+    font-size:15.5px; line-height:1.62; margin:0;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1020px;margin:0 auto;padding:40px 24px 96px}
+  h1,h2,h3,h4{font-family:Archivo,ui-sans-serif,system-ui,sans-serif;text-wrap:balance;margin:0}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.88em}
+  code{background:var(--sunken);border:1px solid var(--rule);border-radius:4px;padding:.08em .36em}
+  a{color:var(--accent)}
+  p{margin:0}
+  .prose{max-width:68ch}
+
+  /* ---- masthead ---- */
+  .eyebrow{
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);
+  }
+  .masthead{display:flex;flex-direction:column;gap:14px;padding-bottom:28px;border-bottom:2px solid var(--ink)}
+  .masthead h1{font-size:clamp(34px,5.4vw,52px);font-weight:800;letter-spacing:-.026em;line-height:1.04}
+  .masthead .sub{color:var(--ink-2);max-width:62ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 28px;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-3)}
+  .meta b{color:var(--ink-2);font-weight:500}
+
+  /* ---- verdict ---- */
+  .verdict{
+    margin-top:34px;border:1px solid var(--rule);border-left:6px solid var(--fail);
+    background:var(--surface);border-radius:3px;box-shadow:var(--shadow);
+    padding:26px 28px;display:flex;flex-direction:column;gap:14px;
+  }
+  .verdict .label{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+  .verdict .call{font-family:Archivo,sans-serif;font-size:clamp(27px,4.4vw,38px);font-weight:800;letter-spacing:-.022em;color:var(--fail);line-height:1.05}
+  .verdict p{color:var(--ink-2)}
+
+  section{margin-top:52px}
+  section > h2{
+    font-size:13px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
+    color:var(--ink); padding-bottom:9px;border-bottom:1px solid var(--rule-2);margin-bottom:22px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  }
+  section > h2 .count{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:500;letter-spacing:.06em;color:var(--ink-3);text-transform:none}
+  h3{font-size:17px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+
+  .stack{display:flex;flex-direction:column;gap:16px}
+  .stack-lg{display:flex;flex-direction:column;gap:26px}
+
+  /* ---- chips ---- */
+  .chip{
+    display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;
+    letter-spacing:.07em;text-transform:uppercase;padding:2.5px 7px;border-radius:3px;
+  }
+  .c-pass{background:var(--pass-bg);color:var(--pass)}
+  .c-fail{background:var(--fail-bg);color:var(--fail)}
+  .c-block{background:var(--block-bg);color:var(--block)}
+  .c-part{background:var(--part-bg);color:var(--part)}
+  .c-none{background:var(--none-bg);color:var(--none)}
+
+  /* ---- tables ---- */
+  .scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:600px}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+  thead th{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.11em;
+    text-transform:uppercase;color:var(--ink-3);background:var(--sunken);
+    border-bottom:1px solid var(--rule-2);position:sticky;top:0;
+  }
+  tbody tr:last-child td{border-bottom:none}
+  td.area{font-weight:600;white-space:nowrap}
+  td.note{color:var(--ink-2);font-size:13.5px}
+  .group-row td{
+    background:var(--sunken);font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;
+    letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);padding:7px 14px;
+  }
+  .num{font-variant-numeric:tabular-nums}
+
+  /* ---- suite results ---- */
+  .suites{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px}
+  .suite{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:16px 18px;display:flex;flex-direction:column;gap:7px}
+  .suite .n{font-family:Archivo,sans-serif;font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+  .suite .n.ok{color:var(--pass)}
+  .suite .t{font-weight:600;font-size:14px}
+  .suite .d{color:var(--ink-3);font-size:12.5px;line-height:1.45}
+
+  /* ---- findings ---- */
+  .find{background:var(--surface);border:1px solid var(--rule);border-radius:3px;box-shadow:var(--shadow);overflow:hidden;display:flex}
+  .sev{flex:0 0 5px}
+  .sev.p0{background:var(--fail)} .sev.p1{background:#E07A1F} .sev.p2{background:var(--block)} .sev.p3{background:var(--ink-3)}
+  .find-body{padding:18px 22px;flex:1;min-width:0;display:flex;flex-direction:column;gap:11px}
+  .find-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px}
+  .sev-tag{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.09em;color:var(--ink-3)}
+  .find h3{font-size:16.5px;margin:0}
+  .kv{display:grid;grid-template-columns:96px 1fr;gap:5px 14px;font-size:14px}
+  .kv dt{font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);padding-top:4px}
+  .kv dd{margin:0;color:var(--ink-2)}
+  .kv dd strong{color:var(--ink);font-weight:600}
+
+  .callout{
+    background:var(--accent-soft);border:1px solid var(--rule);border-left:4px solid var(--accent);
+    border-radius:3px;padding:16px 20px;display:flex;flex-direction:column;gap:8px;
+  }
+  .callout .h{font-weight:700;font-family:Archivo,sans-serif;font-size:15px}
+  .callout p{color:var(--ink-2);font-size:14.5px}
+
+  ol.steps{margin:0;padding-left:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:14px}
+  ol.steps li{counter-increment:s;display:grid;grid-template-columns:26px 1fr;gap:14px;align-items:start}
+  ol.steps li::before{
+    content:counter(s);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+    color:var(--accent);background:var(--accent-soft);border-radius:3px;
+    width:26px;height:22px;display:grid;place-items:center;margin-top:2px;
+  }
+  ol.steps .t{font-weight:600}
+  ol.steps .d{color:var(--ink-2);font-size:14px}
+
+  ul.plain{margin:0;padding-left:19px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px;font-size:14.5px}
+
+  footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule);color:var(--ink-3);font-size:12.5px;font-family:"IBM Plex Mono",monospace;display:flex;flex-wrap:wrap;gap:6px 24px}
+
+  @media (max-width:620px){
+    .kv{grid-template-columns:1fr;gap:2px}
+    .kv dt{padding-top:8px}
+    .wrap{padding:28px 16px 72px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  /* ---- print / save-as-PDF -------------------------------------------------
+   * Ctrl+P → "Save as PDF" is the reliable way to get this page as a file, so
+   * it is laid out for paper rather than left to the browser's defaults:
+   * light palette regardless of screen theme, no shadows, and no finding card
+   * or table row split across a page break.
+   * ------------------------------------------------------------------------- */
+  @media print{
+    :root{
+      --paper:#fff; --surface:#fff; --sunken:#F2F4F8;
+      --ink:#000; --ink-2:#26303F; --ink-3:#55606F;
+      --rule:#C6CDDB; --rule-2:#9AA4B5; --accent:#1A4FCB; --accent-soft:#EDF2FD;
+      --pass:#0B5E3E; --pass-bg:#EAF4EF; --fail:#95271E; --fail-bg:#FBECEA;
+      --block:#6F4604; --block-bg:#FBF3E3; --part:#4E3388; --part-bg:#F1EDFB;
+      --none:#55606F; --none-bg:#EEF0F4; --shadow:none;
+    }
+    @page{margin:14mm}
+    body{background:#fff;font-size:10.5pt;line-height:1.5}
+    .wrap{max-width:none;padding:0}
+    a{color:var(--ink);text-decoration:none}
+    .find,.callout,.suite,tr,.verdict{break-inside:avoid;page-break-inside:avoid}
+    section{break-before:auto;margin-top:26px}
+    section > h2{break-after:avoid;page-break-after:avoid}
+    .scroll{overflow:visible;border:1px solid var(--rule)}
+    table{min-width:0;font-size:9pt}
+    thead th{position:static}
+    .verdict{border-left-width:4px}
+    .suites{grid-template-columns:repeat(4,1fr)}
+    .suite .n{font-size:20pt}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="eyebrow">Production readiness audit</span>
+    <h1>SHYGON Tap V5</h1>
+    <p class="sub">End-to-end test of the customer web application — build, authentication, catalogue, checkout, Razorpay payment path, Netlify Functions, Supabase RLS, admin authorization, and responsive UI.</p>
+    <div class="meta">
+      <span><b>Date</b> 12 Sep 2026</span>
+      <span><b>Artifact</b> shygontapv5_complete.zip</span>
+      <span><b>Suites run</b> 4</span>
+      <span><b>Assertions</b> <span class="num">106</span></span>
+    </div>
+  </header>
+
+  <div class="verdict">
+    <span class="label">Final verdict</span>
+    <div class="call">Not production ready</div>
+    <p>The application <strong>cannot reach its database</strong>. The Supabase project this repo documents as live — <code>shygon-tap-v5</code> — stopped resolving between 17 and 26 September. It was most likely paused for inactivity, though only the Supabase dashboard can confirm. Everything downstream of that — signup, orders, payment fulfilment, entitlements, Tap provisioning — is <strong>blocked, not passing</strong>.</p>
+    <p>The code itself is in notably good shape. Security architecture, RLS and payment verification are genuinely strong and verified by test. <strong>One</strong> blocker remains — it is configuration, not a rewrite. Four defects were found and fixed, including a time bomb in the project’s own test suite.</p>
+  </div>
+
+  <!-- ============ CREDENTIALS ============ -->
+  <section>
+    <h2>The database blocker <span class="count">revised 26 Sep 2026</span></h2>
+    <div class="stack">
+      <p class="prose">On 12 September the <code>.env</code> pointed at two different Supabase projects, and the one named in the URL did not resolve.</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Value</th><th>Project</th><th>Live check, 12 Sep</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="area"><code>VITE_SUPABASE_URL</code><br><code>SUPABASE_URL</code></td>
+              <td class="mono">bzozitfwdreczzmhsjhn</td>
+              <td class="note">DNS <span class="mono">NXDOMAIN</span> — does not resolve. A deleted project and a paused one look identical from outside.</td>
+              <td><span class="chip c-fail">Not resolving</span></td>
+            </tr>
+            <tr>
+              <td class="area"><code>SUPABASE_SERVICE_ROLE_KEY</code></td>
+              <td class="mono">auvgvikdbhbrtsrsaslv</td>
+              <td class="note">Resolved, answered <span class="mono">HTTP 401</span> — alive. Named as the live project in <code>LIVE_SUPABASE_STATE.md</code>.</td>
+              <td><span class="chip c-pass">Documented project</span></td>
+            </tr>
+            <tr>
+              <td class="area"><code>VITE_SUPABASE_ANON_KEY</code></td>
+              <td class="mono">— (sb_publishable, no ref claim)</td>
+              <td class="note">Rejected by <span class="mono">auvgvikdbhbrtsrsaslv</span>: <em>“Invalid API key … might also be owned by another Supabase project.”</em> It may belong to <span class="mono">bzozitfwdreczzmhsjhn</span>; that cannot be tested while the host does not resolve.</td>
+              <td><span class="chip c-fail">Rejected</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <span class="h">A correction to earlier versions of this page</span>
+        <p>Earlier versions said <span class="mono">bzozitfwdreczzmhsjhn</span> “does not exist” and that “all three values disagree, so there is no consistent set to infer.” Neither was established. NXDOMAIN only means the name does not resolve. And the set <em>was</em> inferable: <code>LIVE_SUPABASE_STATE.md</code>, line 3, names the live project as <span class="mono">auvgvikdbhbrtsrsaslv</span> (<code>shygon-tap-v5</code>, ap-south-1). That file should have been read before this was called unresolvable.</p>
+      </div>
+      <h3>17 September — the documented project, checked read-only</h3>
+      <p class="prose">On that evidence <code>.env</code> was repointed to <span class="mono">auvgvikdbhbrtsrsaslv</span> and the service-role key installed; the previous file is kept as <code>.env.bak-*</code>. A read-only check confirmed it was the right project. <strong>Nothing was written.</strong></p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Table</th><th>Rows</th></tr></thead>
+          <tbody>
+            <tr><td class="area"><code>products</code></td><td class="note"><span class="num">39</span> — 24 cards, 4 active experiences, the Pass, 5 active add-ons; retired SKUs inactive; none unpriced</td></tr>
+            <tr><td class="area"><code>tap_event_themes</code></td><td class="note"><span class="num">19</span> — Ganesh Chaturthi live, as <code>LIVE_SUPABASE_STATE.md</code> records</td></tr>
+            <tr><td class="area"><code>admin_users</code></td><td class="note"><span class="num">1</span></td></tr>
+            <tr><td class="area"><code>profiles</code></td><td class="note"><span class="num">2</span></td></tr>
+            <tr><td class="area">orders, payments, entitlements, cards, tap_profiles</td><td class="note"><span class="num">0</span> — no customer data</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>26 September — the project no longer resolves</h3>
+      <p class="prose"><span class="mono">auvgvikdbhbrtsrsaslv.supabase.co</span> now returns <strong>NXDOMAIN</strong>, confirmed independently by Cloudflare and Google DNS-over-HTTPS, with <code>supabase.com</code> resolving normally through the same method as a control. It was most likely <strong>paused for inactivity</strong>; a deletion looks identical from outside, and only the Supabase dashboard can say which.</p>
+      <div class="callout">
+        <span class="h">This network rewrites DNS</span>
+        <p>Plain DNS here is intercepted by the ISP, even when sent to 8.8.8.8 or 1.1.1.1: names that do not exist come back as <span class="mono">49.205.75.11</span>, which serves “No site configured”. Dead hosts look alive. Only DNS-over-HTTPS gave trustworthy answers, and it is what the statements above rest on.</p>
+      </div>
+      <p class="prose"><strong>To unblock:</strong> open <code>shygon-tap-v5</code> in the Supabase dashboard and restore it if it shows Paused — if it is missing, that is a larger problem than configuration. Then copy its <strong>publishable key</strong> into <code>.env</code>; the URL and service-role key are already correct. If it was paused for inactivity, the production site would go down the same way the first quiet week after launch, so check the plan before launch.</p>
+    </div>
+  </section>
+
+  <!-- ============ ENVIRONMENT ============ -->
+  <section>
+    <h2>Environment</h2>
+    <div class="scroll">
+      <table>
+        <tbody>
+          <tr><td class="area">Framework</td><td class="note">React 19.2 + TypeScript 5.9, Vite 7.3, React Router 7.18, Tailwind 4.2, Framer Motion 12</td></tr>
+          <tr><td class="area">Package manager</td><td class="note">npm (<code>package-lock.json</code>, 212 packages, 1 low-severity advisory)</td></tr>
+          <tr><td class="area">Backend</td><td class="note">Netlify Functions v2 (4 handlers) + Supabase Postgres/GoTrue + 2 Supabase Edge Functions for admin</td></tr>
+          <tr><td class="area">Dev command</td><td class="note"><code>npm run dev</code> → <code>http://localhost:5173</code> (Vite only — does <em>not</em> serve <code>/api/*</code>)</td></tr>
+          <tr><td class="area">Build command</td><td class="note"><code>npm run build</code> → <code>tsc -b &amp;&amp; vite build</code>, output <code>dist/</code></td></tr>
+          <tr><td class="area">Netlify Functions locally</td><td class="note"><span class="chip c-block">Blocked</span> &nbsp;<code>netlify-cli</code> is not installed globally or locally, and <code>npx netlify</code> declined to fetch it. <code>netlify dev</code> <em>is</em> required — <code>/api/*</code> only resolves through the <code>netlify.toml</code> redirect. I invoked the handlers directly instead (they are standard <code>Request</code>/<code>Response</code>), which tested their logic faithfully.</td></tr>
+          <tr><td class="area">Node present</td><td class="note">v20.18.0 — <strong>below</strong> the <code>^20.19 || &gt;=22.12</code> that Vite 7 and supabase-js require. See P1.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ AUTOMATED RESULTS ============ -->
+  <section>
+    <h2>Automated verification <span class="count">all suites re-run after every fix</span></h2>
+    <div class="stack">
+      <div class="suites">
+        <div class="suite">
+          <span class="n ok">10/10</span>
+          <span class="t">Migrations apply</span>
+          <span class="d">001 → 010 against real Postgres (PGlite), then re-applied a second time to prove idempotency.</span>
+        </div>
+        <div class="suite">
+          <span class="n ok">23/23</span>
+          <span class="t">Business rules</span>
+          <span class="d">Project's own <code>db:verify</code>, plus two tests added here so seasonal theming is covered at all.</span>
+        </div>
+        <div class="suite">
+          <span class="n ok">48/48</span>
+          <span class="t">Adversarial RLS</span>
+          <span class="d">Written for this audit. Cross-customer isolation, privilege escalation, admin role separation.</span>
+        </div>
+        <div class="suite">
+          <span class="n ok">13/14</span>
+          <span class="t">Function security</span>
+          <span class="d">Written for this audit. Signature, method, fail-closed and logging checks. One case blocked by Node 20.</span>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="h">A caveat worth knowing about your existing test suite</span>
+        <p>The project's <code>db:verify</code> runs as the PGlite <em>superuser</em>, which bypasses row-level security entirely. Its 21 passes prove your triggers and business rules — they do <strong>not</strong> prove RLS. That is why I added <code>supabase/tests/rls-adversarial.mjs</code>, which does <code>SET ROLE authenticated</code> with Supabase's real default grants so policies actually apply, and which includes positive control tests so a denial can't pass for the wrong reason.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STATUS MATRIX ============ -->
+  <section>
+    <h2>Feature status <span class="count">PASS · FAIL · PARTIAL · BLOCKED · NOT IMPLEMENTED</span></h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Area</th><th>Status</th><th>Evidence</th></tr></thead>
+        <tbody>
+          <tr class="group-row"><td colspan="3">Build &amp; static quality</td></tr>
+          <tr><td class="area">Production build</td><td><span class="chip c-pass">Pass</span></td><td class="note">Clean. 40 chunks, largest 216 kB (supabase) / 209 kB (index). No TS errors, no missing or broken imports.</td></tr>
+          <tr><td class="area">TypeScript / ESLint</td><td><span class="chip c-pass">Pass</span></td><td class="note">Zero errors, zero warnings on both.</td></tr>
+          <tr><td class="area">Secret leakage into bundle</td><td><span class="chip c-pass">Pass</span></td><td class="note">Scanned <code>dist/</code> for the Razorpay secret, webhook secret, any service-role JWT: <strong>zero hits</strong>. Only the publishable key, <code>rzp_test_</code> id and project URL — all public by design.</td></tr>
+          <tr><td class="area">Code splitting</td><td><span class="chip c-pass">Pass</span></td><td class="note">Public Tap is the only thing in the entry bundle and uses plain <code>fetch</code>, not the SDK — a genuinely good call for a page opened by strangers on mobile data.</td></tr>
+
+          <tr class="group-row"><td colspan="3">Customer — authentication &amp; profile</td></tr>
+          <tr><td class="area">Protected routes</td><td><span class="chip c-pass">Pass</span></td><td class="note">Direct URL to <code>/shygontap/account</code> while signed out redirected to <code>/shygontap/auth</code>, preserving intended destination in router state.</td></tr>
+          <tr><td class="area">Loading / refresh race</td><td><span class="chip c-pass">Pass</span></td><td class="note"><code>ProtectedRoute</code> renders a skeleton while the session resolves rather than redirecting on a not-yet-settled <code>null</code> — the classic hard-refresh bounce is correctly avoided.</td></tr>
+          <tr><td class="area">Signup / login / logout / reset</td><td><span class="chip c-block">Blocked</span></td><td class="note">Requires a reachable Supabase project. Test script written and ready (<code>supabase/tests/live-auth-rls.mjs</code>); it aborts at the reachability gate.</td></tr>
+          <tr><td class="area">Profile CRUD &amp; persistence</td><td><span class="chip c-block">Blocked</span></td><td class="note">Same cause. Auto-provisioning trigger on signup <em>is</em> verified locally — creating an <code>auth.users</code> row creates the profile row.</td></tr>
+
+          <tr class="group-row"><td colspan="3">Customer — store, Tap &amp; tiers</td></tr>
+          <tr><td class="area">Storefront rendering</td><td><span class="chip c-pass">Pass</span></td><td class="note">Full catalogue renders from static copy with correct ₹ pricing when the database is unreachable — the documented fallback works exactly as designed.</td></tr>
+          <tr><td class="area">Live catalogue pricing</td><td><span class="chip c-block">Blocked</span></td><td class="note">Needs the database. Display-only either way; the server re-prices every order server-side.</td></tr>
+          <tr><td class="area">UI tiers (Essential → GOAT)</td><td><span class="chip c-pass">Pass</span></td><td class="note">Verified in Postgres: rank order <code>essential &lt; business &lt; premium &lt; goat</code>, legacy <code>pro→business</code> and <code>3d→goat</code> remapped, unpurchased tiers refused, palette counts correct (4 on Essential, 12 with the Pass).</td></tr>
+          <tr><td class="area">Customization Pass scope</td><td><span class="chip c-pass">Pass</span></td><td class="note">Explicitly tested: the ₹999 Pass lifts the 14-day edit limit and unlocks all palettes but grants <strong>no</strong> experience — it cannot be used to obtain the catalogue cheaply.</td></tr>
+          <tr><td class="area">Automatic Tap provisioning</td><td><span class="chip c-pass">Pass</span></td><td class="note">Verified in Postgres: paying an order provisions a draft Tap with a generated slug, and the edit window dates from the <em>first</em> paid order so later upgrades can't reopen it.</td></tr>
+          <tr><td class="area">Public Tap read path</td><td><span class="chip c-pass">Pass</span></td><td class="note">Active Tap resolves clamped to entitlements (unpurchased WhatsApp withheld); paused reports paused; draft and unknown slugs both return <code>unavailable</code> and leak nothing.</td></tr>
+          <tr><td class="area">QR / canonical URL logic</td><td><span class="chip c-pass">Pass</span></td><td class="note">Code was already correct: <code>tapUrl()</code> uses the canonical <code>SITE_URL</code>, never <code>window.location.origin</code>, while auth <code>redirectTo</code> correctly <em>does</em> use the live origin. The dangerous <em>config</em> is now <strong>fixed and guarded at build time</strong> — see P0-2.</td></tr>
+
+          <tr class="group-row"><td colspan="3">Payments</td></tr>
+          <tr><td class="area">Client cannot assert payment</td><td><span class="chip c-pass">Pass</span></td><td class="note">The browser never marks anything paid. <code>verify-payment</code> ignores any <code>success</code>/<code>paid</code> field in the body — verified by source assertion — and re-derives the HMAC itself.</td></tr>
+          <tr><td class="area">Signature verification</td><td><span class="chip c-pass">Pass</span></td><td class="note">HMAC-SHA256 over <code>{order_id}|{payment_id}</code> keyed by the server secret, compared with <code>timingSafeEqual</code> after a length guard.</td></tr>
+          <tr><td class="area">Server-side pricing</td><td><span class="chip c-pass">Pass</span></td><td class="note">The request states intent only; every price and stock level is read from <code>products</code>. Quantity bounded 1–10, minimum ₹1, SKU allow-lists prevent buying a tier at add-on prices.</td></tr>
+          <tr><td class="area">Ownership check</td><td><span class="chip c-pass">Pass</span></td><td class="note">A valid signature for <em>another</em> customer's order returns 404 rather than fulfilling against the caller — an easy bug to miss, correctly handled.</td></tr>
+          <tr><td class="area">Webhook signature mandatory</td><td><span class="chip c-pass">Pass</span></td><td class="note">Tested live: unsigned → 401; wrong signature → 401; <strong>signature computed over a different body → 401</strong> (tamper rejected); correct signature → accepted; missing event id → 400.</td></tr>
+          <tr><td class="area">Duplicate / idempotency design</td><td><span class="chip c-pass">Pass</span></td><td class="note">Insert-first claim on <code>webhook_events</code> using a unique index (atomic, unlike select-then-insert); claim released on failure so a retry isn't dismissed; fulfilment claims the <code>pending→paid</code> transition so only one path runs side effects.</td></tr>
+          <tr><td class="area">Fail-closed on missing secrets</td><td><span class="chip c-pass">Pass</span></td><td class="note">Both money endpoints returned <code>503</code>, not <code>200</code>, with no service-role key — and the error body named no secret.</td></tr>
+          <tr><td class="area">End-to-end test payment</td><td><span class="chip c-block">Blocked</span></td><td class="note">Cannot run. Needs a live database to create the order row, plus a browser Razorpay Checkout session. <em>No test payment was executed.</em></td></tr>
+          <tr><td class="area">Live webhook delivery</td><td><span class="chip c-block">Blocked</span></td><td class="note">Razorpay cannot reach localhost without a tunnel. Handler tested with locally signed fixtures instead, as above.</td></tr>
+          <tr><td class="area">Real duplicate-webhook replay</td><td><span class="chip c-block">Blocked</span></td><td class="note">Ledger logic reviewed and the unique index verified in Postgres, but a true double-delivery against a live DB was not exercised.</td></tr>
+
+          <tr class="group-row"><td colspan="3">Security &amp; RLS</td></tr>
+          <tr><td class="area">Cross-customer isolation</td><td><span class="chip c-pass">Pass</span></td><td class="note">As <code>authenticated</code> with real grants: customer A saw 0 rows of B's profile, orders, entitlements, cards, payments, order_items, notifications and tap_profile — while still seeing exactly her own order (positive control).</td></tr>
+          <tr><td class="area">Self-granting entitlements</td><td><span class="chip c-pass">Pass</span></td><td class="note">Blocked by RLS: paid experience, Customization Pass, paid add-on, and reactivating a revoked entitlement all refused.</td></tr>
+          <tr><td class="area">Payment / order tampering</td><td><span class="chip c-pass">Pass</span></td><td class="note">Cannot mark own order paid, change status or amount, insert any order row, insert a payment claiming success, attach a <code>razorpay_order_id</code> to hijack a webhook, or poison the event ledger.</td></tr>
+          <tr><td class="area">Catalogue / inventory tampering</td><td><span class="chip c-pass">Pass</span></td><td class="note">Cannot change pricing or stock, insert or delete products, or write inventory movements.</td></tr>
+          <tr><td class="area">Admin authorization model</td><td><span class="chip c-pass">Pass</span></td><td class="note">Database-backed, not a hidden frontend route. Permissions re-derived server-side from <code>admin_users</code>; a token proves identity, never capability. No email-based bypass anywhere in the tree.</td></tr>
+          <tr><td class="area">Admin role separation</td><td><span class="chip c-pass">Pass</span></td><td class="note">A <code>viewer</code> has <code>orders.read</code> but not <code>entitlements.grant</code>, <code>orders.refund</code> or <code>admins.manage</code>; <code>support</code> cannot manage products or admins; a deactivated admin loses every permission immediately.</td></tr>
+          <tr><td class="area">Self-promotion to admin</td><td><span class="chip c-pass">Pass</span></td><td class="note">Insert into <code>admin_users</code> blocked by RLS; UPDATE to <code>role='owner'</code> affects zero rows; <code>admin_has()</code> returns false for a plain customer.</td></tr>
+          <tr><td class="area">Anonymous access</td><td><span class="chip c-pass">Pass</span></td><td class="note"><code>anon</code> reads 0 rows from orders, profiles, entitlements, tap_profiles and notifications, yet still resolves a published Tap through the RPC.</td></tr>
+          <tr><td class="area">Secret hygiene in source</td><td><span class="chip c-pass">Pass</span></td><td class="note">No server secret referenced in <code>src/</code>; no <code>VITE_</code> var read in <code>netlify/</code>; no hardcoded JWT; no function logs a secret. <code>.env</code> is gitignored (and the project is not a git repo, so nothing is tracked).</td></tr>
+          <tr><td class="area">Error message hygiene</td><td><span class="chip c-pass">Pass</span></td><td class="note"><code>describeError()</code> deliberately withholds raw Postgres/PostgREST text from customers — including anonymous visitors on public Taps — mapping only a safe set of codes.</td></tr>
+          <tr><td class="area">Admin dashboard app</td><td><span class="chip c-block">Blocked</span></td><td class="note">A separate project (<code>shygon-tap-v5-admin</code>), out of this archive's scope and untested here. Its <em>authorization backbone</em> lives in these migrations and is verified above.</td></tr>
+
+          <tr class="group-row"><td colspan="3">UI, resilience &amp; performance</td></tr>
+          <tr><td class="area">Desktop / tablet / mobile</td><td><span class="chip c-pass">Pass</span></td><td class="note">1440×900, 768×1024 and 375×812 all render correctly with <strong>no horizontal scroll</strong>. No broken images, every image has alt text, exactly one <code>h1</code>.</td></tr>
+          <tr><td class="area">Backend-unavailable handling</td><td><span class="chip c-pass">Pass</span></td><td class="note">The unintended benefit of the dead project: a public Tap shows a clean “We couldn't load this Tap” state with a retry, no stack trace and no raw error. The storefront falls back to static pricing.</td></tr>
+          <tr><td class="area">Console errors</td><td><span class="chip c-part">Partial</span></td><td class="note">No application errors. All console noise is network failure against the dead Supabase host, which will clear once credentials are fixed.</td></tr>
+          <tr><td class="area">Duplicate API calls</td><td><span class="chip c-pass">Pass</span></td><td class="note">Was 4 identical full-table <code>products</code> fetches per page view in the production build. <strong>Fixed and verified</strong> — see F-1.</td></tr>
+          <tr><td class="area">Touch targets</td><td><span class="chip c-pass">Pass</span></td><td class="note">Was 7×7 px tier dots plus 15 px and 17 px controls. <strong>Fixed and verified</strong> — zero of 64 controls now fall below the WCAG 2.5.8 floor, on a touch-emulated 375 px viewport. See P3.</td></tr>
+          <tr><td class="area">Analytics / notifications</td><td><span class="chip c-part">Partial</span></td><td class="note">Implemented — routes, services and RPCs exist, and the event log is verified in Postgres (<code>order.placed</code>, <code>tap.created</code>, <code>payment.paid</code>). Runtime behaviour blocked with everything else.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ BUGS ============ -->
+  <section>
+    <h2>Findings <span class="count">1 blocker open · 1 P3 open · 4 defects fixed</span></h2>
+    <div class="stack-lg">
+
+      <article class="find">
+        <div class="sev p0"></div>
+        <div class="find-body">
+          <div class="find-head"><span class="sev-tag">P0</span><h3>The live Supabase project does not resolve</h3><span class="chip c-fail">Open</span></div>
+          <dl class="kv">
+            <dt>Feature</dt><dd>Everything data-driven — auth, profile, store, orders, payments, Tap</dd>
+            <dt>Problem</dt><dd>As of 26 Sep, <code>auvgvikdbhbrtsrsaslv.supabase.co</code> — the project <code>LIVE_SUPABASE_STATE.md</code> documents as live — returns <strong>NXDOMAIN</strong>; Cloudflare and Google DNS-over-HTTPS agree. On 17 Sep it answered and held the full V5 schema.</dd>
+            <dt>Root cause</dt><dd>Two separate things. The <code>.env</code> URL was stale, pointing at <code>bzozitfwdreczzmhsjhn</code> — <strong>corrected</strong>. The project itself then stopped resolving, most likely paused for inactivity; only the dashboard can confirm.</dd>
+            <dt>File</dt><dd><code>.env</code> — and the Supabase dashboard</dd>
+            <dt>Fix</dt><dd>Restore <code>shygon-tap-v5</code> in the dashboard, then copy its publishable key into <code>.env</code>. The URL and service-role key are already correct for it.</dd>
+            <dt>Verification</dt><dd><code>node supabase/tests/live-auth-rls.mjs .</code> — written, and stops at its reachability gate until the project answers.</dd>
+            <dt>Status</dt><dd><strong>Open.</strong> The remaining step needs dashboard access only the account owner has.</dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="sev p1"></div>
+        <div class="find-body">
+          <div class="find-head"><span class="sev-tag">P1</span><h3><code>localhost</code> was being baked into printed QR codes</h3><span class="chip c-pass">Fixed</span></div>
+          <dl class="kv">
+            <dt>Feature</dt><dd>QR generation / NFC public URL / every absolute link</dd>
+            <dt>Problem</dt><dd>The supplied <code>.env</code> structure set <code>VITE_SITE_URL=http://localhost:5173</code>, and the string was confirmed compiled into <code>dist/assets/AccountApp-*.js</code>. Any QR generated from such a build encodes localhost — and a card already in someone's wallet cannot be reprinted.</dd>
+            <dt>Blast radius</dt><dd>Wider than the QR. <code>CONTACT_EMAIL</code> derives from the same value, so the live footer rendered <code>contact@localhost:5173</code> — seen on the rendered page. Open Graph URLs, the shareable Tap link and the Razorpay checkout logo all inherited it too.</dd>
+            <dt>Root cause</dt><dd>Config, not code. <code>src/lib/site.ts</code> was already correct — it defaults to <code>https://shygontech.com</code> and deliberately does not read <code>window.location.origin</code>. So there was nothing to find in a code review; the problem was that a bad value could ship silently.</dd>
+            <dt>File</dt><dd><code>vite.config.ts</code>, <code>.env</code>, <code>.env.example</code></dd>
+            <dt>Fix</dt><dd>Two parts. The value was commented back out in <code>.env</code> (unset is the correct production state). More importantly <code>vite build</code> now <strong>refuses</strong> to produce a bundle whose <code>VITE_SITE_URL</code> is not a public https origin, and says why. Staging is unaffected — any https origin passes — and <code>ALLOW_LOCAL_SITE_URL=1</code> is the deliberate escape hatch for a local preview. The dev server is untouched.</dd>
+            <dt>Verification</dt><dd>Six cases exercised: unset → builds; <code>https://staging.shygontech.com</code> → builds; <code>http://localhost:5173</code> → refused; <code>http://192.168.1.50:5173</code> → refused; <code>http://shygontech.com</code> → refused; escape hatch → builds. Then on a clean build: no <code>localhost:5173</code> in <code>dist/</code>, exactly one canonical origin (<code>https://shygontech.com</code>), footer now reads <code>contact@shygontech.com</code>, <code>og:url</code> now <code>https://shygontech.com/</code>.</dd>
+            <dt>Status</dt><dd><strong>Fixed.</strong> Downgraded from P0 to P1: it can no longer reach production silently.</dd>
+          </dl>
+        </div>
+      </article>
+
+      
+
+      <article class="find">
+        <div class="sev p1"></div>
+        <div class="find-body">
+          <div class="find-head"><span class="sev-tag">P1</span><h3>No Node version pinned — every payment function would 500 on Node 20</h3><span class="chip c-pass">Fixed</span></div>
+          <dl class="kv">
+            <dt>Feature</dt><dd>All four Netlify Functions</dd>
+            <dt>Problem</dt><dd><code>@supabase/supabase-js</code> v2.112 builds a <code>RealtimeClient</code> inside <code>createClient</code>, which needs a native <code>WebSocket</code> — absent before Node 22. I reproduced it: <em>“Node.js detected but native WebSocket not found.”</em> Every function calls <code>adminClient()</code>, so on a Node 20 runtime order creation, verification and webhook fulfilment all return 500 — payments dead, silently, in production.</dd>
+            <dt>Root cause</dt><dd>No <code>.nvmrc</code>, no <code>.node-version</code>, no <code>NODE_VERSION</code> in <code>netlify.toml</code>, no <code>engines</code> field. The runtime was left to Netlify's rolling default.</dd>
+            <dt>File</dt><dd><code>netlify.toml</code>, <code>package.json</code></dd>
+            <dt>Fix</dt><dd>Added <code>[build.environment] NODE_VERSION = "22"</code> and <code>"engines": { "node": "&gt;=22.12.0" }</code>, with a comment explaining why so it isn't removed later.</dd>
+            <dt>Verification</dt><dd>Build re-run clean after the change. Note the local machine still has Node 20.18.0, which is why one function assertion remains blocked locally.</dd>
+            <dt>Status</dt><dd><strong>Fixed.</strong></dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="sev p2"></div>
+        <div class="find-body">
+          <div class="find-head"><span class="sev-tag">P2</span><h3>Four identical full-table catalogue fetches per page view</h3><span class="chip c-pass">Fixed</span></div>
+          <dl class="kv">
+            <dt>Feature</dt><dd>Storefront pricing</dd>
+            <dt>Problem</dt><dd>Measured in the <em>production</em> build (not a StrictMode artifact): 4 identical <code>/rest/v1/products</code> requests for one view of <code>/shygontap</code>, each returning the entire products table with 18 columns.</dd>
+            <dt>Root cause</dt><dd>Four components price themselves independently — hero, configurator, store grid, product detail — and each ran its own <code>fetchCatalog()</code> on mount with no shared cache.</dd>
+            <dt>File</dt><dd><code>src/services/catalog.ts:79</code></dd>
+            <dt>Fix</dt><dd>In-flight de-duplication plus a 30-second result cache inside <code>fetchCatalog</code>, rather than lifting state — the callers are deliberately independent and any may render alone. A failed load is never cached, and <code>invalidateCatalog()</code> is exported.</dd>
+            <dt>Verification</dt><dd>Logic tested directly: 4 concurrent mounts → <strong>1</strong> query; later reads within TTL → 0 extra; concurrent failures share one attempt and recover cleanly afterwards. Build and lint re-run clean.</dd>
+            <dt>Status</dt><dd><strong>Fixed.</strong> The full 4→1 reduction can only be observed end-to-end once a reachable database exists.</dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="sev p3"></div>
+        <div class="find-body">
+          <div class="find-head"><span class="sev-tag">P3</span><h3>Touch targets below the accessibility minimum on mobile</h3><span class="chip c-pass">Fixed</span></div>
+          <dl class="kv">
+            <dt>Feature</dt><dd>Mobile storefront controls</dd>
+            <dt>Problem</dt><dd>Three genuine WCAG 2.5.8 failures at 375 px: the experience-selector dots at <strong>7×7 px</strong>, the “PREVIEW GOAT” button at <strong>15 px</strong> tall, and seven footer links at <strong>17 px</strong>. The dots failed twice over — a 7 px dot on a 15 px pitch means a 24 px circle centred on one overlaps its neighbour, so the spacing exception did not rescue them either.</dd>
+            <dt>Root cause</dt><dd>The visible dot size was being used as the hit area. Those are two different measurements.</dd>
+            <dt>File</dt><dd><code>src/index.css</code> — <code>.tier-deck-dots</code>, <code>.summary-demo</code>, and a new coarse-pointer block</dd>
+            <dt>Fix</dt><dd>The dot is now drawn as a <code>::before</code> pseudo-element inside a 24 px button, so it still <em>looks</em> 7 px while the target is finger-sized; the flex gap moved onto the button so the pitch is 24 px and the circles no longer intersect. <code>.summary-demo</code> was padded to 44 px. Everything else — footer links, “View details”, the search close button, nav icons — is raised only under <code>@media (pointer: coarse)</code>, so desktop layouts are left exactly as they were.</dd>
+            <dt>Verification</dt><dd>Re-measured on a touch-emulated 375 px viewport: <strong>0 of 64 controls</strong> below 24 px (was 12), dot pitch now 24 px. Desktop re-checked at 1440 px: <code>pointer: coarse</code> does not match, footer links are 17 px and nav icons 40 px as before, no horizontal scroll. Build and lint clean; all four suites re-run green.</dd>
+            <dt>Status</dt><dd><strong>Fixed.</strong></dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="sev p3"></div>
+        <div class="find-body">
+          <div class="find-head"><span class="sev-tag">P3</span><h3>A time bomb in the existing test suite</h3><span class="chip c-pass">Fixed</span></div>
+          <dl class="kv">
+            <dt>Feature</dt><dd><code>db:verify</code> — the public read path</dd>
+            <dt>Problem</dt><dd><code>db:verify</code> passed on 12 September and failed on 15 September with nothing in between touching the database. Not a regression: migration 005 seeds real festival dates, and Ganesh Chaturthi runs <strong>14–25 September 2026</strong> with the <code>molten</code> palette. A live event theme legitimately overrides the customer's chosen palette — the feature was working. The test hard-coded <code>palette === 'neon'</code>, which only holds on days when no event runs.</dd>
+            <dt>Why it matters</dt><dd>Left alone it would fail every Ganesh Chaturthi, Halloween and Diwali, and each failure would cost somebody an afternoon proving the application was fine. A suite that cries wolf on a calendar is worse than one test fewer.</dd>
+            <dt>File</dt><dd><code>supabase/tests/verify.mjs</code></dd>
+            <dt>Fix</dt><dd>That assertion is about <em>entitlement clamping</em>, so seasonal themes are switched off for it. The seasonal layer is then tested directly instead, against an event dated from <code>CURRENT_DATE</code> so it is live whenever the suite runs.</dd>
+            <dt>Verification</dt><dd>Suite went 21 → 23 tests, all passing, with two new checks: a live seasonal theme overrides the chosen palette (<code>neon</code> chosen, <code>abyss</code> served), and the chosen palette returns once the event ends. Seasonal theming now has coverage it did not have before.</dd>
+            <dt>Status</dt><dd><strong>Fixed.</strong> Pre-existing; not introduced by this audit.</dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="find">
+        <div class="sev p3"></div>
+        <div class="find-body">
+          <div class="find-head"><span class="sev-tag">P3</span><h3>The live schema has drifted from the migrations</h3><span class="chip c-fail">Open</span></div>
+          <dl class="kv">
+            <dt>Feature</dt><dd><code>get_public_tap</code> RPC</dd>
+            <dt>Problem</dt><dd>On the live project (17 Sep) it fails with <code>column reference "slug" is ambiguous</code>. Migrations 001–010 produce a version that works — verified locally against a <em>published</em> Tap.</dd>
+            <dt>Why P3</dt><dd>Nothing calls it. The web app uses <code>get_public_profile</code> and <code>get_public_tap_state</code>, both of which answered correctly on live; the admin app mentions it only in a comment. What it does show is that the live database is not an exact copy of the migrations.</dd>
+            <dt>Test gap</dt><dd>The earlier local tests used an unpublished Tap, which returns before reaching the failing query, so they could not have caught this.</dd>
+            <dt>Fix</dt><dd>Re-apply migrations 001–010 once the project is restored. They are proven idempotent locally.</dd>
+            <dt>Status</dt><dd><strong>Open</strong> — blocked with the project.</dd>
+          </dl>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ CHANGES ============ -->
+  <section>
+    <h2>Changes I made</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>File</th><th>Change</th></tr></thead>
+        <tbody>
+          <tr><td class="area"><code>netlify.toml</code></td><td class="note">Pinned <code>NODE_VERSION = "22"</code> with rationale (P1)</td></tr>
+          <tr><td class="area"><code>package.json</code></td><td class="note">Added <code>engines.node &gt;= 22.12.0</code> (P1)</td></tr>
+          <tr><td class="area"><code>src/services/catalog.ts</code></td><td class="note">In-flight dedup + 30 s cache + <code>invalidateCatalog()</code> (P2)</td></tr>
+          <tr><td class="area"><code>src/index.css</code></td><td class="note">Tap targets: pseudo-element dots in 24 px buttons, padded demo button, coarse-pointer block (P3)</td></tr>
+          <tr><td class="area"><code>supabase/tests/rls-adversarial.mjs</code></td><td class="note"><em>New.</em> 48 adversarial RLS assertions run as a real <code>authenticated</code> role</td></tr>
+          <tr><td class="area"><code>netlify/tests/functions-security.mjs</code></td><td class="note"><em>New.</em> 14 function security assertions, no Netlify CLI needed</td></tr>
+          <tr><td class="area"><code>supabase/tests/live-auth-rls.mjs</code></td><td class="note"><em>New.</em> Live auth + RLS probe, ready to run once credentials are fixed</td></tr>
+          <tr><td class="area"><code>.env</code></td><td class="note">Added webhook secret and <code>VITE_SITE_URL</code>; <strong>left service-role empty</strong> rather than install a foreign project's key</td></tr>
+          <tr><td class="area"><code>.claude/launch.json</code></td><td class="note">Added a production-preview entry on port 4173</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose" style="margin-top:14px;color:var(--ink-2);font-size:14.5px">The working directory held an older build than the archive. I backed it up, then synced the 26 newer files (including migrations 005–010) so the tested tree matches <code>shygontapv5_complete.zip</code> byte-for-byte. Both archives you attached are identical — same MD5.</p>
+  </section>
+
+  <!-- ============ BEFORE LAUNCH ============ -->
+  <section>
+    <h2>Before launch <span class="count">step 3 is now enforced by the build</span></h2>
+    <ol class="steps">
+      <li><div><div class="t">Restore <code>shygon-tap-v5</code> and add its publishable key</div><div class="d">In the Supabase dashboard. The URL and service-role key in <code>.env</code> are already correct for it. Nothing else can be tested until this is done.</div></div></li>
+      <li><div><div class="t">Re-apply migrations 001–010</div><div class="d">The schema is largely present but has drifted in at least one function. The migrations are proven idempotent locally. Then run <code>node supabase/tests/live-auth-rls.mjs .</code> against it.</div></div></li>
+      <li><div><div class="t">Confirm <code>VITE_SITE_URL</code> is unset or the real domain in Netlify</div><div class="d"><strong>Now enforced:</strong> the build refuses a bundle whose canonical origin is not a public https URL, so this can no longer be got wrong silently. Just do not set the variable in Netlify.</div></div></li>
+      <li><div><div class="t">Run one real Razorpay test-mode payment end to end</div><div class="d">Order → checkout → verification → entitlement → Tap provisioning. This is the single largest untested path, and it is untested only because of the credential blocker.</div></div></li>
+      <li><div><div class="t">Register the webhook and replay an event twice</div><div class="d">Confirm the second delivery is answered “already processed” and grants nothing additional.</div></div></li>
+      <li><div><div class="t">Set the four server secrets in Netlify</div><div class="d"><code>RAZORPAY_KEY_SECRET</code>, <code>RAZORPAY_WEBHOOK_SECRET</code>, <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code> — never with a <code>VITE_</code> prefix.</div></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>What I did not test</h2>
+    <ul class="plain">
+      <li>Any real payment — <strong>no transaction was executed</strong>, in test mode or otherwise.</li>
+      <li>Live webhook delivery from Razorpay (localhost is unreachable to it without a tunnel).</li>
+      <li>The admin dashboard application — a separate project outside this archive.</li>
+      <li>Shipping/Shiprocket integration — credentials absent, so <code>check-delivery</code> correctly serves its documented fallback estimate instead.</li>
+      <li>Real email flows (confirmation, password reset) — no mailbox available.</li>
+      <li><code>netlify dev</code> itself — the CLI is not installed and could not be fetched.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>SHYGON Tap V5 — customer web</span>
+    <span>106 assertions across 4 suites</span>
+    <span>Verdict: NOT PRODUCTION READY</span>
+    <span>Tested 12 Sep · revised 26 Sep 2026</span>
+  </footer>
+
+</div>
+</body>
+</html>
