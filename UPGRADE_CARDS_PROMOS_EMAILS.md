@@ -2,21 +2,30 @@
 
 Added to the existing site. The design, routes and existing flows are unchanged.
 
-## Deploy in this order
+## Status: NOT ready for production (review of 2026-10-02, branch `fix/upgraded-zip`)
 
-1. **Database first.** Run `supabase/migrations/019_…` through `025_…` in the SQL editor, in order
-   (or paste the regenerated `supabase/APPLY_ALL.sql`). All are idempotent.
-   022 stops with a clear message if the live database has a function that still assumes one page per
-   customer (`ON CONFLICT (user_id)` on `tap_profiles`); fix that function, then re-run.
-2. **Razorpay webhook:** add the events `refund.processed` and `refund.failed` to the existing webhook
-   (keep `payment.captured`, `order.paid`, `payment.failed`).
-3. **Environment variables** (Netlify / Vercel): an email provider (Gmail SMTP or Resend) and `CRON_SECRET`.
-   See the bottom of `.env.example`.
-4. **Deploy the site** and rebuild the Admin app.
-5. **GST:** Admin app → More → *GST & invoices*: enter the GSTIN and confirm rate / inclusive pricing (default 18%, prices include GST).
-6. **Stock:** Admin app → More → *Card stock* → Import the chip ids of each printed batch.
-7. **New cards:** write `https://shygontech.com/c/<CARD ID>` to each new card's NFC chip. The Card ID is on the
-   customer's *My cards* page and in the admin data (`cards.card_code`). Cards already printed keep working.
+Do not apply these migrations to the live project and do not deploy this build yet.
+
+* **Never paste `supabase/APPLY_ALL.sql` into the SQL editor.** It replays migrations 001–019 onto live,
+  which changes 48 live objects and breaks sign-up (DEC-2026-023; `docs/governance/SCHEMA_DRIFT_REPORT.md`).
+* The migrations are now **022–028** (019 is the live order-SMS migration; 020–021 are reserved for M0.3).
+* **022 refuses to run on live** until two owner decisions are made (DEC-2026-033):
+  1. live `tap_profiles_customer_id_key` allows one page per customer record, so "one page per card" cannot work;
+  2. live `cards.card_id` is NOT NULL with no default (I-4), so no card can be issued.
+* New pages are **drafts** until the customer publishes them (owner decision D-U4).
+* Migrations reach production only through the approved process (DEC-2026-023), never by pasting files.
+
+When those decisions are made and implemented, the remaining one-time setup is:
+
+1. **Razorpay webhook:** add `refund.processed` and `refund.failed` (keep `payment.authorized`,
+   `payment.captured`, `order.paid`, `payment.failed`).
+2. **Environment variables** (Vercel): an email provider (Gmail SMTP or Resend) and `CRON_SECRET`
+   (bottom of `.env.example`). The Vercel cron in `vercel.json` runs **once a day** (03:00 UTC); for prompt
+   shipped/delivered/payment-failed emails add a Supabase Database Webhook on `email_outbox` → `/api/send-emails`.
+3. **GST:** Admin app → More → *GST & invoices*: GSTIN, rate, inclusive pricing (default 18%, included).
+4. **Stock:** Admin app → More → *Card stock* → import the chip ids of each printed batch.
+5. **New cards:** write `https://shygontech.com/c/<CARD ID>` to each new card's NFC chip. Cards already
+   printed keep working.
 
 ## What each feature is
 
@@ -26,7 +35,7 @@ Added to the existing site. The design, routes and existing flows are unchanged.
 | Expiry, start date, usage limit, per-customer limit, minimum, cap | `promo_codes` table; admin RPCs `admin_list_promo_codes`, `admin_upsert_promo_code`, `admin_set_promo_code_active` (audited) |
 | ₹49 delivery on every card order | `products` row `delivery-standard` (change the price there) |
 | Custom card ₹799 (any material/finish) | Store, builder, `/shygontap/store/custom`; SKUs `card-custom-*` |
-| One page per card, created and published automatically | DB trigger when a card is issued; replacement cards keep the old card's page |
+| One page per card, created as a draft the customer publishes (D-U4) | DB trigger when a card is issued; replacement cards keep the old card's page |
 | Permanent Card ID, nickname, activate, deactivate, report lost, replacement | *My cards* |
 | Card opening animation per card design | Plays when a page is opened from a card link |
 | Custom URL slug (old address keeps redirecting) | Tap profile → Change address |
@@ -59,7 +68,7 @@ Added to the existing site. The design, routes and existing flows are unchanged.
 | Buy Now → **Card details** → Delivery → Payment. Name on card, title, company and contact buttons; the new page is created already filled in once the payment is verified | `/shygontap/card-details`; `orders.profile_details`; `applyProfileDetails` in fulfilment |
 | Limited-edition number shown like a watch caseback (Chapter I · Nº 037 / 100; ranges for several cards) | Card details page |
 | Buttons by tier: Essential = call, email, WhatsApp · Business + Instagram, LinkedIn, website · Premium + location, YouTube, custom links · GOAT + photo gallery. Add-ons still unlock a button on any tier | `public.tier_buttons()` (public page, editor save rule) and `src/lib/tierButtons.ts` (display) |
-| Quantity (1–10; experience charged once), Save for later, Recently viewed, Saved filter | Product page, Store |
+| Quantity (1–10; experience charged once), Save for later, Recently viewed, Saved filter | Product page, Store. **Known gap:** fulfilment issues one card record per order line, so an order for 3 cards gets 1 card and 1 page. Fixing it depends on the card model (I-4, DEC-2026-028) |
 | Share: native share sheet, WhatsApp, copy link | Product page |
 | Verified-buyer reviews and star ratings (only paying customers, one per design, first name + initial shown) | Product page; admin app → Reviews (hide/show, audited) |
 | Buy again (same design, material and finish) | Orders |
@@ -67,14 +76,18 @@ Added to the existing site. The design, routes and existing flows are unchanged.
 ## Fixed on the way
 
 * Card issuing used an upsert that could never match the partial unique index on `cards(order_id, sku)`,
-  so no card row was ever created. It is now a plain insert.
+  so no card row was ever created. It is now a plain insert. On live it still fails until I-4 is decided
+  (`cards.card_id` NOT NULL, uniqueness on `(order_id, sku, card_slot)`).
 * Admin customer RPCs used scalar sub-queries on `tap_profiles` that would error once a customer has two pages.
+
+The 2026-10-02 review fixed more; see `git log fix/upgraded-zip` for each change and its evidence.
 
 ## Tests
 
 ```
-npm run db:apply    # all migrations, twice
-npm run db:verify        # 23 existing + 48 new checks
-npm run test:functions   # checkout/payment/webhook/GST/card details (19), security (14), email templates (7)
-npm run build
+npm run db:apply         # all migrations, twice (history chain)
+npm run db:verify        # 23 existing + 51 upgrade checks
+npm run test:functions   # checkout/payment/webhook/GST/card details (20), security (14), email templates (8)
+npm run test:payments:ci # Razorpay confirmation + order SMS (15) and security, network denied
+npm run build && npm run test:bundle
 ```
