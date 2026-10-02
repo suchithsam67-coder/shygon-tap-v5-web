@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
  *                 ->  verify-payment  and/or  razorpay-webhook  ->  fulfilment
  *
  * No real money moves and no real database is touched: `fetch` is replaced by
- * an in-memory PostgREST and a fake Razorpay orders API. What is proven is the
+ * an in-memory PostgREST and a fake Razorpay orders + payments API. What is proven is the
  * behaviour of OUR functions — that the browser cannot set a price, that
  * nothing is marked paid without a valid signature, that a replay does not pay
  * or issue twice, and that no card data is stored.
@@ -34,6 +34,7 @@ const db = {
   products: [
     { id: 'p1', sku: 'card-business-standard-pvc', name: 'Shygon Tap Business — PVC', price_in_paise: 39900, stock: 100, product_type: 'card', active: true },
     { id: 'p2', sku: 'delivery-standard', name: 'Delivery', price_in_paise: 4900, stock: null, product_type: 'delivery', active: true },
+    { id: 'p3', sku: 'plan-premium', name: 'Premium experience', price_in_paise: 99900, stock: null, product_type: 'digital_plan', active: true },
   ],
   entitlements: [],
   orders: [],
@@ -47,6 +48,15 @@ const db = {
   tax_settings: [{ id: true, enabled: true, rate_percent: 18, prices_include_tax: true, seller_state: 'Karnataka' }],
 };
 const razorpayOrders = [];
+/** Payments Razorpay "took" (what netlify/lib/razorpay.mjs confirms before anything is marked paid). */
+const razorpayPayments = new Map();
+/** The customer paying in Razorpay Checkout: Razorpay now holds a captured payment for the order. */
+const payInRazorpay = (orderId, paymentId, amount) => {
+  const order = razorpayOrders.find((o) => o.id === orderId);
+  razorpayPayments.set(paymentId, {
+    id: paymentId, order_id: orderId, amount: amount ?? order?.amount, currency: 'INR', status: 'captured',
+  });
+};
 let seq = 0;
 const uuid = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, '0')}`;
 
@@ -105,6 +115,14 @@ async function mockFetch(input, init = {}) {
   const body = bodyText ? JSON.parse(bodyText) : undefined;
 
   if (url.host === 'api.razorpay.com') {
+    const payment = url.pathname.match(/^\/v1\/payments\/([^/]+)(\/capture)?$/);
+    if (payment) {
+      const entity = razorpayPayments.get(decodeURIComponent(payment[1]));
+      if (!entity) return reply({ error: { code: 'BAD_REQUEST_ERROR', description: 'The id provided does not exist' } }, 400);
+      if (payment[2] && method === 'POST') entity.status = 'captured';
+      return reply(entity);
+    }
+    if (url.pathname !== '/v1/orders' || method !== 'POST') return reply({ error: { description: 'unsupported' } }, 404);
     const order = { id: `order_T${razorpayOrders.length + 1}`, amount: body.amount, currency: body.currency };
     razorpayOrders.push({ ...order, notes: body.notes });
     return reply(order);
@@ -271,6 +289,18 @@ await check('an invalid promo code is refused, not ignored', async () => {
   return (await res.json()).error;
 });
 
+await check('a customer who owns an experience can buy a higher one (and not a lower one)', async () => {
+  // A legacy key ('pro' was the second tier) is read as the experience it was sold as.
+  db.entitlements.push({ id: uuid(), user_id: ALICE, type: 'digital_plan', key: 'pro', is_active: true });
+  const up = await createOrder(post({ orderType: 'digitalUpgrade', planId: 'premium' }));
+  const upJson = await up.json();
+  assert(up.status === 200 && upJson.amount === 99900, `upgrade: ${up.status} ${JSON.stringify(upJson)}`);
+  const down = await createOrder(post({ orderType: 'digitalUpgrade', planId: 'business' }));
+  assert(down.status === 409, `same tier again: ${down.status}`);
+  db.entitlements.length = 0;
+  return 'owns business (legacy "pro"): premium 200, business 409';
+});
+
 await check('a signed-out caller cannot create an order', async () => {
   const res = await createOrder(post(cardIntent(), null));
   assert(res.status === 401, `status ${res.status}`);
@@ -303,6 +333,7 @@ await check("a valid signature for someone else's order is refused", async () =>
 });
 
 await check('a verified payment marks the order paid and fulfils it', async () => {
+  payInRazorpay(order1.order_id, 'pay_1');
   const res = await verifyPayment(post({
     razorpay_order_id: order1.order_id, razorpay_payment_id: 'pay_1', razorpay_signature: sign(order1.order_id, 'pay_1'),
   }));
@@ -427,20 +458,22 @@ await check('card details are kept with the order (known fields only) and fill t
   // The page this order's card opens (made by the database trigger in production).
   const pageId = uuid();
   db.tap_profiles.push({ id: pageId, user_id: ALICE, slug: 'arjun', selected_ui_tier: 'essential', enabled_customizations: ['email', 'phone'], display_name: '' });
+  payInRazorpay(json.order_id, 'pay_details');
   const paid = await verifyPayment(post({ razorpay_order_id: json.order_id, razorpay_payment_id: 'pay_details', razorpay_signature: sign(json.order_id, 'pay_details') }));
   assert(paid.status === 200, `verify ${paid.status}`);
   const card = db.cards.find((c) => c.order_id === row.id);
   card.tap_profile_id = pageId;
   const { applyProfileDetails } = await import('../lib/fulfilment.mjs');
-  const { createClient } = await import('@supabase/supabase-js');
-  await applyProfileDetails(createClient(SUPABASE, 'service-key'), orderByRzp(json.order_id));
+  // The same client the functions use (it also runs on Node 20, which has no WebSocket).
+  const { adminClient } = await import('../lib/supabase.mjs');
+  await applyProfileDetails(adminClient(), orderByRzp(json.order_id));
   const page = db.tap_profiles.find((t) => t.id === pageId);
   assert(page.display_name === 'Arjun Mehta' && page.whatsapp === '+919876543210' && page.designation === 'Founder', JSON.stringify(page));
   assert(page.enabled_customizations.includes('whatsapp'), 'WhatsApp not switched on for Essential');
   assert(!page.enabled_customizations.includes('instagram'), 'Instagram switched on for Essential');
   // A retry never overwrites what the customer changed since.
   page.display_name = 'Arjun M.';
-  await applyProfileDetails(createClient(SUPABASE, 'service-key'), orderByRzp(json.order_id));
+  await applyProfileDetails(adminClient(), orderByRzp(json.order_id));
   assert(page.display_name === 'Arjun M.', 'retry overwrote the page');
   return 'stored without card fields; page filled; whatsapp on, instagram off (Essential); retry safe';
 });

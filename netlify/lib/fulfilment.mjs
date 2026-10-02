@@ -30,7 +30,7 @@ const LEGACY_EXPERIENCE_KEYS = {
   custom: 'goat',
 };
 
-function normaliseExperienceKey(key) {
+export function normaliseExperienceKey(key) {
   const value = String(key ?? '').trim().toLowerCase();
   return LEGACY_EXPERIENCE_KEYS[value] ?? value;
 }
@@ -319,7 +319,7 @@ async function decrementStock(admin, orderItemId, sku, quantity) {
  *
  * Since migration 022 the database does this itself: the payment trigger
  * provisions a customer's first page, and every issued card gets its own page
- * (published automatically) when its row is written. This covers a database
+ * (an unpublished draft, owner decision D-U4) when its row is written. This covers a database
  * where neither trigger ran, and keeps the reference "edit window started"
  * date on the customer's pages.
  */

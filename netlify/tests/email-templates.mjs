@@ -42,7 +42,9 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.includes('/profiles?')) return reply([{ full_name: 'Test Buyer', email: 'buyer@test.invalid' }]);
   if (u.includes('/orders?')) return reply([ORDER]);
   if (u.includes('/order_items?')) return reply([{ name: 'Obsidian card', sku: 'card-obsidian-standard-pvc', quantity: 1, line_total_in_paise: 165000 }]);
-  if (u.includes('/cards?') || u.includes('/tap_profiles?')) return reply([]);
+  if (u.includes('/cards?')) return reply([{ card_code: 'K7M4Q9XD', sku: 'card-obsidian-standard-pvc', tap_profile_id: 'tp1' }]);
+  // A new page is a draft until the customer publishes it (D-U4).
+  if (u.includes('/tap_profiles?')) return reply([{ id: 'tp1', slug: 'test-buyer', status: 'draft' }]);
   if (u.includes('/support_tickets?')) return reply([{ id: 't1', reference: 'ST-ABCD1234', subject: 'Card not scanning', status: 'open' }]);
   if (u.includes('/support_messages?')) return reply([{ body: 'Please hold the card near the top of the phone.\nThanks!' }]);
   return reply([]);
@@ -65,7 +67,11 @@ const replyMail = sent.find((m) => /Reply on/.test(m.subject));
 check('three emails sent', summary.sent === 3, JSON.stringify(summary));
 check('e-bill shows CGST and SGST halves', Boolean(bill?.html.includes('CGST 9%') && bill.html.includes('SGST 9%')));
 check('e-bill shows the customer GSTIN and billing address', Boolean(bill?.html.includes('29ABCDE1234F1Z5') && bill.html.includes('9 Residency Rd')));
-check('support request email names the reference', Boolean(created?.html.includes('ST-ABCD1234')));
+check(
+  'a draft page is not called live and its public address is not given out',
+  Boolean(bill && /draft/i.test(bill.html) && !/is live/i.test(bill.html) && !bill.html.includes('/shygontap/test-buyer') && !bill.text.includes('/shygontap/test-buyer')),
+);
+check('support request email names the reference',Boolean(created?.html.includes('ST-ABCD1234')));
 check('support reply email carries the reply text', Boolean(replyMail?.html.includes('near the top of the phone.<br>Thanks!')));
 check('plain-text parts have no HTML', sent.every((m) => !/<[a-z]/i.test(m.text ?? '')));
 check('every row completed', outcomes.length === 3);

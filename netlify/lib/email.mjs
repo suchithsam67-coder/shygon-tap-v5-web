@@ -375,21 +375,30 @@ async function render(cfg, row) {
       const pages = tapIds.length
         ? (await rest(cfg, `tap_profiles?id=in.(${tapIds.join(',')})&select=id,slug,status`)) ?? []
         : [];
+      // New pages start as drafts (owner decision D-U4): only a published page
+      // gets its public address; a draft points to the editor instead.
+      const editorLink = `${SITE_OK}/shygontap/tap`;
+      const isLive = (page) => page?.status === 'active';
       const pageList = cards
         .map((card) => {
           const page = pages.find((pg) => pg.id === card.tap_profile_id);
           if (!page?.slug) return null;
-          return `<li style="margin:0 0 6px;"><a href="${SITE_OK}/shygontap/${esc(page.slug)}" style="color:#111;font-weight:700;">${esc(DOMAIN)}/shygontap/${esc(page.slug)}</a> — ${esc(cardLabel(card))}</li>`;
+          return isLive(page)
+            ? `<li style="margin:0 0 6px;"><a href="${SITE_OK}/shygontap/${esc(page.slug)}" style="color:#111;font-weight:700;">${esc(DOMAIN)}/shygontap/${esc(page.slug)}</a> — ${esc(cardLabel(card))}</li>`
+            : `<li style="margin:0 0 6px;"><a href="${editorLink}" style="color:#111;font-weight:700;">Draft page for ${esc(cardLabel(card))}</a> — publish it when you are ready</li>`;
         })
         .filter(Boolean)
         .join('');
+      const anyDraft = pages.some((page) => page.slug && !isLive(page));
       const custom = items.some((item) => /^card-custom-/.test(item.sku ?? ''));
       const body = [
         hello,
         p(`Thank you — your payment was received and order <strong>${esc(order.order_id)}</strong> is confirmed. Your e-bill is below.`),
         ebill(order, items, profile, cards),
         pageList
-          ? p('Your Tap page is live. It updates the moment you edit it in your account:') +
+          ? p(anyDraft
+              ? 'Your card has its own Tap page, waiting as a draft. Nobody can see it until you add your details and publish it in your account:'
+              : 'Your Tap page is live. It updates the moment you edit it in your account:') +
             `<ul style="margin:0 0 16px;padding-left:18px;font-size:14px;line-height:1.6;">${pageList}</ul>`
           : '',
         custom
@@ -402,7 +411,7 @@ async function render(cfg, row) {
         to: profile.email,
         subject: `Order confirmed — ${order.order_id} · your SHYGON Tap e-bill`,
         html: layout({ preheader: `Payment received. E-bill for ${order.order_id}.`, title: 'Your order is confirmed', body }),
-        text: `Hi ${first},\n\nPayment received — order ${order.order_id} is confirmed.\nTotal paid: ${rupees(order.amount_in_paise)}\n${items.map((i) => `- ${i.name}: ${rupees(i.line_total_in_paise)}`).join('\n')}${order.discount_in_paise ? `\nPromo ${order.promo_code}: -${rupees(order.discount_in_paise)}` : ''}\nPayment reference: ${order.razorpay_payment_id ?? '-'}\n\n${pages.map((pg) => `Your page: ${SITE_OK}/shygontap/${pg.slug}`).join('\n')}\n\nTrack your order: ${ordersLink}\n\n${COMPANY}`,
+        text: `Hi ${first},\n\nPayment received — order ${order.order_id} is confirmed.\nTotal paid: ${rupees(order.amount_in_paise)}\n${items.map((i) => `- ${i.name}: ${rupees(i.line_total_in_paise)}`).join('\n')}${order.discount_in_paise ? `\nPromo ${order.promo_code}: -${rupees(order.discount_in_paise)}` : ''}\nPayment reference: ${order.razorpay_payment_id ?? '-'}\n\n${pages.filter((pg) => pg.slug).map((pg) => (isLive(pg) ? `Your page: ${SITE_OK}/shygontap/${pg.slug}` : `Your draft page (publish it when ready): ${editorLink}`)).join('\n')}\n\nTrack your order: ${ordersLink}\n\n${COMPANY}`,
       };
     }
 
