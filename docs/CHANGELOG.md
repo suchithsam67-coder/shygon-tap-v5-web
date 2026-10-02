@@ -5,6 +5,19 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M0.3 U1 started, then stopped at its stop rule (2026-10-02), branch `feat/m0.3-security-identity`
+**Added** (tooling only; not yet wired into any script or CI)
+- `supabase/tests/lib/live-db.mjs`: builds an isolated PGlite database from the live baseline (DEC-2026-023 Option A). It loads `live-platform-shim.sql`, then `000_live_baseline.sql`, then `live-auth-shim.sql`, then migrations `020+`. 001–019 are never re-run.
+- `supabase/tests/live-auth-shim.sql`: a stand-in for the sign-up trigger `on_auth_user_created`, which migration 002 created on live and which the `public`-only dump omits. VERIFY ON LIVE.
+- `docs/shygon-os/M0_3_U1_BASELINE_FINDINGS.md`: the existing suites run on the live baseline with assertions unchanged.
+  - `rls-adversarial`: 44/48. The 4 failures are anonymous reads that error instead of returning 0 rows; no data leaks. This is the M0.4 item.
+  - `verify`: 6/23. With a scratch I-1 prototype: 20/23 (seed-data checks ×2; live auto-publishes the Tap ×1).
+- **New observation O-12:** once I-1 is fixed, live auto-publishes a first-time buyer's Tap, showing their name and account email. Decisions D-U1-a, D-U1-b and D-U4 are requested.
+
+**Recorded:** the owner confirmed scope points 1–5 (DEC-2026-024 = Option A).
+
+**Not changed:** the suites, CI, migrations, RLS, auth, payments and production. CI still runs on the history chain and passes.
+
 ### Owner approvals recorded; M0.3 scope defined (2026-10-02), governance only
 **Recorded** (repository owner, in session):
 - DEC-2026-018 **APPROVED, Option B:** the one-person control model. The new record file is `DEC-2026-018_role-holders.md`; `ROLE_ROSTER.md` is updated with no invented names or handles.
