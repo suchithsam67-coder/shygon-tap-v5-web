@@ -5,6 +5,20 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M0.2: Live schema baseline and drift reconciliation (2026-09-30 → 2026-10-02)
+**Added**
+- `supabase/baseline/000_live_baseline.sql`: the authoritative schema-only dump of the live project, provided by the owner. Not modified.
+  - Checked independently: no data, gitleaks 0 findings.
+  - Its `\restrict` line is pg_dump's nonce, not a credential.
+- `supabase/tests/schema-drift.mjs`: read-only drift tool. It rebuilds LIVE (baseline) and REPO (migrations) in isolated in-memory PGlite and diffs their catalogs, ignoring comments and layout.
+  - It also reports per-migration lineage.
+  - `--replay` simulates what `db:push` would do to live.
+- `supabase/tests/live-platform-shim.sql`: test-only stand-ins for the Supabase roles and `auth` objects the baseline references.
+- `docs/governance/SCHEMA_DRIFT_REPORT.md`: the full M0.2 report.
+- DEC-2026-023 (migration origin + `db:push` safeguard) and DEC-2026-024 (live-schema runtime incompatibilities, including the P1 latent paid-claim defect). Both are OPEN.
+
+**Not changed:** no migration, application code, RLS, auth or payment change. Production was not touched by Claude Code. The P0 triage counts were run by the owner: mismatch 0, retry 0, 6 customers exposed. The candidate was downgraded to P1 (DEC-2026-024).
+
 ### M0.1 completion: audit gate resolved; M0.2 check (2026-09-30)
 **Changed**
 - `package-lock.json`: dev-only `brace-expansion` 1.1.18 → 1.1.21 and 5.0.9 → 5.0.12. This is DEC-2026-021 option A, approved by the owner, commit `c458a6f`.
