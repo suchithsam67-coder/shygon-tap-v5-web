@@ -62,6 +62,40 @@ gitleaks 8.30.1 flagged a real (not fake) key in the V5 baseline. How should tha
   3. If the form is ever abused, regenerate the key in Web3Forms.
 - Decision date: 2026-09-30
 
+## Provenance check: a second occurrence (2026-10-02; the value is not shown)
+
+**Trigger:** the full-history gitleaks gate (`npm run test:secrets`, `--log-opts=--all`) failed with one finding:
+- rule `generic-api-key`;
+- `src/components/ProjectConsultation.tsx:75`;
+- commit `9c8caa7932819e3fc3cea0023630d396000f8f79`.
+
+This exception's fingerprint names only commit `8becea3…`, so the occurrence in the new commit is reported.
+
+**Verification** (hashes and lengths only; the value was never printed):
+
+| Commit | File blob | Line 75 | Token length | sha256 of token (first 16 hex) |
+|---|---|---|---|---|
+| `8becea3` (approved by this record) | `89563fa` | `access_key` line | 36 | `1db0669d4873b662` |
+| `9c8caa7` (flagged) | `89563fa` | `access_key` line | 36 | `1db0669d4873b662` |
+| `89f1bc2` | `89563fa` | same | 36 | `1db0669d4873b662` |
+| `27aa5e2` | `89563fa` | same | 36 | `1db0669d4873b662` |
+
+**Result:** the flagged value is **exactly the public Web3Forms key this record approved**. The whole file is the same git blob in all four commits. It is not a new secret, and not a P0. gitleaks reports only `9c8caa7`, the root commit that introduced the line on those branches.
+
+**Where the flagged commit comes from (OBSERVED; git metadata only):**
+- `9c8caa7` is a root commit, "chore(import): SHYGON Tap V5 snapshot shygon-tap-v5-web-2026-09-28-final.zip, as found", on branch `import/v5-2026-09-28-final`.
+- `89f1bc2` ("upgrade zip … 2026-09-29-upgraded.zip, as found") on `import/upgraded-zip-2026-09-29` descends from it.
+- `fix/upgraded-zip` merges `89f1bc2` onto `c31f9df` (merge commit `27aa5e2`). It is checked out in a second worktree, `../shygon-tap-v5-web-upgrade-fix`.
+- Branch reflogs show these refs were created locally on 2026-10-02 between 15:49:46 and 15:57:09 IST, outside the Claude Code session that maintains this record. The commits' own dates are set to the ZIP dates.
+- No `.env`, key or credential-type file is tracked in any commit of those branches.
+- None of them is merged into `feat/m0.3-security-identity`, which scans clean on its own (17 commits).
+- **Whether this worktree and its branches are expected is awaiting the repository owner's confirmation.**
+
+**Not changed:** `.gitleaksignore` (owner instruction: do not modify the ignore configuration yet). Until the owner decides, the full-history gate stays red on these branches. Options for the Security Owner (the repository owner under DEC-2026-018):
+- (a) extend this exception with a second fingerprint for `9c8caa7…:src/components/ProjectConsultation.tsx:generic-api-key:75` (the same value);
+- (b) keep these branches out of the repository whose history the gate scans;
+- (c) another option the owner defines.
+
 ## Result (filled at review date)
 - Observed result:
 - Reviewed on / by:
