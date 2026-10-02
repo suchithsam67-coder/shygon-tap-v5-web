@@ -5,6 +5,23 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M1.0: Architecture & Implementation Readiness Package (2026-10-02), planning only
+**Added** (documentation only)
+- `docs/shygon-os/M1_ARCHITECTURE_PLAN.md` (36 sections).
+- Companions: `M1_DOMAIN_MODEL.md`, `M1_API_CONTRACTS.md`, `M1_SECURITY_MODEL.md`, `M1_DATABASE_PLAN.md`, `M1_TEST_STRATEGY.md`.
+- Decision proposals DEC-2026-025 … 032:
+  - organisations timing;
+  - M1 sequence and the M0 gate;
+  - environments vs "no new Supabase project";
+  - card lifecycle vocabulary;
+  - identity key contract;
+  - OS dashboard scope;
+  - notification providers / WhatsApp;
+  - vertical taxonomy.
+- Security observations O-1…O-6 for the Security Owner.
+
+**Not changed:** no schema, migration, RLS, auth, payment, deployment or production change. Live payments OFF. The approved pack files in `docs/shygon-os/` are unchanged; only new `M1_*` files were added.
+
 ### M0.2: Live schema baseline and drift reconciliation (2026-09-30 → 2026-10-02)
 **Added**
 - `supabase/baseline/000_live_baseline.sql`: the authoritative schema-only dump of the live project, provided by the owner. Not modified.
