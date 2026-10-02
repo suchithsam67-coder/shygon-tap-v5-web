@@ -89,9 +89,16 @@ This exception's fingerprint names only commit `8becea3…`, so the occurrence i
 - Branch reflogs show these refs were created locally on 2026-10-02 between 15:49:46 and 15:57:09 IST, outside the Claude Code session that maintains this record. The commits' own dates are set to the ZIP dates.
 - No `.env`, key or credential-type file is tracked in any commit of those branches.
 - None of them is merged into `feat/m0.3-security-identity`, which scans clean on its own (17 commits).
-- **Whether this worktree and its branches are expected is awaiting the repository owner's confirmation.**
+- **The worktree is EXPECTED** (confirmed by the repository owner, 2026-10-02, in session). It is a parallel worktree belonging to this project. Its branches are not to be modified or merged by this workstream.
 
-**Not changed:** `.gitleaksignore` (owner instruction: do not modify the ignore configuration yet). Until the owner decides, the full-history gate stays red on these branches. Options for the Security Owner (the repository owner under DEC-2026-018):
+**Classification (repository owner, 2026-10-02):** the finding is an **approved public-key reuse in a separate, expected worktree**. The flagged value is the public Web3Forms key this record already approved.
+
+**The scan result stays visible:**
+- `.gitleaksignore` is unchanged, and so is the secret-scan wrapper.
+- `npm run test:secrets` (full history, all branches) still reports this finding and still exits non-zero. Nothing is suppressed.
+- The single-branch scan of `feat/m0.3-security-identity` is clean, but it is diagnostic evidence only. It does not replace the gate.
+
+**Not changed:** `.gitleaksignore` (owner instruction: do not change it yet). Until the owner decides, the full-history gate stays red because of these branches. This is a known, classified result, not a new finding. Options for the Security Owner (the repository owner under DEC-2026-018):
 - (a) extend this exception with a second fingerprint for `9c8caa7…:src/components/ProjectConsultation.tsx:generic-api-key:75` (the same value);
 - (b) keep these branches out of the repository whose history the gate scans;
 - (c) another option the owner defines.

@@ -5,6 +5,23 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### Secret-scan finding classified (2026-10-02), governance only
+**Context:** the full-history secret scan (`npm run test:secrets`) reports one finding:
+- `generic-api-key` at `src/components/ProjectConsultation.tsx:75`, in commit `9c8caa7`;
+- the commit is on branches of a parallel worktree, `../shygon-tap-v5-web-upgrade-fix` (`import/v5-2026-09-28-final`, `import/upgraded-zip-2026-09-29`, `fix/upgraded-zip`).
+
+**Verified, without showing the value:** it is the public Web3Forms key DEC-2026-020 already approved (identical git blob `89563fa` and token hash).
+
+**Recorded:**
+- The repository owner confirmed the worktree is **expected** and belongs to this project.
+- The finding is classified as an **approved public-key reuse in a separate, expected worktree** (DEC-2026-020 provenance section; `docs/DECISIONS.md`).
+
+**Not changed:**
+- `.gitleaksignore` and the scan wrapper. The full-history gate **still fails and stays visible**.
+- The worktree's branches; they are not modified or merged.
+
+`feat/m0.3-security-identity` scans clean on its own; that is evidence only, not a substitute for the gate.
+
 ### M0.3 U2 complete: `db:push` safeguard (2026-10-02), branch `feat/m0.3-security-identity`
 **Decided** by the repository owner, in session:
 - **DEC-2026-023 amendment A-1:** S1 is allowlist only, with no override flag.
