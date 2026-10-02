@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CreditCard, Loader2, PauseCircle, SearchX, WifiOff } from 'lucide-react';
 import { TapExperience } from '../components/tap/TapExperience';
+import { loadCardOpening } from '../components/tap/cardOpeningLoader';
 import {
   fetchPublicCard,
   fetchPublicPageCard,
@@ -102,6 +103,9 @@ export default function PublicTap({ slug: slugProp }: { slug?: string } = {}) {
    */
   const resolve = useCallback(async (): Promise<Outcome> => {
     if (!slug && !code) return { kind: 'state', state: 'unavailable' };
+
+    // Opened from a card: fetch the opening's chunk while the data loads.
+    if (code || searchParams.get('src') === 'nfc') void loadCardOpening().catch(() => undefined);
 
     try {
       if (code) {

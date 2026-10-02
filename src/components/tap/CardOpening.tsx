@@ -33,6 +33,12 @@ export function CardOpening({
   const finished = useRef(false);
   const reduced = prefersReducedMotion();
   const opening = openingFor(card);
+  // The parent passes a new onDone on every render. Read it through a ref so a
+  // re-render during the opening does not restart its timer.
+  const onDoneRef = useRef(onDone);
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
 
   useEffect(() => {
     if (finished.current) return;
@@ -40,7 +46,7 @@ export function CardOpening({
       if (finished.current) return;
       finished.current = true;
       setGone(true);
-      onDone();
+      onDoneRef.current();
     };
     if (reduced) {
       finish();
@@ -52,7 +58,7 @@ export function CardOpening({
       window.clearTimeout(timer);
       window.removeEventListener('pointerdown', finish);
     };
-  }, [reduced, onDone, tier]);
+  }, [reduced, tier]);
 
   if (gone || reduced) return null;
 

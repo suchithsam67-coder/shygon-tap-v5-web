@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import BrandMark from '../brand/BrandMark';
 import {
   Briefcase,
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import type { CardLook, Experience, PublicProfile } from '../../lib/database.types';
 import { ExperienceIntro } from './ExperienceIntro';
-import { CardOpening } from './CardOpening';
+import { loadCardOpening } from './cardOpeningLoader';
 import { hasOpeningAnimation } from './intro-rules';
 import { TapDepthField } from './TapDepthField';
 import { paletteOf } from './palettes';
@@ -73,41 +73,47 @@ function useDynamicAccent(experience: Experience, profile: PublicProfile) {
   }, [experience, profile.company]);
 }
 
+/** If the opening's chunk cannot load, the page is simply revealed. */
+function SkipOpening({ onDone }: { onDone: () => void }) {
+  useEffect(() => onDone(), [onDone]);
+  return null;
+}
+
 /**
- * "Save contact": a vCard 3.0 of exactly what this page shows, built in the
- * browser (no request), which phones open straight into "Add to contacts".
+ * Only pages opened from a card play this, so it is its own chunk rather than
+ * part of the public Tap's entry bundle (see cardOpeningLoader.ts). Until it
+ * arrives the page stays in its "opening" state, so nothing flashes.
  */
-function saveContact(data: PublicProfile) {
-  const esc = (value: string) => value.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1');
-  const name = data.displayName?.trim() || 'SHYGON Tap contact';
-  const parts = name.split(/\s+/);
-  const last = parts.length > 1 ? parts.pop()! : '';
-  const lines = [
-    'BEGIN:VCARD',
-    'VERSION:3.0',
-    `FN:${esc(name)}`,
-    `N:${esc(last)};${esc(parts.join(' '))};;;`,
-    data.company && `ORG:${esc(data.company)}`,
-    (data.designation || data.headline) && `TITLE:${esc(data.designation || data.headline || '')}`,
-    data.phone && `TEL;TYPE=CELL:${data.phone}`,
-    data.whatsapp && data.whatsapp !== data.phone && `TEL;TYPE=WORK:${data.whatsapp}`,
-    data.email && `EMAIL;TYPE=INTERNET:${data.email}`,
-    data.website && `URL:${href(data.website)}`,
-    data.location && `ADR;TYPE=WORK:;;${esc(data.location)};;;;`,
-    data.linkedin && `X-SOCIALPROFILE;TYPE=linkedin:${href(data.linkedin)}`,
-    data.instagram && `X-SOCIALPROFILE;TYPE=instagram:${href(data.instagram)}`,
-    `NOTE:${esc(`SHYGON Tap · ${window.location.origin}/shygontap/${data.slug}`)}`,
-    'END:VCARD',
-  ].filter(Boolean);
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/vcard;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${name.replace(/[^\w\- ]+/g, '').trim() || 'contact'}.vcf`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+const CardOpening = lazy(() =>
+  loadCardOpening()
+    .then((module) => ({ default: module.CardOpening }))
+    .catch(() => ({ default: SkipOpening })),
+);
+
+type SaveContact = (data: PublicProfile) => void;
+const loadVcard = () => import('./vcard');
+
+/**
+ * The "Save contact" builder (vcard.ts), loaded once the page has rendered so
+ * the tap itself can run it synchronously, inside the user gesture.
+ */
+function useSaveContact(): (data: PublicProfile) => void {
+  const [ready, setReady] = useState<SaveContact | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadVcard()
+      .then((module) => {
+        if (live) setReady(() => module.saveContact);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+  return (data) => {
+    if (ready) ready(data);
+    else void loadVcard().then((module) => module.saveContact(data)).catch(() => undefined);
+  };
 }
 
 function href(value: string | null | undefined): string | undefined {
@@ -136,6 +142,7 @@ export function TapExperience({
   introKey?: string | number;
   card?: CardLook | null;
 }) {
+  const saveContact = useSaveContact();
   const experience = data.experience;
   const theme = data.theme;
 
@@ -229,12 +236,14 @@ export function TapExperience({
       )}
 
       {cardOpening ? (
-        <CardOpening
-          key={introToken}
-          card={cardOpening}
-          tier={experience}
-          onDone={() => setRevealedFor(introToken)}
-        />
+        <Suspense fallback={null}>
+          <CardOpening
+            key={introToken}
+            card={cardOpening}
+            tier={experience}
+            onDone={() => setRevealedFor(introToken)}
+          />
+        </Suspense>
       ) : (
         <ExperienceIntro
           key={introToken}
