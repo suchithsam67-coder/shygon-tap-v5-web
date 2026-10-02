@@ -41,7 +41,7 @@
    - A client value equal to the row's own auth user id is **mapped** to `customers.id`. That is DEC-024 Option A as written.
    - Any other client value that is not the caller's own `customers.id` is **refused (42501)**. That is B2: "never accepted from a client".
    - Server-side writes are mapped the same way, and otherwise left alone.
-5. **`provision_tap_on_payment()` stays byte-identical.** Its insert passes `customer_id = user_id`, which the new normalisation trigger maps. This is the smaller of the two forms Option A allows. The record's wording ("looks up, or creates") is met by the shared helper.
+5. **REVERSED by owner decision D-U4 (2026-10-02, O-12): `provision_tap_on_payment()` is changed in U4 so that the Tap provisioned on first payment is an unpublished draft.** Its `customer_id` value is still corrected by the normalisation trigger. See `M0_3_U1_BASELINE_FINDINGS.md` §3 and §5.
 
 ---
 
@@ -86,7 +86,8 @@ Each unit ends with: tests written, all gates in §5 green (or a stop), a focuse
 - **Migration `021_resolve_customer_id.sql`:**
   - `customer_id_for(uuid)`: a definer helper that returns, or creates, the user's `customers.id`, using the same `CUST-…` code format as live `handle_new_user`. It is not executable by `anon`, `authenticated` or `PUBLIC`.
   - A BEFORE INSERT / UPDATE OF `customer_id` trigger on `profiles` and `tap_profiles` applies the §2 point 4 rule.
-  - **No change to:** `provision_tap_on_payment`, `handle_new_user`, any policy or grant on existing tables, or `fulfilment.mjs`, `Settings.tsx`, `Checkout.tsx`, `create-order.mjs`.
+  - **Changed in U4 by D-U4:** `provision_tap_on_payment` creates the Tap as a draft (`status='draft'`, `published=false`) instead of publishing it. The frozen signature, trigger and other behaviour are unchanged; an admin-contract snapshot proves the signature.
+  - **No change to:** `handle_new_user`, any policy or grant on existing tables, or `fulfilment.mjs`, `Settings.tsx`, `Checkout.tsx`, `create-order.mjs`.
 - **Identity audit, recorded in the U4 report:**
   - `orders.customer_id` keeps holding the auth user id (FK `auth.users`). It is correct and is not renamed.
   - `cards.customer_id` has no writer and is unchanged.

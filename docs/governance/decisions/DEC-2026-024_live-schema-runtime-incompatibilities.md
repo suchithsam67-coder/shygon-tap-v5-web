@@ -97,6 +97,10 @@ Each item was CONFIRMED in an isolated rebuild of the live baseline and compared
   - customer-record id resolution in the database for `profiles.customer_id` and `tap_profiles.customer_id`;
   - frozen V5 code is unchanged: `fulfilment.mjs`, `Settings.tsx`, `Checkout.tsx`, `create-order.mjs`;
   - the fix follows the DEC-2026-029 contract (Option A, B1–B7).
+- **Owner decision D-U4 (2026-10-02, in session; observation O-12):** fixing I-1 would let the unchanged live `provision_tap_on_payment` auto-publish a first-time buyer's Tap. The Tap would sit at a name-derived slug, with the buyer's full name and account email visible to anonymous visitors (CONFIRMED in isolation; `docs/shygon-os/M0_3_U1_BASELINE_FINDINGS.md` §3).
+  - **Decision:** the function is changed in U4 so that it **creates the Tap as an unpublished draft**. This reverses scope point 5.
+  - Signature and trigger are unchanged.
+  - **Open detail for U4, to be raised there:** the function's notification text, "Your SHYGON Tap is live", would no longer be accurate for a draft.
 - **Not covered, still OPEN:**
   - **I-4** card-record creation: depends on DEC-2026-028 + DEC-2026-002, and on finding E-3 (`fulfil_order()` also omits `card_id`).
   - **I-5:** VERIFY ON LIVE where `pgcrypto` lives.

@@ -60,7 +60,8 @@ This is the index of every decision record (DEC). Doc 13 §4 and §11 define the
 | Implementation authorization | Database changes **YES** · RLS changes **YES** · Payment changes **YES** (test mode; live activation **NOT AUTHORIZED**) · Auth changes **NO** · M1.1 **NO** · Deployment **NO** · Production data modification **NO** |
 | Deviation D-1 | **doc 12 §3 M0.3 is amended:** F1 + F3 + F4 instead of F1 + F2 (DEC-2026-022 Position A). F2 goes to the backlog. F3 and F4 fixes wait for DEC-022 Q2 and Q3 |
 | Deviation D-2 | The DEC-2026-024 I-1…I-3 fix and DEC-2026-029 enforcement are scheduled **in M0.3**, by owner instruction. In the M1 plan they sat in M1.2 / M1.9 |
-| Scope | `docs/shygon-os/M0_3_IMPLEMENTATION_SCOPE.md` (units U1–U7; implementation not started) |
+| Deviation D-3 | **D-U4 (O-12):** the frozen `provision_tap_on_payment` body is changed in U4 to create the first-payment Tap as an unpublished draft. Approved by the owner, 2026-10-02 |
+| Scope | `docs/shygon-os/M0_3_IMPLEMENTATION_SCOPE.md` (units U1–U7). U1 decisions are in `M0_3_U1_BASELINE_FINDINGS.md` §5 |
 
 ## Queued: not yet numbered (from `docs/shygon-os/00_README_INDEX.md` and doc 11 Part D)
 
@@ -71,7 +72,7 @@ This is the index of every decision record (DEC). Doc 13 §4 and §11 define the
 | OQ-21 / OQ-22 | Name the internal operating layer; productize it or not | Founder (UNASSIGNED) | P2 | HUMAN ACTION REQUIRED |
 | GAP-1 … GAP-12 | Gaps in the governance spec (doc 13 §13), each with a proposed resolution | Product Owner / Founder (UNASSIGNED) | — | HUMAN ACTION REQUIRED |
 | M1 security observations O-1…O-6 | `require_admin` executable by anon; legacy `get_public_tap` returns contact columns; card OTP bypass via the readable `activation_code`; no CHECK on `cards.status`; stale Vercel deployment; pgcrypto location (`docs/shygon-os/M1_SECURITY_MODEL.md` §5) | Security Owner (UNASSIGNED) | — | HUMAN ACTION REQUIRED: triage |
-| **Observation O-12 (2026-10-02, M0.3 U1)** | **Auto-publication on first payment, activated by the approved DEC-2026-024 fix.** Live `provision_tap_on_payment` creates a *published* Tap at a name-derived slug, showing the account's full name and email to anonymous visitors. Today I-1 blocks it. It is latent, not a P0. CONFIRMED in isolation (`docs/shygon-os/M0_3_U1_BASELINE_FINDINGS.md` §3) | Product Owner + Security Owner (repository owner, DEC-018) | Before U4 | **HUMAN DECISION REQUIRED: D-U4.** U1 also needs D-U1-a and D-U1-b |
+| **Observation O-12 (2026-10-02, M0.3 U1)** | **Auto-publication on first payment, activated by the approved DEC-2026-024 fix.** Live `provision_tap_on_payment` creates a *published* Tap at a name-derived slug, showing the account's full name and email to anonymous visitors. Today I-1 blocks it. It is latent, not a P0. CONFIRMED in isolation (`docs/shygon-os/M0_3_U1_BASELINE_FINDINGS.md` §3) | Product Owner + Security Owner (repository owner, DEC-018) | Before U4 | **DECIDED 2026-10-02: D-U4 = create the Tap as a draft** (changes `provision_tap_on_payment` in U4; reverses scope point 5). D-U1-a = catalogue checks kept as history tests. D-U1-b = error OR 0 rows counts as denial for 4 anon checks; RLS unchanged |
 | Observations O-7…O-11 (2026-10-02) | Owner can re-activate any card suspension, including admin and expiry (O-7); Terms text vs F3 (O-8); expiry sweeper schedule unknown (O-9); card↔persona link columns never written (O-10); unused email columns on live `orders` (O-11) (`docs/shygon-os/HUMAN_DECISION_PACK.md` §2) | Security Owner (O-7); Product Owner (O-8); Data Owner (O-9, O-10); Principal Architect (O-11), all UNASSIGNED | — | HUMAN ACTION REQUIRED: triage |
 | Other OQs | The remaining open questions in doc 11 Part D | per doc 11 | per doc 11 | HUMAN ACTION REQUIRED |
 
