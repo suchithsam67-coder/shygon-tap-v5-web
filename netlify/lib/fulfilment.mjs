@@ -35,6 +35,27 @@ function normaliseExperienceKey(key) {
   return LEGACY_EXPERIENCE_KEYS[value] ?? value;
 }
 
+/**
+ * What of a Razorpay payload we keep. Razorpay never sends a full card number
+ * or CVV, but a payment entity does carry card metadata (last four digits,
+ * network, issuer, a card id) and sometimes a UPI id or token. None of it is
+ * needed to reconcile a payment, so none of it is stored.
+ */
+const SENSITIVE_PAYMENT_KEYS = ['card', 'card_id', 'token', 'token_id', 'vpa', 'upi', 'bank_account', 'emi'];
+
+export function redactPaymentPayload(payload) {
+  if (!payload || typeof payload !== 'object') return payload ?? null;
+  const copy = JSON.parse(JSON.stringify(payload));
+  const scrub = (entity) => {
+    if (!entity || typeof entity !== 'object') return;
+    for (const key of SENSITIVE_PAYMENT_KEYS) delete entity[key];
+  };
+  scrub(copy?.payload?.payment?.entity);
+  scrub(copy?.payment);
+  scrub(copy);
+  return copy;
+}
+
 export async function recordPayment(admin, { orderId, amountInPaise, providerOrderId, providerPaymentId, rawPayload }) {
   const { error } = await admin.from('payments').upsert(
     {
@@ -44,7 +65,7 @@ export async function recordPayment(admin, { orderId, amountInPaise, providerOrd
       provider_payment_id: providerPaymentId,
       status: 'paid',
       amount_in_paise: amountInPaise,
-      raw_payload: rawPayload ?? null,
+      raw_payload: redactPaymentPayload(rawPayload),
       verified_at: new Date().toISOString(),
     },
     { onConflict: 'provider_payment_id' },
@@ -63,7 +84,7 @@ export async function markPaymentFailed(admin, { orderId, amountInPaise, provide
       provider_payment_id: providerPaymentId,
       status: 'failed',
       amount_in_paise: amountInPaise,
-      raw_payload: rawPayload ?? null,
+      raw_payload: redactPaymentPayload(rawPayload),
     },
     { onConflict: 'provider_payment_id' },
   );
@@ -76,7 +97,9 @@ export async function markPaymentFailed(admin, { orderId, amountInPaise, provide
 export async function fulfilOrder(admin, orderId) {
   const { data: order, error: orderError } = await admin
     .from('orders')
-    .select('id, user_id, order_id, order_type, plan_id, product_id, product_name, material, tier, plan, amount, amount_in_paise, payment_status, order_status, fulfillment_status, created_at')
+    // Every column, so the fields added later (replaces_card_id, migration 020)
+    // come along when present without failing on a database that lacks them.
+    .select('*')
     .eq('id', orderId)
     .maybeSingle();
 
@@ -125,6 +148,7 @@ export async function fulfilOrder(admin, orderId) {
     }
 
     await ensureTapProfile(admin, order);
+    await applyProfileDetails(admin, order);
 
     const { error: completeError } = await admin
       .from('orders')
@@ -192,6 +216,9 @@ async function grantFromLineItems(admin, order, items) {
         await grantEntitlement(admin, order.user_id, 'customization', key, order.id);
         break;
       }
+      case 'delivery':
+        // The delivery charge (migration 020): paid for, nothing to grant.
+        break;
       default:
         console.warn('[fulfilment] unknown product_type', item.product_type, item.sku);
         break;
@@ -242,24 +269,40 @@ async function grantEntitlement(admin, userId, type, key, sourceOrderId) {
 }
 
 /**
- * One card record per purchased card. The unique index on (order_id, sku) means
- * a replayed webhook cannot mint extra cards, so this is safe to re-run.
+ * One card record per purchased card line. The database gives it its permanent
+ * Card ID and its own page (migration 019); a replacement order links the new
+ * card to the replaced card's page instead.
+ *
+ * A plain insert, not an upsert: the unique index on cards(order_id, sku) is
+ * partial (WHERE order_id IS NOT NULL), and `ON CONFLICT (order_id, sku)` cannot
+ * use a partial index without repeating its predicate — every upsert failed
+ * with 42P10 and no card was ever issued. A replay now hits the index and gets
+ * 23505, which means "already issued" and is exactly as safe.
  */
 async function issueCards(admin, order, item) {
-  const { error } = await admin.from('cards').upsert(
-    {
-      user_id: order.user_id,
-      order_id: order.id,
-      sku: item.sku,
-      status: 'pending',
-      is_replacement: /replacement/i.test(item.name ?? ''),
-    },
-    { onConflict: 'order_id,sku', ignoreDuplicates: true },
-  );
+  const { data: existing } = await admin
+    .from('cards')
+    .select('id')
+    .eq('order_id', order.id)
+    .eq('sku', item.sku)
+    .maybeSingle();
+  if (existing) return;
+
+  const row = {
+    user_id: order.user_id,
+    order_id: order.id,
+    sku: item.sku,
+    status: 'pending',
+    is_replacement: Boolean(order.replaces_card_id) || /replacement/i.test(item.name ?? ''),
+  };
+  if (order.replaces_card_id) row.replaces_card_id = order.replaces_card_id;
+
+  const { error } = await admin.from('cards').insert(row);
+  if (!error || error.code === '23505') return;
 
   // A missing card record is an operational problem, not a reason to fail the
   // customer's whole fulfilment — the entitlement is what unlocks their Tap.
-  if (error) console.error('[fulfilment] card issue failed', item.sku, error.message);
+  console.error('[fulfilment] card issue failed', item.sku, error.message);
 }
 
 async function decrementStock(admin, orderItemId, sku, quantity) {
@@ -272,59 +315,68 @@ async function decrementStock(admin, orderItemId, sku, quantity) {
 }
 
 /**
- * Safety net: every paying customer ends up with a Tap profile.
+ * Safety net: every paying customer ends up with a Tap page.
  *
- * A database trigger on `orders` does this too, inside the transaction that
- * marks the order paid. Both are guarded by the unique index on
- * tap_profiles(user_id), so running both is harmless and losing either one
- * still leaves the customer provisioned.
+ * Since migration 019 the database does this itself: the payment trigger
+ * provisions a customer's first page, and every issued card gets its own page
+ * (published automatically) when its row is written. This covers a database
+ * where neither trigger ran, and keeps the reference "edit window started"
+ * date on the customer's pages.
  */
 async function ensureTapProfile(admin, order) {
   const userId = order.user_id;
-  const { data: existing } = await admin
+  const { data: pages, error } = await admin
     .from('tap_profiles')
     .select('id, slug, edit_window_started_at')
-    .eq('user_id', userId)
-    .maybeSingle();
+    .eq('user_id', userId);
 
-  // The editing window is dated from the FIRST paid order, so an upgrade
-  // bought later must never reopen it. The database trigger does this too;
-  // both take the earlier of the two values, so running both is harmless.
-  if (existing && order.created_at) {
-    const current = existing.edit_window_started_at;
-    if (!current || new Date(order.created_at) < new Date(current)) {
-      const { error } = await admin
-        .from('tap_profiles')
-        .update({ edit_window_started_at: order.created_at })
-        .eq('id', existing.id);
-      if (error) console.error('[fulfilment] edit window stamp failed', error.message);
-    }
+  if (error) {
+    console.error('[fulfilment] page lookup failed', error.message);
+    return;
   }
 
-  if (existing?.slug) return;
+  if (!pages || pages.length === 0) {
+    const { error: provisionError } = await admin.rpc('provision_tap_page', {
+      p_user: userId,
+      p_started: order.created_at ?? new Date().toISOString(),
+      p_experience: (order.order_type ?? 'physical') === 'physical' ? order.plan_id ?? order.plan ?? 'essential' : null,
+    });
+    if (!provisionError) return;
+    // Before migration 019: the one-page-per-customer path.
+    if (provisionError.code === 'PGRST202' || provisionError.code === '42883') {
+      await legacyProvision(admin, order);
+      return;
+    }
+    console.error('[fulfilment] page provisioning failed', provisionError.message);
+    return;
+  }
 
+  // The editing window is dated from the FIRST paid order; a later purchase
+  // must never move it. Reference only — the rule itself is per page.
+  if (order.created_at) {
+    for (const page of pages) {
+      if (page.edit_window_started_at && new Date(order.created_at) >= new Date(page.edit_window_started_at)) continue;
+      const { error: stampError } = await admin
+        .from('tap_profiles')
+        .update({ edit_window_started_at: order.created_at })
+        .eq('id', page.id);
+      if (stampError) console.error('[fulfilment] edit window stamp failed', stampError.message);
+    }
+  }
+}
+
+/** The pre-019 provisioning: one draft Tap per customer, keyed on user_id. */
+async function legacyProvision(admin, order) {
+  const userId = order.user_id;
   const { data: profile } = await admin
     .from('profiles')
     .select('full_name, email')
     .eq('id', userId)
     .maybeSingle();
 
-  const { data: slug, error: slugError } = await admin.rpc('generate_tap_slug', {
-    p_user: userId,
-  });
-
+  const { data: slug, error: slugError } = await admin.rpc('generate_tap_slug', { p_user: userId });
   if (slugError) {
     console.error('[fulfilment] slug generation failed', slugError.message);
-    return;
-  }
-
-  if (existing) {
-    const { error } = await admin
-      .from('tap_profiles')
-      .update({ slug, username: slug })
-      .eq('id', existing.id)
-      .is('slug', null);
-    if (error) console.error('[fulfilment] slug assignment failed', error.message);
     return;
   }
 
@@ -346,4 +398,57 @@ async function ensureTapProfile(admin, order) {
   );
 
   if (error) console.error('[fulfilment] tap profile provisioning failed', error.message);
+}
+
+// Migration 024's public.tier_buttons(), mirrored: the buttons a tier includes.
+const TIER_BUTTONS = {
+  essential: ['phone', 'email', 'whatsapp'],
+  business: ['phone', 'email', 'whatsapp', 'instagram', 'linkedin', 'website'],
+  premium: ['phone', 'email', 'whatsapp', 'instagram', 'linkedin', 'website', 'location', 'youtube', 'links'],
+  goat: ['phone', 'email', 'whatsapp', 'instagram', 'linkedin', 'website', 'location', 'youtube', 'links', 'gallery'],
+};
+const DETAIL_COLUMNS = {
+  displayName: 'display_name', designation: 'designation', company: 'company', phone: 'phone', email: 'email',
+  whatsapp: 'whatsapp', instagram: 'instagram', linkedin: 'linkedin', website: 'website', location: 'location',
+  youtube: 'youtube',
+};
+
+/**
+ * Copies the Card details page into the page(s) this order's cards opened.
+ * Only empty fields are filled, so a retried fulfilment (or a customer who has
+ * already edited the page) is never overwritten. Buttons the page's tier
+ * includes are switched on when they have a value.
+ */
+export async function applyProfileDetails(admin, order) {
+  const details = order.profile_details;
+  if (!details || typeof details !== 'object' || order.replaces_card_id) return;
+  try {
+    const { data: cards } = await admin.from('cards').select('tap_profile_id').eq('order_id', order.id);
+    const ids = [...new Set((cards ?? []).map((c) => c.tap_profile_id).filter(Boolean))];
+    if (ids.length === 0) return;
+    const { data: pages } = await admin
+      .from('tap_profiles')
+      .select('id, selected_ui_tier, enabled_customizations, ' + Object.values(DETAIL_COLUMNS).join(', '))
+      .in('id', ids);
+    for (const page of pages ?? []) {
+      const patch = {};
+      for (const [key, column] of Object.entries(DETAIL_COLUMNS)) {
+        const value = typeof details[key] === 'string' ? details[key].trim() : '';
+        if (value && !String(page[column] ?? '').trim()) patch[column] = value;
+      }
+      const included = TIER_BUTTONS[String(page.selected_ui_tier ?? 'essential').toLowerCase()] ?? TIER_BUTTONS.essential;
+      const enabled = new Set(page.enabled_customizations ?? ['phone', 'email']);
+      for (const button of included) {
+        const column = DETAIL_COLUMNS[button];
+        if (column && (patch[column] ?? page[column])) enabled.add(button);
+      }
+      if (enabled.size !== (page.enabled_customizations ?? []).length) patch.enabled_customizations = [...enabled].sort();
+      if (Object.keys(patch).length === 0) continue;
+      const { error } = await admin.from('tap_profiles').update(patch).eq('id', page.id);
+      if (error) console.error('[fulfilment] card details not applied', error.message);
+    }
+  } catch (error) {
+    // The page exists either way; the customer can still fill it in by hand.
+    console.error('[fulfilment] card details failed', error?.message ?? error);
+  }
 }

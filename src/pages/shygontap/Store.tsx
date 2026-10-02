@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useStoreEvent } from '../../lib/funnel';
+import { useRecentCards, useSavedCards } from '../../lib/shop';
 import BrandMark from '../../components/brand/BrandMark';
 import ThemeToggle from '../../components/ThemeToggle';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -72,6 +74,7 @@ function useCardPrices() {
 
 export default function Store() {
   const navigate = useNavigate();
+  useStoreEvent('store_visit');
   usePageMeta(META);
   const [searchParams] = useSearchParams();
 
@@ -88,6 +91,9 @@ export default function Store() {
   const [maxPrice, setMaxPrice] = useState(1000);
   const [sort, setSort] = useState<SortKey>('featured');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const saved = useSavedCards();
+  const recent = useRecentCards();
+  const [onlySaved, setOnlySaved] = useState(() => searchParams.get('saved') === '1');
 
   const toggle = <T,>(list: T[], value: T, set: (next: T[]) => void) =>
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -97,6 +103,7 @@ export default function Store() {
 
     const matched = products.filter((product) => {
       if (categories.length > 0 && !categories.includes(product.id)) return false;
+      if (onlySaved && !saved.includes(product.id)) return false;
 
       // A product qualifies if ANY of its allowed configurations is in budget.
       const tiers = tier === 'any' ? TIERS : [tier];
@@ -120,10 +127,10 @@ export default function Store() {
     // priceFor/fromPrice change once, when the live catalog arrives; without
     // them here the budget filter and price sort would keep using the static
     // fallback prices for the rest of the session.
-  }, [query, categories, materials, tier, maxPrice, sort, priceFor, fromPrice]);
+  }, [query, categories, materials, tier, maxPrice, sort, priceFor, fromPrice, onlySaved, saved]);
 
   const activeFilterCount =
-    categories.length + materials.length + (tier === 'any' ? 0 : 1) + (maxPrice < 1000 ? 1 : 0);
+    categories.length + materials.length + (tier === 'any' ? 0 : 1) + (maxPrice < 1000 ? 1 : 0) + (onlySaved ? 1 : 0);
 
   const clearAll = () => {
     setCategories([]);
@@ -131,6 +138,7 @@ export default function Store() {
     setTier('any');
     setMaxPrice(1000);
     setQuery('');
+    setOnlySaved(false);
   };
 
   return (
@@ -228,6 +236,14 @@ export default function Store() {
               )}
             </div>
 
+            <FilterGroup title="Saved">
+              <Checkbox
+                label={`Only my saved cards (${saved.length})`}
+                checked={onlySaved}
+                onChange={() => setOnlySaved((v) => !v)}
+              />
+            </FilterGroup>
+
             <FilterGroup title="Card type">
               {products.map((product) => (
                 <Checkbox
@@ -301,6 +317,25 @@ export default function Store() {
                 ))}
               </div>
             )}
+
+            {recent.filter((id) => products.some((p) => p.id === id)).length > 0 && (
+              <div className="shop-strip">
+                <h2>Recently viewed</h2>
+                <ul>
+                  {recent
+                    .map((id) => products.find((p) => p.id === id))
+                    .filter((p): p is Product => Boolean(p))
+                    .map((p) => (
+                      <li key={p.id}>
+                        <Link to={`/shygontap/store/${p.id}`}>
+                          <img src={p.images.pvc} alt="" loading="lazy" />
+                          {p.name}
+                        </Link>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
           </section>
         </div>
       </main>
@@ -330,7 +365,9 @@ function ProductCard({ product, price, edition }: { product: Product; price: num
           {product.eyebrow}
         </p>
         <h3>{product.name}</h3>
-        <p className="edition-note mt-2">Limited · {edition ?? 'chapters of 100'}</p>
+        <p className="edition-note mt-2">
+          {product.collection === 'custom' ? 'Made to order · your artwork' : `Limited · ${edition ?? 'chapters of 100'}`}
+        </p>
         <p className="text-sm text-[var(--ds-text-secondary)] mt-2">{product.shortDescription}</p>
 
         <ul className="mt-3 space-y-1">

@@ -8,6 +8,7 @@ import {
   Loader2,
   LogOut,
   Mail,
+  MonitorSmartphone,
   Pause,
   Play,
   ShieldCheck,
@@ -55,6 +56,7 @@ export default function Settings() {
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [signingOutOthers, setSigningOutOthers] = useState(false);
 
   // Both of these adjust state from a value that arrives asynchronously, which
   // React handles during render rather than in an effect — an effect would
@@ -179,7 +181,7 @@ export default function Settings() {
     }
     setStatusBusy(true);
     try {
-      setTap(await setTapStatus(user.id, next));
+      setTap(await setTapStatus(tap.id, next));
       toast.success(
         next === 'active' ? 'Your Tap is live' : 'Tap paused',
         next === 'active'
@@ -190,6 +192,24 @@ export default function Settings() {
       toast.error('Could not change visibility', describeError(err));
     } finally {
       setStatusBusy(false);
+    }
+  }
+
+  /**
+   * Ends every other session on this account — a phone left signed in, a
+   * shared computer — and keeps this one. Supabase revokes their refresh
+   * tokens, so they are signed out the next time their access token expires.
+   */
+  async function signOutOtherDevices() {
+    setSigningOutOthers(true);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'others' });
+      if (error) throw error;
+      toast.success('Signed out of other devices', 'Only this device is still signed in.');
+    } catch (err) {
+      toast.error('Could not sign out other devices', describeError(err));
+    } finally {
+      setSigningOutOthers(false);
     }
   }
 
@@ -380,6 +400,16 @@ export default function Settings() {
                 >
                   {sendingReset ? <Loader2 size={15} className="spin" /> : <Mail size={15} />}
                   {sendingReset ? 'Sending…' : 'Email me a reset link instead'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-block"
+                  style={{ justifyContent: 'flex-start' }}
+                  onClick={() => void signOutOtherDevices()}
+                  disabled={signingOutOthers}
+                >
+                  {signingOutOthers ? <Loader2 size={15} className="spin" /> : <MonitorSmartphone size={15} />}
+                  {signingOutOthers ? 'Signing out…' : 'Sign out of all other devices'}
                 </button>
               </div>
             )}

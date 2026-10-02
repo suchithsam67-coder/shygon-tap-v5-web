@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { adminClient, json, MissingSecretError, requireEnv } from '../lib/supabase.mjs';
 import { fulfilOrder, markPaymentFailed, recordPayment } from '../lib/fulfilment.mjs';
 import { captureIfAuthorised } from '../lib/razorpay.mjs';
+import { drainEmailOutbox } from '../lib/email.mjs';
 
 /**
  * POST /api/razorpay-webhook
@@ -12,7 +13,8 @@ import { captureIfAuthorised } from '../lib/razorpay.mjs';
  *
  * Configure in Razorpay Dashboard > Settings > Webhooks:
  *   URL    https://<your-site>/api/razorpay-webhook
- *   Events payment.authorized, payment.captured, order.paid, payment.failed
+ *   Events payment.authorized, payment.captured, order.paid, payment.failed,
+ *          refund.processed, refund.failed
  *   Secret must match RAZORPAY_WEBHOOK_SECRET
  */
 
@@ -77,6 +79,20 @@ export default async (request) => {
     // From here the claim is ours; release it if processing throws, or the
     // retry would be dismissed as a duplicate and the customer never fulfilled.
     claimedEventId = eventId;
+
+    // Refunds (the admin-refund function starts them; Razorpay confirms them).
+    const refundEntity = payload?.payload?.refund?.entity;
+    if ((eventType === 'refund.processed' || eventType === 'refund.failed') && refundEntity?.payment_id) {
+      const { error: refundError } = await admin.rpc('orders_refund_from_webhook', {
+        p_razorpay_payment_id: refundEntity.payment_id,
+        p_refund_id: refundEntity.id,
+        p_amount: typeof refundEntity.amount === 'number' ? refundEntity.amount : null,
+        p_status: eventType === 'refund.processed' ? 'processed' : 'failed',
+      });
+      if (refundError) throw new Error(`Refund sync failed: ${refundError.message}`);
+      await drainEmailOutbox({ limit: 5, budgetMs: 4000 });
+      return json({ success: true, eventId, message: `Refund ${eventType.split('.')[1]}` });
+    }
 
     const paymentEntity = payload?.payload?.payment?.entity;
     const orderEntity = payload?.payload?.order?.entity;
@@ -143,7 +159,10 @@ export default async (request) => {
       }
 
       const result = await fulfilOrder(admin, order.id);
-      return json({ success: true, eventId, newlyFulfilled: result.newlyFulfilled });
+      // Razorpay waits for the answer, so this is simply awaited: a few seconds
+      // for the confirmation email is well inside its timeout.
+      const emails = await drainEmailOutbox({ limit: 10, budgetMs: 6000 });
+      return json({ success: true, eventId, newlyFulfilled: result.newlyFulfilled, emailsSent: emails.sent });
     }
 
     if (eventType === 'payment.failed' && razorpayPaymentId) {
@@ -162,6 +181,8 @@ export default async (request) => {
         .eq('id', order.id)
         .neq('payment_status', 'paid');
 
+      // The "payment failed" email is held for ten minutes (see email.mjs):
+      // Razorpay lets the customer retry in the same checkout.
       return json({ success: true, eventId });
     }
 

@@ -102,3 +102,17 @@ export function editionAvailability(rows: Map<string, EditionRow> | null, design
   const { chapter, left, size } = currentChapter(row);
   return `Chapter ${roman(chapter)} · ${left} of ${size} left`;
 }
+
+/**
+ * The number the next card of this design will get: issued + 1. A preview
+ * only — the database assigns the real serial when the payment is verified, so
+ * someone paying a moment earlier moves it on by one.
+ */
+export function nextEdition(rows: Map<string, EditionRow> | null, design: string) {
+  const row = rows?.get(design);
+  if (!row) return null;
+  const size = row.chapter_size || CHAPTER_SIZE;
+  const serial = row.issued + 1;
+  const { chapter, number } = place(serial, size);
+  return { chapter, chapterRoman: roman(chapter), number, numberLabel: pad(number, size), size, name: row.name };
+}

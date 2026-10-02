@@ -1208,3 +1208,7 @@ body:has(.storefront) .product-card-image .tilt-card-inner { border-color: trans
 /* Its pointer-driven shine covers the whole (invisible) box, so it lit an
    empty rectangle around the cut-out. The hero photograph keeps it. */
 body:has(.storefront) .product-card-image .card-shine { display: none; }
+
+/* The card-tap opening inside the storefront demo phone (CardOpening, tap.css). */
+.phone-opening { position: absolute; z-index: 4; inset: 10px; border-radius: 38px; overflow: hidden; pointer-events: none; }
+.phone-compact .phone-opening { inset: 7px; border-radius: 27px; }

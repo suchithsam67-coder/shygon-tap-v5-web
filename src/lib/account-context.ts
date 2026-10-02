@@ -12,11 +12,20 @@ import type { Entitlements } from '../services/entitlements';
 
 export interface AccountContextValue {
   profile: ProfileRow | null;
+  /**
+   * The page the account screens are working on: the one picked in the page
+   * switcher, or the customer's first page. Every screen that edits "your Tap"
+   * edits this one.
+   */
   tap: TapProfileRow | null;
+  /** Every page the customer owns (one per card since migration 019), oldest first. */
+  taps: TapProfileRow[];
+  /** Switches the page the account screens work on. Remembered on this device. */
+  selectTap: (tapId: string) => void;
   entitlements: Entitlements;
   /**
-   * The 14-day editing window, as decided by the database. Null until it has
-   * been read, or when the customer has no Tap yet. The UI uses it to explain
+   * The 14-day editing window of the selected page, as decided by the
+   * database. Null until it has been read, or when the customer has no Tap yet. The UI uses it to explain
    * itself; the rule is enforced by a trigger regardless of what is here.
    */
   editState: TapEditStateRow | null;

@@ -127,17 +127,20 @@ await check('a customer cannot mark their own order paid', async () => {
   return msg.slice(0, 60);
 });
 
-await check('paying the order provisions a draft Tap', async () => {
+// Since 019 a page is published the moment it is created ("automatic
+// deployment"); before that it was provisioned as a draft.
+await check('paying the order provisions a live Tap', async () => {
   await q(`UPDATE public.orders SET payment_status = 'paid' WHERE id = $1`, [order.id]);
   const { rows } = await q(
     `SELECT slug, status, published, selected_ui_tier FROM public.tap_profiles WHERE user_id = $1`,
     [uid],
   );
   assert(rows.length === 1, 'no Tap provisioned');
-  assert(rows[0].status === 'draft', `status was ${rows[0].status}`);
-  assert(rows[0].published === false, 'a new Tap must not be published');
+  assert(rows[0].status === 'active', `status was ${rows[0].status}`);
+  assert(rows[0].published === true, 'a new Tap must be published');
+  assert(rows[0].slug, 'a new Tap must have an address');
   assert(rows[0].selected_ui_tier === 'essential', `tier was ${rows[0].selected_ui_tier}`);
-  return `slug=${rows[0].slug}, status=draft, essential`;
+  return `slug=${rows[0].slug}, status=active, essential`;
 });
 
 await check('order + payment notifications were raised', async () => {
@@ -193,10 +196,11 @@ await check('Essential unlocks exactly 4 palettes; the Pass unlocks 12', async (
   return `essential=4, +pass=12, goat=12`;
 });
 
-await check('cannot enable an add-on that was never bought', async () => {
+// 024: WhatsApp is included in Essential; Instagram starts at Business.
+await check('cannot enable a button above the page tier that was never bought', async () => {
   const msg = await asUser(uid, () =>
     refused(
-      `UPDATE public.tap_profiles SET enabled_customizations = ARRAY['phone','whatsapp'] WHERE user_id = $1`,
+      `UPDATE public.tap_profiles SET enabled_customizations = ARRAY['phone','instagram'] WHERE user_id = $1`,
       [uid],
     ),
   );

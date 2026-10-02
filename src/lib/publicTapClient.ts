@@ -1,4 +1,11 @@
-import { DEFAULT_THEME, toExperience, type PublicProfile, type PublicTapState } from './database.types';
+import {
+  DEFAULT_THEME,
+  toExperience,
+  type CardLook,
+  type PublicCard,
+  type PublicProfile,
+  type PublicTapState,
+} from './database.types';
 
 /**
  * The public Tap's data access, written against PostgREST directly with
@@ -98,6 +105,48 @@ export async function recordTapEvent(
       p_event: event,
       p_link_key: linkKey ?? null,
     });
+  } catch {
+    /* analytics must never break the page */
+  }
+}
+
+/**
+ * What a tapped card opens (migration 019): its page's address and the card's
+ * design, or why it opens nothing. Never names the owner or the card's history.
+ */
+export async function fetchPublicCard(code: string): Promise<PublicCard> {
+  let value: PublicCard | null;
+  try {
+    value = await rpc<PublicCard | null>('get_public_card', { p_code: code });
+  } catch (error) {
+    // A database without migration 019 has no card lookup (404): no card can
+    // exist there, so it is "not found", not a connection failure.
+    if (error instanceof Error && / failed: 404$/.test(error.message)) return { state: 'unavailable' };
+    throw error;
+  }
+  return value && typeof value === 'object' && 'state' in value ? value : { state: 'unavailable' };
+}
+
+/** The design of the card on a page, for a legacy chip that opens /t/<slug>?src=nfc. */
+export async function fetchPublicPageCard(slug: string): Promise<CardLook | null> {
+  const value = await rpc<CardLook | null>('get_public_page_card', { p_slug: slug });
+  return value && typeof value === 'object' && value.design ? value : null;
+}
+
+/** A page's current address when `slug` is one it used to have. */
+export async function resolveTapAlias(slug: string): Promise<string | null> {
+  const value = await rpc<string | null>('resolve_tap_alias', { p_slug: slug });
+  return typeof value === 'string' && value ? value : null;
+}
+
+/** Fire-and-forget analytics for a card-opened page, counted against the card. */
+export async function recordCardTap(
+  code: string,
+  event: 'view' | 'nfc' | 'link_click',
+  linkKey?: string,
+): Promise<void> {
+  try {
+    await rpc('record_card_tap', { p_code: code, p_event: event, p_link_key: linkKey ?? null });
   } catch {
     /* analytics must never break the page */
   }

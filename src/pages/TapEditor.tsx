@@ -14,7 +14,9 @@ import {
   Mail,
   MapPin,
   MessageCircle,
+  Nfc,
   Pause,
+  PencilLine,
   Phone,
   Play,
   QrCode,
@@ -22,6 +24,7 @@ import {
   Share2,
   Sparkles,
   UserRound,
+  Youtube,
 } from 'lucide-react';
 import { AppShell } from '../components/app/AppShell';
 import { useAuth } from '../lib/auth-context';
@@ -34,8 +37,10 @@ import {
   EXPERIENCE_LABELS,
   TAP_STATUS_HINTS,
   TAP_STATUS_LABELS,
+  cardUrl,
   claimSlug,
   fetchEventTheme,
+  formatCardCode,
   saveTap,
   setTapStatus,
   suggestSlug,
@@ -43,12 +48,17 @@ import {
   type TapDraft,
 } from '../services/tap';
 import { ownsExperience } from '../services/entitlements';
+import { TIER_LABELS, tierIncluding, unlockedButtons } from '../lib/tierButtons';
 import { QrCodeCanvas } from '../components/app/QrCode';
+import { fetchMyCards } from '../services/cards';
+import { cardLookOf } from '../components/tap/card-openings';
+import { useAsync } from '../hooks/useAsync';
 import { TapExperience } from '../components/tap/TapExperience';
 import {
   DEFAULT_THEME,
   experienceRank,
   toExperience,
+  type CardRow,
   type Experience,
   type PublicProfile,
   type TapStatus,
@@ -74,6 +84,7 @@ const CONTACT_ADDONS = [
   { key: 'instagram', icon: Instagram, label: 'Instagram' },
   { key: 'linkedin', icon: Linkedin, label: 'LinkedIn' },
   { key: 'location', icon: MapPin, label: 'Location & Directions' },
+  { key: 'youtube', icon: Youtube, label: 'YouTube' },
 ] as const;
 
 const ALWAYS_ON = ['phone', 'email'];
@@ -97,6 +108,15 @@ export default function TapEditor() {
   const [previewNonce, setPreviewNonce] = useState(0);
   const [justPublished, setJustPublished] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [changingSlug, setChangingSlug] = useState(false);
+
+  // The cards that open this page (one page per card since migration 019).
+  const { data: myCards } = useAsync(
+    () => (user ? fetchMyCards(user.id) : Promise.resolve([] as CardRow[])),
+    { enabled: Boolean(user), deps: [user?.id] },
+  );
+  const pageCards = (myCards ?? []).filter((card) => card.tap_profile_id === tap?.id && card.status !== 'replaced');
+  const openingCard = pageCards.find((card) => card.status === 'active') ?? pageCards[0];
   const [eventTheme, setEventTheme] = useState<Awaited<ReturnType<typeof fetchEventTheme>>>(null);
 
   useEffect(() => {
@@ -156,6 +176,13 @@ export default function TapEditor() {
   // The edit-state RPC is authoritative. Never turn an unknown state into an
   // unlocked editor; a real database error must fail closed.
   const canEdit = editState?.can_edit === true;
+  // Buttons this page may show: what its tier includes (migration 024) plus add-ons bought.
+  const pageTier: Experience = tap
+    ? experienceRank(toExperience(tap.selected_ui_tier)) <= experienceRank(entitlements.maxExperience)
+      ? toExperience(tap.selected_ui_tier)
+      : entitlements.maxExperience
+    : 'essential';
+  const unlocked = useMemo(() => unlockedButtons(pageTier, entitlements.customizations), [pageTier, entitlements.customizations]);
   const coolingDown = editState?.reason === 'cooling_down';
   const intervalDays = editState?.interval_days ?? 14;
   const status: TapStatus = tap?.status ?? 'draft';
@@ -166,7 +193,7 @@ export default function TapEditor() {
 
   function toggleAddon(key: string) {
     if (!draft) return;
-    if (!entitlements.customizations.includes(key)) return;
+    if (!unlocked.has(key)) return;
     const current = draft.enabled_customizations ?? [];
     update(
       'enabled_customizations',
@@ -189,7 +216,7 @@ export default function TapEditor() {
 
     const visible = new Set(
       (draft.enabled_customizations ?? []).filter(
-        (key) => ALWAYS_ON.includes(key) || entitlements.customizations.includes(key),
+        (key) => ALWAYS_ON.includes(key) || unlocked.has(key),
       ),
     );
     const shown = (key: string, value: string | null | undefined) =>
@@ -223,7 +250,7 @@ export default function TapEditor() {
         animation: eventTheme?.theme.animation ?? draft.theme_animation ?? tap.theme_animation ?? DEFAULT_THEME.animation,
       },
     };
-  }, [tap, draft, entitlements, eventTheme]);
+  }, [tap, draft, entitlements, eventTheme, unlocked]);
 
   const openPreview = useCallback(() => {
     setPreviewNonce((n) => n + 1);
@@ -231,10 +258,10 @@ export default function TapEditor() {
   }, []);
 
   async function save() {
-    if (!user || !draft) return;
+    if (!user || !draft || !tap) return;
     setSaving(true);
     try {
-      const saved = await saveTap(user.id, draft);
+      const saved = await saveTap(tap.id, draft);
       setTap(saved);
       await refresh();
       toast.success('Saved', 'Your Tap profile has been updated.');
@@ -260,10 +287,17 @@ export default function TapEditor() {
     setSlugError('');
     setClaiming(true);
     try {
-      const claimed = await claimSlug(slugInput);
+      const hadAddress = Boolean(tap?.slug);
+      const claimed = await claimSlug(slugInput, tap?.id);
       setSlugInput(claimed);
+      setChangingSlug(false);
       await refresh();
-      toast.success('Tap address claimed', `Your Tap will live at ${tapUrl(claimed)}`);
+      toast.success(
+        hadAddress ? 'Tap address changed' : 'Tap address claimed',
+        hadAddress
+          ? `Your Tap now lives at ${tapUrl(claimed)}. The old address still opens it.`
+          : `Your Tap will live at ${tapUrl(claimed)}`,
+      );
     } catch (err) {
       setSlugError(describeError(err, 'That address could not be claimed.'));
     } finally {
@@ -287,7 +321,7 @@ export default function TapEditor() {
 
     setStatusBusy(true);
     try {
-      setTap(await setTapStatus(user.id, next));
+      setTap(await setTapStatus(tap.id, next));
       if (next === 'active') {
         setJustPublished(true);
         toast.success('Your Tap is live', 'Share it — one tap opens your profile.');
@@ -353,6 +387,7 @@ export default function TapEditor() {
       eyebrow="Your SHYGON Tap"
       title="Tap profile"
       description="This is what people see the instant they tap your card or scan your QR. Anything you publish here is public to anyone with the link, so share only what you're happy for others to see."
+      pageScoped
       actions={
         tap ? (
           <>
@@ -669,7 +704,8 @@ export default function TapEditor() {
                   </label>
 
                   {CONTACT_ADDONS.map(({ key, icon: Icon, label }) => {
-                    const owned = entitlements.customizations.includes(key);
+                    const owned = unlocked.has(key);
+                    const unlockTier = tierIncluding(key);
                     const enabled = (draft?.enabled_customizations ?? []).includes(key);
                     const fieldKey = key as keyof TapDraft;
 
@@ -706,7 +742,7 @@ export default function TapEditor() {
                               style={{ border: 0, cursor: 'pointer' }}
                               onClick={() => navigate('/shygontap/customizations')}
                             >
-                              <Lock size={11} /> Locked — add-on
+                              <Lock size={11} /> {unlockTier ? `${TIER_LABELS[unlockTier]}+ or add-on` : 'Locked — add-on'}
                             </button>
                           )}
                         </div>
@@ -729,6 +765,7 @@ export default function TapEditor() {
                 style={{
                   position: 'sticky',
                   bottom: 16,
+                  zIndex: 20,
                   display: 'flex',
                   justifyContent: 'flex-end',
                   gap: 10,
@@ -769,7 +806,7 @@ export default function TapEditor() {
                   </div>
                 </div>
                 <div className="panel-body">
-                  {tap.slug ? (
+                  {tap.slug && !changingSlug ? (
                     <>
                       <div
                         style={{
@@ -805,13 +842,25 @@ export default function TapEditor() {
                         </a>
                       </div>
                       <p className="field-hint" style={{ marginTop: 10 }}>
-                        This is the address your card's NFC chip and QR code open.
+                        This is the address your QR code opens. Your cards open it through their own Card ID links.
                       </p>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ marginTop: 6 }}
+                        onClick={() => {
+                          setSlugInput(tap.slug ?? '');
+                          setSlugError('');
+                          setChangingSlug(true);
+                        }}
+                        disabled={!canEdit}
+                      >
+                        <PencilLine size={13} /> Change address
+                      </button>
                     </>
                   ) : (
                     <>
                       <label className="field" style={{ marginBottom: 8 }}>
-                        <span>Choose your Tap address</span>
+                        <span>{tap.slug ? 'New Tap address' : 'Choose your Tap address'}</span>
                         <input
                           className="input"
                           value={slugInput}
@@ -823,17 +872,56 @@ export default function TapEditor() {
                           placeholder="your-name"
                         />
                         {slugError && <p className="field-error">{slugError}</p>}
-                        <p className="field-hint">/tap/{slugInput || 'your-name'}</p>
+                        <p className="field-hint">/shygontap/{slugInput || 'your-name'}</p>
                       </label>
+                      {tap.slug && (
+                        <p className="field-hint" style={{ margin: '0 0 10px' }}>
+                          Your current address keeps working, so anything already printed still opens this page.
+                          {editState?.has_pass ? '' : ` Changing it counts as your profile change for the next ${intervalDays} days.`}
+                        </p>
+                      )}
                       <button
                         className="btn btn-blue btn-block"
                         onClick={() => void handleClaimSlug()}
-                        disabled={claiming || slugInput.trim().length < 3}
+                        disabled={claiming || slugInput.trim().length < 3 || slugInput === tap.slug}
                       >
                         {claiming ? <Loader2 size={14} className="spin" /> : null}
-                        {claiming ? 'Claiming…' : 'Claim address'}
+                        {claiming ? 'Saving…' : tap.slug ? 'Change address' : 'Claim address'}
                       </button>
+                      {tap.slug && (
+                        <button
+                          className="btn btn-ghost btn-sm btn-block"
+                          style={{ marginTop: 8 }}
+                          onClick={() => {
+                            setChangingSlug(false);
+                            setSlugError('');
+                          }}
+                          disabled={claiming}
+                        >
+                          Cancel
+                        </button>
+                      )}
                     </>
+                  )}
+                  {pageCards.length > 0 && (
+                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)', display: 'grid', gap: 6 }}>
+                      <span className="mini-label">Cards that open this page</span>
+                      {pageCards.map((card) => (
+                        <a
+                          key={card.id}
+                          href={card.card_code ? cardUrl(card.card_code) : undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ds-text)', textDecoration: 'none' }}
+                        >
+                          <Nfc size={14} color="var(--muted)" />
+                          <span style={{ fontWeight: 650 }}>{card.nickname || `Card ${formatCardCode(card.card_code)}`}</span>
+                          <span style={{ color: 'var(--muted)' }}>
+                            {card.status === 'active' ? 'Active' : card.lost_at ? 'Lost' : card.status === 'suspended' ? 'Deactivated' : 'Not activated'}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
                   )}
                 </div>
               </section>
@@ -940,7 +1028,12 @@ export default function TapEditor() {
               do not own yet.
             </p>
             <div className="tap-preview-frame">
-              <TapExperience data={previewRow} preview introKey={previewNonce} />
+              <TapExperience
+                data={previewRow}
+                preview
+                introKey={previewNonce}
+                card={openingCard ? cardLookOf(openingCard.sku) ?? undefined : undefined}
+              />
             </div>
             {dirty && (
               <p className="field-hint" style={{ margin: '12px 0 0' }}>

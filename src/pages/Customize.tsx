@@ -134,11 +134,11 @@ export default function Customize() {
   }
 
   async function save() {
-    if (!user || !draft) return;
+    if (!user || !draft || !tap) return;
     setSaving(true);
     try {
       setTap(
-        await saveTap(user.id, {
+        await saveTap(tap.id, {
           theme_palette: draft.palette,
           theme_layout: draft.layout,
           theme_buttons: draft.buttons,
@@ -208,6 +208,7 @@ export default function Customize() {
       eyebrow="Digital experience"
       title="Customize your Tap"
       description="Colour, layout, buttons, type and the opening animation. What you can choose depends on your experience and the Customization Pass."
+      pageScoped
       actions={
         <>
           <button className="btn btn-ghost btn-sm" onClick={() => navigate('/shygontap/tiers')}>
@@ -353,6 +354,7 @@ export default function Customize() {
               style={{
                 position: 'sticky',
                 bottom: 16,
+                zIndex: 20,
                 display: 'flex',
                 justifyContent: 'flex-end',
               }}

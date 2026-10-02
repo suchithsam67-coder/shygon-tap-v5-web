@@ -3,7 +3,7 @@ import { supabase, isMissingSchema } from './supabase';
 import { useAuth } from './auth-context';
 import type { ProfileRow, TapEditStateRow, TapProfileRow } from './database.types';
 import { EMPTY_ENTITLEMENTS, fetchEntitlements, type Entitlements } from '../services/entitlements';
-import { fetchEditState, fetchMyTap } from '../services/tap';
+import { fetchEditState, fetchMyTaps } from '../services/tap';
 import { countUnread } from '../services/notifications';
 import { AccountContext, type AccountContextValue } from './account-context';
 
@@ -19,10 +19,26 @@ import { AccountContext, type AccountContextValue } from './account-context';
 
 
 
+/** Which page the account screens are on, remembered per device. */
+const SELECTED_TAP_KEY = 'shygon_selected_tap';
+
+function readSelectedTap(): string | null {
+  try {
+    return localStorage.getItem(SELECTED_TAP_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function pickTap(taps: TapProfileRow[], preferred: string | null): TapProfileRow | null {
+  return taps.find((t) => t.id === preferred) ?? taps[0] ?? null;
+}
+
 /** Everything the account area reads, applied as one update. */
 interface AccountSnapshot {
   profile: ProfileRow | null;
   tap: TapProfileRow | null;
+  taps: TapProfileRow[];
   entitlements: Entitlements;
   editState: TapEditStateRow | null;
   unreadCount: number;
@@ -33,6 +49,7 @@ interface AccountSnapshot {
 const EMPTY_SNAPSHOT: AccountSnapshot = {
   profile: null,
   tap: null,
+  taps: [],
   entitlements: EMPTY_ENTITLEMENTS,
   editState: null,
   unreadCount: 0,
@@ -46,11 +63,22 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<AccountSnapshot>(EMPTY_SNAPSHOT);
   const [loading, setLoading] = useState(true);
   const [notificationsVersion, setNotificationsVersion] = useState(0);
-  const { profile, tap, entitlements, editState, unreadCount, error, setupRequired } = snapshot;
+  const { profile, tap, taps, entitlements, editState, unreadCount, error, setupRequired } = snapshot;
+  // Which page is selected. A ref, not state: what renders is snapshot.tap,
+  // and the loader only needs to know the preference when it runs.
+  const selectedRef = useRef<string | null>(null);
+  if (selectedRef.current === null) selectedRef.current = readSelectedTap() ?? '';
 
   /** Optimistically replaces the cached Tap after a local save. */
   const setTapState = useCallback(
-    (next: TapProfileRow) => setSnapshot((current) => ({ ...current, tap: next })),
+    (next: TapProfileRow) =>
+      setSnapshot((current) => ({
+        ...current,
+        tap: current.tap?.id === next.id || !current.tap ? next : current.tap,
+        taps: current.taps.some((t) => t.id === next.id)
+          ? current.taps.map((t) => (t.id === next.id ? next : t))
+          : [...current.taps, next],
+      })),
     [],
   );
 
@@ -76,7 +104,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
     // One failing table must not blank the whole account, so each source is
     // settled independently and the page decides what it can still render.
-    const [profileResult, tapResult, entitlementResult, editResult, unreadResult] =
+    const [profileResult, tapResult, entitlementResult, unreadResult] =
       await Promise.allSettled([
         supabase
           .from('profiles')
@@ -87,11 +115,15 @@ export function AccountProvider({ children }: { children: ReactNode }) {
           )
           .eq('id', user.id)
           .maybeSingle(),
-        fetchMyTap(user.id),
+        fetchMyTaps(user.id),
         fetchEntitlements(user.id),
-        fetchEditState(),
         countUnread(user.id),
       ]);
+
+    // The edit window is per page, so it is read for the page on screen.
+    const loadedTaps = tapResult.status === 'fulfilled' ? tapResult.value : [];
+    const current = pickTap(loadedTaps, selectedRef.current);
+    const [editResult] = await Promise.allSettled([fetchEditState(current?.id)]);
 
     const next: AccountSnapshot = { ...EMPTY_SNAPSHOT };
     let firstError: string | null = null;
@@ -109,8 +141,10 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       firstError ??= 'We could not load your profile.';
     }
 
-    if (tapResult.status === 'fulfilled') next.tap = tapResult.value;
-    else if (isMissingSchema(tapResult.reason)) next.setupRequired = true;
+    if (tapResult.status === 'fulfilled') {
+      next.taps = tapResult.value;
+      next.tap = current;
+    } else if (isMissingSchema(tapResult.reason)) next.setupRequired = true;
 
     if (entitlementResult.status === 'fulfilled') next.entitlements = entitlementResult.value;
     else if (isMissingSchema(entitlementResult.reason)) next.setupRequired = true;
@@ -180,11 +214,39 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     if (mounted.current) setNotificationsVersion((v) => v + 1);
   }, [user]);
 
+  /**
+   * Switches the page every account screen works on. The page itself is
+   * already loaded; only its own edit window is read fresh.
+   */
+  const selectTap = useCallback(
+    (tapId: string) => {
+      selectedRef.current = tapId;
+      try {
+        localStorage.setItem(SELECTED_TAP_KEY, tapId);
+      } catch {
+        /* private mode: the choice lasts until the page reloads */
+      }
+      setSnapshot((currentSnapshot) => {
+        const nextTap = currentSnapshot.taps.find((t) => t.id === tapId) ?? currentSnapshot.tap;
+        return { ...currentSnapshot, tap: nextTap, editState: nextTap?.id === currentSnapshot.tap?.id ? currentSnapshot.editState : null };
+      });
+      void fetchEditState(tapId)
+        .then((latest) => {
+          if (!mounted.current || selectedRef.current !== tapId) return;
+          setSnapshot((currentSnapshot) => ({ ...currentSnapshot, editState: latest }));
+        })
+        .catch(() => {
+          // Fails closed: with no edit state the editor stays locked.
+        });
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!user || !editState || editState.has_pass || editState.can_edit || !editState.next_edit_at) return;
     const timer = window.setInterval(() => {
       if (new Date(editState.next_edit_at!).getTime() <= Date.now()) {
-        void fetchEditState().then((latest) => {
+        void fetchEditState(tap?.id).then((latest) => {
           if (!mounted.current || !latest) return;
           setSnapshot((current) => ({ ...current, editState: latest }));
         }).catch(() => {
@@ -193,12 +255,14 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       }
     }, 30000);
     return () => window.clearInterval(timer);
-  }, [user, editState]);
+  }, [user, editState, tap?.id]);
 
   const value = useMemo<AccountContextValue>(
     () => ({
       profile,
       tap,
+      taps,
+      selectTap,
       entitlements,
       editState,
       unreadCount,
@@ -213,6 +277,8 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     [
       profile,
       tap,
+      taps,
+      selectTap,
       entitlements,
       editState,
       unreadCount,

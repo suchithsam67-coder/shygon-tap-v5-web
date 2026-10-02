@@ -44,12 +44,14 @@ const Customize = lazy(() => import('./pages/Customize'));
 const TapQr = lazy(() => import('./pages/TapQr'));
 const Customizations = lazy(() => import('./pages/Customizations'));
 const Checkout = lazy(() => import('./pages/Checkout'));
+const CardDetails = lazy(() => import('./pages/CardDetails'));
 const Orders = lazy(() => import('./pages/Orders'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const AnalyticsPage = lazy(() => import('./pages/Analytics'));
 const Support = lazy(() => import('./pages/Support'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Cards = lazy(() => import('./pages/Cards'));
+const Billing = lazy(() => import('./pages/Billing'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'));
 const Terms = lazy(() => import('./pages/legal/Terms'));
@@ -112,7 +114,9 @@ export default function AccountApp() {
               <Route path="/shygontap/customize" element={<Protected title="Customize your Tap"><Customize /></Protected>} />
               <Route path="/shygontap/qr" element={<Protected title="QR code"><TapQr /></Protected>} />
               <Route path="/shygontap/cards" element={<Protected title="Your cards"><Cards /></Protected>} />
+              <Route path="/shygontap/billing" element={<Protected title="Billing"><Billing /></Protected>} />
               <Route path="/shygontap/customizations" element={<Protected title="Add-ons"><Customizations /></Protected>} />
+              <Route path="/shygontap/card-details" element={<Protected title="Card details"><CardDetails /></Protected>} />
               <Route path="/shygontap/checkout" element={<Protected title="Checkout"><Checkout /></Protected>} />
               <Route path="/shygontap/orders" element={<Protected title="Your orders"><Orders /></Protected>} />
               <Route path="/shygontap/notifications" element={<Protected title="Notifications"><Notifications /></Protected>} />

@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
-import { Loader2, PauseCircle, SearchX, WifiOff } from 'lucide-react';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { CreditCard, Loader2, PauseCircle, SearchX, WifiOff } from 'lucide-react';
 import { TapExperience } from '../components/tap/TapExperience';
-import { fetchPublicProfile, fetchPublicTapState, recordTapEvent } from '../lib/publicTapClient';
-import type { PublicProfile, PublicTapState } from '../lib/database.types';
+import {
+  fetchPublicCard,
+  fetchPublicPageCard,
+  fetchPublicProfile,
+  fetchPublicTapState,
+  recordCardTap,
+  recordTapEvent,
+  resolveTapAlias,
+} from '../lib/publicTapClient';
+import type { CardLook, PublicCard, PublicProfile, PublicTapState } from '../lib/database.types';
 // Type-only: the builders in seo/meta carry the product catalogue, which the
 // public Tap bundle must not include.
 import type { PageMeta } from '../seo/meta';
@@ -39,7 +47,7 @@ function tapMeta(data: PublicProfile): PageMeta {
   return {
     title: `${name} | SHYGON Tap`,
     description: clip(data.headline || data.bio || role || `Connect with ${name} on SHYGON Tap.`),
-    path: `/t/${data.slug}`,
+    path: `/shygontap/${data.slug}`,
     type: 'profile',
     image: data.avatarUrl ?? undefined,
     imageAlt: name,
@@ -48,17 +56,26 @@ function tapMeta(data: PublicProfile): PageMeta {
 
 type Outcome =
   | { kind: 'loading' }
-  | { kind: 'tap'; data: PublicProfile }
+  | { kind: 'tap'; data: PublicProfile; card: CardLook | null }
   | { kind: 'state'; state: PublicTapState }
+  | { kind: 'card'; state: Exclude<PublicCard['state'], 'active' | 'paused' | 'unavailable'> }
+  | { kind: 'moved'; slug: string }
   | { kind: 'offline' }
   | { kind: 'error' };
 
-export default function PublicTap() {
-  const { username: slug } = useParams();
+export default function PublicTap({ slug: slugProp }: { slug?: string } = {}) {
+  // /t/<slug> (a page's address, what the QR encodes) or /c/<Card ID> (one
+  // card's own link, what a new card's NFC chip encodes — migration 019).
+  const params = useParams();
+  // /shygontap/<name> is matched in App.tsx and passes the name in.
+  const slug = slugProp ?? params.username;
+  const code = slugProp ? undefined : params.code;
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const [outcome, setOutcome] = useState<Outcome>(() =>
-    slug ? { kind: 'loading' } : { kind: 'state', state: 'unavailable' },
+    slug || code ? { kind: 'loading' } : { kind: 'state', state: 'unavailable' },
   );
   const [attempt, setAttempt] = useState(0);
   const viewLogged = useRef(false);
@@ -71,10 +88,10 @@ export default function PublicTap() {
       return {
         title: outcome.kind === 'state' && outcome.state === 'paused' ? 'Temporarily unavailable | SHYGON Tap' : 'Tap unavailable | SHYGON Tap',
         description: 'This SHYGON Tap profile is not available right now.',
-        path: `/t/${slug ?? ''}`,
+        path: code ? `/c/${code}` : `/shygontap/${slug ?? ''}`,
         noindex: true,
       };
-    }, [outcome, slug]),
+    }, [outcome, slug, code]),
   );
 
   /**
@@ -84,15 +101,47 @@ export default function PublicTap() {
    * already navigated away from is discarded instead of overwriting the new one.
    */
   const resolve = useCallback(async (): Promise<Outcome> => {
-    if (!slug) return { kind: 'state', state: 'unavailable' };
+    if (!slug && !code) return { kind: 'state', state: 'unavailable' };
 
     try {
-      const result = await fetchPublicProfile(slug);
-      if (result) return { kind: 'tap', data: result };
+      if (code) {
+        // A card: ask what it opens, then read that page exactly as /t/ does,
+        // through get_public_profile() and all of its clamps.
+        const card = await fetchPublicCard(code);
+        if (card.state === 'paused') return { kind: 'state', state: 'paused' };
+        if (card.state === 'not_activated' || card.state === 'inactive') return { kind: 'card', state: card.state };
+        if (card.state !== 'active' || !card.slug) return { kind: 'state', state: 'unavailable' };
+        const result = await fetchPublicProfile(card.slug);
+        if (result) {
+          return {
+            kind: 'tap',
+            data: result,
+            card: card.design ? { design: card.design, material: card.material, finish: card.finish } : null,
+          };
+        }
+        try {
+          return { kind: 'state', state: await fetchPublicTapState(card.slug) };
+        } catch {
+          return { kind: 'state', state: 'unavailable' };
+        }
+      }
+
+      const page = slug!;
+      // A chip written before Card IDs opens /t/<slug>?src=nfc: it still gets
+      // its card's opening, looked up alongside the page.
+      const [result, look] = await Promise.all([
+        fetchPublicProfile(page),
+        searchParams.get('src') === 'nfc' ? fetchPublicPageCard(page).catch(() => null) : Promise.resolve(null),
+      ]);
+      if (result) return { kind: 'tap', data: result, card: look };
+
+      // An address the page used to have still works: send the visitor on.
+      const current = await resolveTapAlias(page).catch(() => null);
+      if (current && current.toLowerCase() !== page.toLowerCase()) return { kind: 'moved', slug: current };
 
       // Not live. Ask why, so a paused Tap does not read as a dead link.
       try {
-        return { kind: 'state', state: await fetchPublicTapState(slug) };
+        return { kind: 'state', state: await fetchPublicTapState(page) };
       } catch {
         return { kind: 'state', state: 'unavailable' };
       }
@@ -102,7 +151,16 @@ export default function PublicTap() {
       // both wrong and alarming.
       return { kind: navigator.onLine === false ? 'offline' : 'error' };
     }
-  }, [slug]);
+    // searchParams is read once per landing; re-resolving on every change of
+    // the query string would replay the opening for nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, code]);
+
+  // An old address: replace it in the history with the page's current one.
+  useEffect(() => {
+    if (outcome.kind !== 'moved') return;
+    navigate(`/shygontap/${outcome.slug}${location.search}`, { replace: true });
+  }, [outcome, navigate, location.search]);
 
   useEffect(() => {
     viewLogged.current = false;
@@ -129,16 +187,23 @@ export default function PublicTap() {
   // Exactly one 'view' per landing, plus an 'nfc'/'qr' event when the physical
   // card or a QR scan added the matching query parameter.
   useEffect(() => {
-    if (!slug || outcome.kind !== 'tap' || viewLogged.current) return;
+    if (outcome.kind !== 'tap' || viewLogged.current) return;
     viewLogged.current = true;
 
+    // Opened by a card: the view and the tap are counted against that card.
+    if (code) {
+      void recordCardTap(code, 'view');
+      void recordCardTap(code, 'nfc');
+      return;
+    }
+    if (!slug) return;
     void recordTapEvent(slug, 'view');
     const source = searchParams.get('src');
     if (source === 'nfc') void recordTapEvent(slug, 'nfc');
     else if (source === 'qr') void recordTapEvent(slug, 'qr');
-  }, [slug, outcome.kind, searchParams]);
+  }, [slug, code, outcome.kind, searchParams]);
 
-  if (outcome.kind === 'loading') {
+  if (outcome.kind === 'loading' || outcome.kind === 'moved') {
     return (
       <div className="tap-state-page">
         <div>
@@ -175,6 +240,22 @@ export default function PublicTap() {
     );
   }
 
+  if (outcome.kind === 'card') {
+    return outcome.state === 'not_activated' ? (
+      <TapStatePage
+        icon={<CreditCard size={24} />}
+        title="This card isn't active yet"
+        message="Its owner hasn't activated it. Once they do, tapping it opens their SHYGON Tap."
+      />
+    ) : (
+      <TapStatePage
+        icon={<CreditCard size={24} />}
+        title="This card is no longer active"
+        message="The owner has switched this card off. Ask them for their current link."
+      />
+    );
+  }
+
   if (outcome.kind === 'state') {
     return outcome.state === 'paused' ? (
       <TapStatePage
@@ -192,9 +273,12 @@ export default function PublicTap() {
   }
 
   const tap = outcome.data;
+  const openedFrom = outcome.card;
 
   async function share() {
-    const url = window.location.href;
+    // Share the page's own address, not the card link: a card can be switched
+    // off, the page's address stays.
+    const url = code ? new URL(`/shygontap/${tap.slug}`, window.location.origin).href : window.location.href;
     const title = tap.displayName ?? 'SHYGON Tap';
     if (navigator.share) {
       try {
@@ -214,9 +298,11 @@ export default function PublicTap() {
   return (
     <TapExperience
       data={tap}
+      card={openedFrom}
       onShare={() => void share()}
       onLinkClick={(key) => {
-        if (slug) void recordTapEvent(slug, 'link_click', key);
+        if (code) void recordCardTap(code, 'link_click', key);
+        else if (slug) void recordTapEvent(slug, 'link_click', key);
       }}
     />
   );

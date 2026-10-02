@@ -252,6 +252,8 @@
 .tap-action:hover { transform: translateY(-2px); }
 .tap-action-primary { background: var(--tap-accent); color: var(--tap-on-accent); }
 .tap-action-whatsapp { background: #25d366; color: #05230f; }
+/* Save contact (vCard): a quiet outline beside Call and WhatsApp. */
+.tap-action-save { font: inherit; font-weight: 700; cursor: pointer; background: transparent; color: inherit; border-color: color-mix(in srgb, var(--tap-accent) 55%, transparent); }
 
 .tap-business-block {
   display: grid;
@@ -610,3 +612,378 @@
 /* Visitors of a Tap are covered by the Privacy Policy (visit statistics). */
 .tap-footnote a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .tap-footnote a:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 2px; }
+
+/* ==========================================================================
+   CARD OPENINGS
+   When a page is opened by tapping a card (/c/<Card ID>), the card design
+   opens it: the card arrives, an NFC pulse leaves it, the design makes its one
+   signature move, and the page is revealed. See card-openings.ts. Everything
+   here is decoration; the page underneath is already rendered.
+   ========================================================================== */
+.card-opening {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
+  animation: coOut var(--co-t, 1.7s) ease forwards;
+}
+@keyframes coOut {
+  0%, 74% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.card-opening-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 45% at 50% 46%, color-mix(in srgb, var(--co-glow) 22%, transparent), transparent 70%),
+    var(--co-bg);
+}
+.card-opening-motif { position: absolute; inset: 0; }
+.card-opening-motif i { position: absolute; display: block; }
+
+.card-opening-stage {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: min(76%, 420px);
+  aspect-ratio: 1000 / 630;
+  transform: translate(-50%, -50%);
+  perspective: 900px;
+}
+.card-opening-card {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 22px 34px rgba(0, 0, 0, 0.45));
+  transform-origin: 50% 60%;
+  animation: coCard var(--co-t, 1.7s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes coCard {
+  0% { opacity: 0; transform: translateY(24px) rotateX(18deg) rotateY(-62deg) scale(0.72); }
+  28% { opacity: 1; transform: none; }
+  66% { opacity: 1; transform: translateY(-4px) scale(1.02); }
+  100% { opacity: 0; transform: translateY(-9%) scale(1.16); }
+}
+.card-opening-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 6%;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.55) 50%, transparent 62%);
+  mix-blend-mode: soft-light;
+  opacity: 0;
+  animation: coShine var(--co-t, 1.7s) ease forwards;
+}
+@keyframes coShine {
+  0%, 30% { opacity: 0; transform: translateX(-60%); }
+  45% { opacity: 1; }
+  62%, 100% { opacity: 0; transform: translateX(60%); }
+}
+.card-opening-ripple { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.card-opening-ripple i {
+  position: absolute;
+  left: -60px;
+  top: -60px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--co-accent) 80%, transparent);
+  opacity: 0;
+  animation: coRipple 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.42s forwards;
+}
+.card-opening-ripple i:nth-child(2) { animation-delay: 0.56s; }
+.card-opening-ripple i:nth-child(3) { animation-delay: 0.7s; }
+@keyframes coRipple {
+  0% { opacity: 0; transform: scale(0.6); }
+  25% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(4.2); }
+}
+
+/* Obsidian Feather: a feather of gold light sweeps across. */
+.card-opening-feather .card-opening-motif i {
+  left: -30%;
+  top: 38%;
+  width: 160%;
+  height: 16%;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--co-accent) 55%, transparent) 55%, transparent);
+  filter: blur(14px);
+  opacity: 0;
+  transform: rotate(-22deg) translateX(-55%);
+  animation: coFeather 1.15s cubic-bezier(0.3, 0.05, 0.2, 1) 0.38s forwards;
+}
+@keyframes coFeather {
+  0% { opacity: 0; transform: rotate(-22deg) translateX(-55%); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(-22deg) translateX(55%); }
+}
+
+/* Copper Lotus: eight petals bloom behind the card. */
+.card-opening-lotus .card-opening-motif i {
+  left: 43%;
+  top: 12%;
+  width: 14%;
+  height: 34%;
+  border-radius: 50% 50% 50% 50% / 70% 70% 30% 30%;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--co-accent) 60%, transparent), transparent);
+  border: 1px solid color-mix(in srgb, var(--co-glow) 45%, transparent);
+  transform-origin: 50% 100%;
+  opacity: 0;
+  transform: rotate(calc(var(--i) * 45deg)) scaleY(0.1);
+  animation: coPetal 1.3s cubic-bezier(0.22, 1, 0.36, 1) calc(0.3s + var(--i) * 0.04s) forwards;
+}
+@keyframes coPetal {
+  0% { opacity: 0; transform: rotate(calc(var(--i) * 45deg)) scaleY(0.1); }
+  40% { opacity: 0.85; }
+  100% { opacity: 0; transform: rotate(calc(var(--i) * 45deg + 18deg)) scaleY(1.25); }
+}
+
+/* Emerald Arch: two arched doors part to let the page through. */
+.card-opening-arch .card-opening-bg {
+  background: radial-gradient(50% 60% at 50% 50%, color-mix(in srgb, var(--co-glow) 55%, transparent), var(--co-bg) 75%);
+}
+.card-opening-arch .card-opening-door {
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  background: linear-gradient(180deg, #0b3a2b, var(--co-bg));
+  border: 1px solid color-mix(in srgb, var(--co-accent) 60%, transparent);
+  animation: coDoor 1.25s cubic-bezier(0.65, 0, 0.35, 1) 0.4s forwards;
+}
+.card-opening-door-left { left: 0; border-radius: 0 100% 0 0 / 0 30% 0 0; --dir: -1; }
+.card-opening-door-right { right: 0; border-radius: 100% 0 0 0 / 30% 0 0 0; --dir: 1; }
+@keyframes coDoor {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(var(--dir) * 102%)); }
+}
+
+/* Ivory Bloom: review stars rise from the card. */
+.card-opening-bloom .card-opening-motif i {
+  left: calc(33% + var(--i) * 7.5%);
+  top: 58%;
+  width: 7%;
+  aspect-ratio: 1;
+  background: var(--co-glow);
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  opacity: 0;
+  animation: coStar 1.1s cubic-bezier(0.22, 1, 0.36, 1) calc(0.45s + var(--i) * 0.08s) forwards;
+}
+@keyframes coStar {
+  0% { opacity: 0; transform: translateY(0) scale(0.3) rotate(-20deg); }
+  45% { opacity: 1; transform: translateY(-120%) scale(1) rotate(0); }
+  100% { opacity: 0; transform: translateY(-190%) scale(0.8) rotate(10deg); }
+}
+
+/* Obsidian Smoke: smoke drifts up and clears. */
+.card-opening-smoke .card-opening-motif i {
+  left: calc(4% + var(--i) * 20%);
+  top: 50%;
+  width: 45%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(157, 151, 141, 0.55), transparent 65%);
+  filter: blur(18px);
+  opacity: 0;
+  animation: coSmoke 1.6s ease-out calc(0.2s + var(--i) * 0.08s) forwards;
+}
+@keyframes coSmoke {
+  0% { opacity: 0; transform: translateY(20%) scale(0.6); }
+  40% { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-70%) scale(1.5); }
+}
+
+/* Rose Marble: a rose-gold sheen washes over. */
+.card-opening-marble .card-opening-bg {
+  background: radial-gradient(70% 55% at 30% 20%, rgba(246, 211, 210, 0.35), transparent 70%), var(--co-bg);
+}
+.card-opening-marble .card-opening-motif i {
+  inset: -40%;
+  background: linear-gradient(120deg, transparent 40%, color-mix(in srgb, var(--co-accent) 50%, transparent) 50%, transparent 60%);
+  opacity: 0;
+  animation: coSheen 1.3s cubic-bezier(0.3, 0.05, 0.2, 1) 0.35s forwards;
+}
+@keyframes coSheen {
+  0% { opacity: 0; transform: translateX(-40%); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(40%); }
+}
+
+/* Carbon Aurum: the gold pinstripe draws, then parts. */
+.card-opening-pinstripe .card-opening-motif i {
+  left: 0;
+  top: 46%;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--co-glow), var(--co-accent), transparent);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  animation: coStripe 1.2s cubic-bezier(0.65, 0, 0.35, 1) 0.35s forwards;
+}
+@keyframes coStripe {
+  0% { transform: scaleX(0); opacity: 1; }
+  55% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1) scaleY(18); opacity: 0; }
+}
+
+/* Sandstone Jaali: the carved lattice appears, then dissolves. */
+.card-opening-jaali .card-opening-motif i {
+  inset: -10%;
+  background:
+    repeating-linear-gradient(45deg, color-mix(in srgb, var(--co-accent) 35%, transparent) 0 1.5px, transparent 1.5px 36px),
+    repeating-linear-gradient(-45deg, color-mix(in srgb, var(--co-accent) 35%, transparent) 0 1.5px, transparent 1.5px 36px);
+  opacity: 0;
+  animation: coJaali 1.4s ease 0.25s forwards;
+}
+@keyframes coJaali {
+  0% { opacity: 0; transform: scale(1.15); }
+  40% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.94); }
+}
+
+/* Sapphire Night: a constellation lights up around the card. */
+.card-opening-constellation .card-opening-motif i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--co-glow);
+  box-shadow: 0 0 12px 3px color-mix(in srgb, var(--co-glow) 70%, transparent);
+  opacity: 0;
+  animation: coTwinkle 1.2s ease calc(0.35s + var(--i) * 0.07s) forwards;
+}
+.card-opening-constellation .card-opening-motif i:nth-child(1) { left: 14%; top: 18%; }
+.card-opening-constellation .card-opening-motif i:nth-child(2) { left: 30%; top: 12%; }
+.card-opening-constellation .card-opening-motif i:nth-child(3) { left: 52%; top: 20%; }
+.card-opening-constellation .card-opening-motif i:nth-child(4) { left: 74%; top: 14%; }
+.card-opening-constellation .card-opening-motif i:nth-child(5) { left: 86%; top: 30%; }
+.card-opening-constellation .card-opening-motif i:nth-child(6) { left: 22%; top: 76%; }
+.card-opening-constellation .card-opening-motif i:nth-child(7) { left: 80%; top: 72%; }
+@keyframes coTwinkle {
+  0% { opacity: 0; transform: scale(0.2); }
+  35% { opacity: 1; transform: scale(1.3); }
+  60% { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* Aurora Glass: aurora bands sweep across. */
+.card-opening-aurora .card-opening-motif i {
+  left: -30%;
+  width: 160%;
+  height: 30%;
+  top: calc(12% + var(--i) * 24%);
+  border-radius: 50%;
+  filter: blur(26px);
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, #4fd1c2, #8f6ff0, #f19cc4, transparent);
+  animation: coAurora 1.4s ease-in-out calc(0.2s + var(--i) * 0.1s) forwards;
+}
+@keyframes coAurora {
+  0% { opacity: 0; transform: translateX(-30%) skewY(-6deg); }
+  45% { opacity: 0.75; }
+  100% { opacity: 0; transform: translateX(30%) skewY(6deg); }
+}
+
+/* Custom: crop marks frame the customer artwork. */
+.card-opening-crops { position: absolute; inset: -12px; }
+.card-opening-crops i {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-color: var(--co-accent);
+  border-style: solid;
+  border-width: 0;
+  opacity: 0;
+  animation: coCrop 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.4s forwards;
+}
+.card-opening-crops i:nth-child(1) { left: 0; top: 0; border-left-width: 2px; border-top-width: 2px; --x: -1; --y: -1; }
+.card-opening-crops i:nth-child(2) { right: 0; top: 0; border-right-width: 2px; border-top-width: 2px; --x: 1; --y: -1; }
+.card-opening-crops i:nth-child(3) { left: 0; bottom: 0; border-left-width: 2px; border-bottom-width: 2px; --x: -1; --y: 1; }
+.card-opening-crops i:nth-child(4) { right: 0; bottom: 0; border-right-width: 2px; border-bottom-width: 2px; --x: 1; --y: 1; }
+@keyframes coCrop {
+  0% { opacity: 0; transform: translate(calc(var(--x) * -14px), calc(var(--y) * -14px)); }
+  40% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translate(calc(var(--x) * 18px), calc(var(--y) * 18px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-opening { display: none; }
+}
+
+/* ---- Quality by experience: Essential < Business < Premium < GOAT -------- */
+
+/* Essential: a quick, clean arrival — no design move, no sweep, one pulse. */
+.card-opening-tier-essential .card-opening-bg { background: var(--co-bg); }
+.card-opening-tier-essential .card-opening-shine,
+.card-opening-tier-essential .card-opening-ripple i:nth-child(n + 2),
+.card-opening-tier-essential .card-opening-crops { display: none; }
+.card-opening-tier-essential .card-opening-card { animation-name: coCardSimple; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.35)); }
+@keyframes coCardSimple {
+  0% { opacity: 0; transform: translateY(16px) scale(0.9); }
+  30% { opacity: 1; transform: none; }
+  72% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-6%) scale(1.06); }
+}
+
+/* Business: the design's signature move, two pulses, no light sweep. */
+.card-opening-tier-business .card-opening-shine,
+.card-opening-tier-business .card-opening-ripple i:nth-child(3) { display: none; }
+
+/* Premium: everything, with a deeper glow behind the card. */
+.card-opening-tier-premium .card-opening-bg {
+  background:
+    radial-gradient(55% 42% at 50% 46%, color-mix(in srgb, var(--co-glow) 34%, transparent), transparent 72%),
+    var(--co-bg);
+}
+
+/* GOAT: the card turns a full circle in 3D, halo rings and sparks leave it. */
+.card-opening-tier-goat .card-opening-card { animation-name: coCardGoat; filter: drop-shadow(0 26px 40px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 22px color-mix(in srgb, var(--co-accent) 45%, transparent)); }
+@keyframes coCardGoat {
+  0% { opacity: 0; transform: translateY(40px) rotateX(24deg) rotateY(-200deg) scale(0.55); }
+  34% { opacity: 1; transform: translateY(0) rotateX(0) rotateY(0) scale(1.04); }
+  46% { transform: scale(1); }
+  74% { opacity: 1; transform: translateY(-4px) scale(1.03); }
+  100% { opacity: 0; transform: translateY(-12%) scale(1.24); }
+}
+.card-opening-tier-goat .card-opening-bg {
+  background:
+    radial-gradient(60% 46% at 50% 46%, color-mix(in srgb, var(--co-glow) 42%, transparent), transparent 72%),
+    conic-gradient(from 0deg at 50% 46%, transparent, color-mix(in srgb, var(--co-accent) 12%, transparent), transparent 30%),
+    var(--co-bg);
+}
+.card-opening-goat { position: absolute; left: 50%; top: 46%; width: 0; height: 0; perspective: 700px; }
+.card-opening-goat b {
+  position: absolute;
+  left: -110px;
+  top: -110px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--co-glow) 70%, transparent);
+  opacity: 0;
+  animation: coHalo 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.55s forwards;
+}
+.card-opening-goat b:nth-child(2) { animation-delay: 0.7s; }
+.card-opening-goat b:nth-child(3) { animation-delay: 0.85s; }
+@keyframes coHalo {
+  0% { opacity: 0; transform: rotateX(68deg) scale(0.4); }
+  30% { opacity: 0.9; }
+  100% { opacity: 0; transform: rotateX(0deg) scale(2.6); }
+}
+.card-opening-goat i {
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--co-glow);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--co-accent) 80%, transparent);
+  opacity: 0;
+  animation: coSpark 1.2s ease-out calc(0.75s + var(--i) * 0.03s) forwards;
+}
+@keyframes coSpark {
+  0% { opacity: 0; transform: rotate(calc(var(--i) * 45deg)) translateX(40px) scale(0.4); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(calc(var(--i) * 45deg + 25deg)) translateX(190px) scale(1); }
+}

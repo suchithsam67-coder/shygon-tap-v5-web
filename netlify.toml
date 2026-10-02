@@ -144,6 +144,12 @@
   to = "/shygontap/store/aurora-glass.html"
   status = 200
 
+# The custom card (your own artwork, flat price).
+[[redirects]]
+  from = "/shygontap/store/custom"
+  to = "/shygontap/store/custom.html"
+  status = 200
+
 # Policy pages (prerendered).
 [[redirects]]
   from = "/shygontap/privacy-policy"
@@ -243,6 +249,11 @@
   to = "/index.html"
   status = 200
 
+[[redirects]]
+  from = "/shygontap/billing"
+  to = "/index.html"
+  status = 200
+
 # Customer Taps: the address printed on each card and encoded in its QR.
 # `/tap/` is kept so links shared before the change keep resolving.
 
@@ -253,6 +264,19 @@
 
 [[redirects]]
   from = "/tap/*"
+  to = "/index.html"
+  status = 200
+
+# A customer's page: /shygontap/<name>. After every explicit /shygontap/ rule
+# above, which win because Netlify uses the first match.
+[[redirects]]
+  from = "/shygontap/*"
+  to = "/index.html"
+  status = 200
+
+# A card's own link: /c/<CARD ID>, written to the NFC chip of every new card.
+[[redirects]]
+  from = "/c/*"
   to = "/index.html"
   status = 200
 

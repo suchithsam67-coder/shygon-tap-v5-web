@@ -72,6 +72,7 @@ export default function TapQr() {
       eyebrow="Share"
       title="Your QR code"
       description="Print it, stick it on a table tent, or show it on your phone. It opens the same profile your card does."
+      pageScoped
     >
       {loading ? (
         <div className="panel" style={{ padding: 24 }}>

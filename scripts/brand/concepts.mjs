@@ -77,6 +77,19 @@ export const CONCEPTS = {
     muted: '#dcd5e8',
     foil: 'foilIris',
   },
+  // The custom card: the customer's own artwork. Its art shows the canvas the
+  // artwork is printed on, and it is not a numbered edition.
+  custom: {
+    product: 'custom',
+    name: 'Custom',
+    custom: true,
+    from: '#2a2b30',
+    to: '#0c0c0e',
+    light: '#ffffff',
+    ink: '#f1ede6',
+    muted: '#a39d94',
+    foil: 'foilGold',
+  },
 };
 
 function defs(id, c) {
@@ -143,6 +156,14 @@ function texture(key, id) {
     );
   }
   if (key === 'sapphire') return full(`filter="url(#${id}brushL)" opacity=".28"`) + full(`filter="url(#${id}brushD)" opacity=".32"`);
+  if (key === 'custom') {
+    // A designer's canvas: a fine grid under a soft grain.
+    return (
+      `<defs><pattern id="${id}grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-width=".6" opacity=".09"/></pattern></defs>` +
+      full(`fill="url(#${id}grid)"`) +
+      full(`filter="url(#${id}grainL)" opacity=".06"`)
+    );
+  }
   // aurora
   return full(`fill="url(#${id}teal)"`) + full(`fill="url(#${id}violet)"`) + full(`fill="url(#${id}rose)"`);
 }
@@ -237,6 +258,8 @@ export function renderConcept({ key, material = 'pvc', finish = 'standard', face
   const isPremium = finish === 'premium';
   const badge = (x, y) => pill(isPremium ? 'PREMIUM' : 'STANDARD', x, y, { premium: isPremium, ink: c.ink, line: c.pale && !clear ? '#b08a4e' : '#d4ab66' });
 
+  if (c.custom) return customCard({ id, c, material, face, finish, site, company, markup, foil, badge, lifted });
+
   const body =
     face === 'front'
       ? watermark(id, c, material, markup) +
@@ -265,4 +288,56 @@ export function renderConcept({ key, material = 'pvc', finish = 'standard', face
     : `<rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="${R - 1}" fill="none" stroke="url(#${id}bevel)" stroke-width="${material === 'metal' ? 2.4 : 2}"/>`;
   const title = `SHYGON Tap ${c.name} card, limited edition, ${material}, ${finish}, ${face}`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}"><title>${title}</title>${defs(id, c)}<g clip-path="url(#${id}clip)">${markup}${body}</g>${edge}</svg>\n`;
+}
+
+/**
+ * The custom card's two faces: an artboard where the customer's artwork goes,
+ * with crop marks, on the front; the NFC and QR side on the back. No edition
+ * line — custom cards are made to order, not numbered.
+ */
+function customCard({ id, c, material, face, finish, site, company, markup, foil, badge, lifted }) {
+  const clear = material === 'transparent';
+  const isPremium = finish === 'premium';
+  const domain = site.replace(/^https?:\/\//, '');
+  const line = clear ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.34)';
+  const art = { x: 548, y: 66, w: 392, h: 498 };
+  const crop = (x, y, dx, dy) => `<path d="M${x} ${y + dy * 26}V${y}H${x + dx * 26}" fill="none" stroke="url(#${c.foil})" stroke-width="2.2"/>`;
+  const artboard =
+    `<rect x="${art.x}" y="${art.y}" width="${art.w}" height="${art.h}" rx="22" fill="#ffffff" fill-opacity="${clear ? 0.05 : 0.035}" stroke="${line}" stroke-width="1.4" stroke-dasharray="9 8"/>` +
+    crop(art.x - 12, art.y - 12, 1, 1) +
+    crop(art.x + art.w + 12, art.y - 12, -1, 1) +
+    crop(art.x - 12, art.y + art.h + 12, 1, -1) +
+    crop(art.x + art.w + 12, art.y + art.h + 12, -1, -1) +
+    useMark(id, art.x + art.w / 2 - 44, art.y + 150, 118, '#ffffff', 0.16) +
+    type('YOUR ARTWORK', { font: 'inter600', size: 15, tracking: 0.32, x: art.x + art.w / 2, y: art.y + 330, anchor: 'middle' }, foil) +
+    type('Printed edge to edge', { font: 'inter400', size: 14.5, x: art.x + art.w / 2, y: art.y + 358, anchor: 'middle' }, c.muted);
+
+  const body =
+    face === 'front'
+      ? (isPremium ? premium(id, c) : '') +
+        lifted(useMark(id, 62, 52, 72, foil)) +
+        type('CUSTOM CARD', { font: 'inter600', size: 11.5, tracking: 0.32, x: 62, y: 172 }, foil) +
+        `<path d="M62 190L200 190" stroke="url(#${c.foil})" stroke-width="1.2"/>` +
+        artboard +
+        lifted(type('YOUR NAME', { font: 'inter500', size: 32, tracking: 0.1, x: 62, y: 500 }, c.ink)) +
+        type('Your title · Your company', { font: 'inter400', size: 16, tracking: 0.03, x: 62, y: 532 }, c.muted) +
+        (isPremium ? badge(62, 548) : '') +
+        waves(488, 548, foil, 0.85)
+      : (isPremium ? premium(id, c) : '') +
+        lifted(useMark(id, 62, 52, 64, foil)) +
+        badge(W - 60 - (isPremium ? 138 : 146), 52) +
+        type('TAP OR SCAN', { font: 'inter600', size: 12.5, tracking: 0.3, x: 62, y: 262 }, foil) +
+        lifted(type('Your design. Your card.', { font: 'serif400', size: 34, x: 60, y: 306 }, c.ink)) +
+        type('Send us your artwork after you order.', { font: 'inter400', size: 16.5, x: 62, y: 340 }, c.muted) +
+        qr(`${site}/shygontap`, 764, 206, 170, { panel: 'rgba(255,255,255,.95)', ink: '#15130f' }) +
+        type('CUSTOM · MADE TO ORDER', { font: 'inter600', size: 11.5, tracking: 0.26, x: 62, y: 508 }, foil) +
+        type(domain, { font: 'inter400', size: 15, x: 62, y: 548 }, c.muted) +
+        type(company, { font: 'inter400', size: 13, tracking: 0.04, x: 62, y: 572 }, c.muted);
+
+  const edge = clear
+    ? `<rect x=".9" y=".9" width="${W - 1.8}" height="${H - 1.8}" rx="${R - 1}" fill="none" stroke="#fff" stroke-opacity=".62" stroke-width="1.8"/>`
+    : `<rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="${R - 1}" fill="none" stroke="url(#${id}bevel)" stroke-width="${material === 'metal' ? 2.4 : 2}"/>`;
+  const title = `SHYGON Tap custom card, your artwork, ${material}, ${finish}, ${face}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}"><title>${title}</title>${defs(id, c)}<g clip-path="url(#${id}clip)">${markup}${body}</g>${edge}</svg>
+`;
 }
