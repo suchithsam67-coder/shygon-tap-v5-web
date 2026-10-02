@@ -5,6 +5,29 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M0.3 U2 complete: `db:push` safeguard (2026-10-02), branch `feat/m0.3-security-identity`
+**Decided** by the repository owner, in session:
+- **DEC-2026-023 amendment A-1:** S1 is allowlist only, with no override flag.
+- **`APPLY_ALL.sql`:** text-only clean-up.
+
+**Changed** (DEC-2026-023 Option A + S1/A-1)
+- `supabase/tests/apply-remote.mjs` (`npm run db:push`). **Before any network call** it refuses:
+  - any argument, including the removed `--i-know-this-is-not-production`;
+  - an unset or malformed `SUPABASE_PROJECT_REF`;
+  - a ref not on the allowlist;
+  - every ref, if the allowlist is missing or invalid.
+
+  It prints its plan before contacting Supabase, sends only migrations `020+` (never 001–019), and never prints the token.
+- New `supabase/non-production-projects.json`: the allowlist, empty, so `db:push` refuses everything today.
+- New `supabase/tests/lib/push-guard.mjs`: pure checks that fail closed.
+- New `supabase/tests/lib/migrations.mjs`: 020+ selection with no dependencies. `lib/live-db.mjs` re-exports it.
+- New `supabase/tests/db-push-guard.mjs` (`npm run test:push-guard`, in `ci` and CI): 18 checks. These include end-to-end runs of the real script under the network guard, asserting **no network attempt on every refusal path**. A sandbox shows that only `020+` is planned and only `api.supabase.com` is contacted.
+- **Mutation control** (scratch): with the allowlist check removed, the script reaches the network, which the refusal checks would catch.
+- `.github/CODEOWNERS`: the allowlist and guard files need Data + Security review.
+- **`APPLY_ALL.sql` (text only):** every paste instruction became a warning, in the `db:push` message, `README.md`, `PRODUCTION.md` §5, the header text `db:bundle` writes, and `supabase/migrations/README.md`. **The file and what `db:bundle` bundles are unchanged** (M0.4).
+
+**Not changed:** migrations (no 020/021), schema, RLS, auth, payments, fulfilment, production. Nothing was pushed or deployed.
+
 ### M0.3 U1 complete: database suites on the live baseline (2026-10-02), branch `feat/m0.3-security-identity`
 **Decided** by the repository owner, in session:
 - **D-U4:** the first-payment Tap is created as a draft. `provision_tap_on_payment` changes in U4; this reverses scope point 5.

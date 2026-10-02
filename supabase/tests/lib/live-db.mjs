@@ -1,7 +1,9 @@
 import { PGlite } from '@electric-sql/pglite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { ROOT, MIGRATIONS_DIR, FIRST_NEW_MIGRATION, newMigrations } from './migrations.mjs';
+
+export { ROOT, MIGRATIONS_DIR, FIRST_NEW_MIGRATION, newMigrations };
 
 /**
  * Builds an isolated in-memory database from the live schema baseline, the
@@ -16,22 +18,7 @@ import { fileURLToPath } from 'node:url';
  * baseline was captured, and they are never re-run here or anywhere else.
  */
 
-export const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-export const MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
-export const FIRST_NEW_MIGRATION = 20;
-
 const read = (...parts) => fs.readFileSync(path.join(ROOT, ...parts), 'utf8');
-
-/** Migrations numbered 020 and up, in order. `only` limits it to one number. */
-export function newMigrations(dir = MIGRATIONS_DIR, only = null) {
-  return fs
-    .readdirSync(dir)
-    .filter((f) => /^\d{3}_.*\.sql$/.test(f))
-    .filter((f) => Number(f.slice(0, 3)) >= FIRST_NEW_MIGRATION)
-    .filter((f) => only === null || Number(f.slice(0, 3)) === only)
-    .sort()
-    .map((name) => ({ name, sql: fs.readFileSync(path.join(dir, name), 'utf8') }));
-}
 
 /** A fresh database holding exactly the live schema (no migrations applied). */
 export async function createLiveDb() {

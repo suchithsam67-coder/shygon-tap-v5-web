@@ -438,32 +438,42 @@ which would have bounced.
 
 ## 5. Migrations
 
-### Applying them — three ways, easiest first
+> **Superseded on 2026-10-02 (DEC-2026-023).** The live schema baseline
+> `supabase/baseline/000_live_baseline.sql` is now the origin of all database work.
+> Migrations 001–019 were applied on live and are **history: never re-apply them**,
+> whether by `db:push`, by pasting, or by hand. Replaying them onto live changes dozens
+> of objects and breaks sign-up (`docs/governance/SCHEMA_DRIFT_REPORT.md`). New work
+> starts at `020_`; see `supabase/migrations/README.md`. The three "ways" below are kept
+> as the historical record of how V5 was set up. Ways 2 and 3 must not be used.
+
+### Applying them — three ways, easiest first (historical)
 
 **1. Automatic.** Needs a personal access token from
 <https://supabase.com/dashboard/account/tokens>:
 
 ```bash
-SUPABASE_ACCESS_TOKEN=sbp_… SUPABASE_PROJECT_REF=<20-char-ref> npm run db:push
+SUPABASE_ACCESS_TOKEN=sbp_… SUPABASE_PROJECT_REF=<allowlisted ref> npm run db:push
 ```
 
-Applies all four through the Management API, stops at the first failure, and
-prints the resulting catalog. The token is read from the environment and never
-written to disk — it is a full-account credential, so do not put it in `.env`.
+*Now (DEC-2026-023 S1, amendment A-1):* `db:push` sends only migrations 020+, and only
+to a project listed in `supabase/non-production-projects.json`. It refuses everything
+else before any network call, with no override. Production is never on that list. The
+token is read from the environment and never written to disk. It is a full-account
+credential, so do not put it in `.env`.
 
-**2. One paste.** `supabase/APPLY_ALL.sql` is all four concatenated in order.
-Dashboard → SQL Editor → New query → paste → Run. One transaction, so either all
-of it lands or none does. Regenerate with `npm run db:bundle` after changing any
-migration.
+**2. One paste: DO NOT USE.** `supabase/APPLY_ALL.sql` bundles the 001–019 history.
+Pasting it into a SQL editor replays that history onto the project. Do not paste it into
+any Supabase project. `npm run db:bundle` still regenerates it, which stays unchanged
+until M0.4.
 
-**3. By hand.** The four files below, in order, in the SQL editor.
+**3. By hand: DO NOT USE for 001–019.** The files below are the historical record.
 
 ### Testing them without a project
 
 ```bash
-npm run db:apply    # executes all four on Postgres 18 (WASM), then again for idempotency
-npm run db:verify   # 21 behaviour checks
-npm run db:bundle   # regenerates APPLY_ALL.sql and proves it applies as one batch
+npm run db:apply    # live baseline + 020+ on Postgres (WASM), then again for idempotency
+npm run db:verify   # behaviour checks on the live baseline
+npm run test:push-guard   # proves db:push refuses non-allowlisted projects and never sends 001–019
 ```
 
 No Docker and no live project needed. Run these after touching any migration.

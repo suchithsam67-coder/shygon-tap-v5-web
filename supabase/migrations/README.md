@@ -23,5 +23,10 @@ None of these touch a real Supabase project.
 
 - **Production is never targeted by tooling.** A migration reaches production only through the approved pipeline (doc 12 M1.13, not built yet). Until then, a human applies it under documented break-glass, with post-apply verification and a confirmed backup or PITR.
 - **No migration produced under the DEC-2026-001 M0.3 waiver is applied to production** until the credentials are rotated, or the owner extends the waiver in writing.
-- **`npm run db:push` is NOT guarded yet.** It still re-applies every file, 001–019 included, to whatever project it is pointed at. The DEC-2026-023 S1 allowlist guard is M0.3 unit U2, which is not done. **Never run it against production.**
-- **Do not paste `supabase/APPLY_ALL.sql` into a production SQL editor.** It bundles 001–019 and would replay history onto live, the same hazard as above. Its regeneration from baseline + `020+` is an M0.4 item.
+- **`npm run db:push` is guarded** (DEC-2026-023 S1, amendment A-1; M0.3 U2):
+  - It runs only for a project listed in `supabase/non-production-projects.json`. That list is empty today, so it refuses everything.
+  - There is no override flag. A missing or malformed list refuses everything.
+  - It sends only `020+` and never 001–019.
+  - Every check runs before any network call (`npm run test:push-guard`).
+  - Adding a non-production project is a reviewed commit (Data Owner + Security Owner). **Production is never listed.**
+- **Do not paste `supabase/APPLY_ALL.sql` into any Supabase SQL editor.** It bundles 001–019 and would replay history onto the project. `npm run db:bundle` and the file are unchanged; whether to regenerate them from baseline + `020+` or delete them is an M0.4 item.

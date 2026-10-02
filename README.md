@@ -27,14 +27,21 @@ Do not expose `RAZORPAY_KEY_SECRET` or webhook secrets to frontend variables.
 
 ## Database
 
-The schema lives in `supabase/migrations/`, applied in numeric order.
+The schema of record is the live baseline, `supabase/baseline/000_live_baseline.sql`
+(DEC-2026-023). `supabase/migrations/001–019` are history: they were applied on live
+and are **never re-applied**. New work starts at `020_`. See
+`supabase/migrations/README.md`.
 
 ```bash
-npm run db:apply     # run every migration on a local Postgres (WASM) — no Docker
-npm run db:verify    # 21 checks on the rules they enforce
-npm run db:bundle    # regenerate supabase/APPLY_ALL.sql (all four, one paste)
-npm run db:push      # apply to a real project (needs SUPABASE_ACCESS_TOKEN + SUPABASE_PROJECT_REF)
+npm run db:apply     # live baseline + migrations 020+, on a local Postgres (WASM) — no Docker
+npm run db:verify    # behaviour checks on that database
+npm run db:push      # 020+ only, and only to a project on supabase/non-production-projects.json
 ```
 
+> **Do not paste `supabase/APPLY_ALL.sql` into any Supabase SQL editor.** It bundles
+> the 001–019 history; replaying it onto the live project changes dozens of objects and
+> breaks sign-up (`docs/governance/SCHEMA_DRIFT_REPORT.md`). `npm run db:bundle` still
+> regenerates it from the same history; that is unchanged until M0.4.
+
 Run `db:apply` and `db:verify` after changing anything under
-`supabase/migrations/`. See PRODUCTION.md §5.
+`supabase/migrations/`.

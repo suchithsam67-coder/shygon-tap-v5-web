@@ -41,3 +41,12 @@
 /scripts/ci/                             @role-security-owner @role-release-owner
 /scripts/check-bundle-size.mjs           @role-principal-architect
 /.nvmrc                                  @role-release-owner
+
+# Added in M0.3 U2 (DEC-2026-023 S1, amendment A-1): the db:push safeguard.
+# The allowlist is the only gate between `npm run db:push` and a real project,
+# so adding a ref is a Data + Security decision. Production is never listed.
+/supabase/non-production-projects.json   @role-data-owner @role-security-owner
+/supabase/tests/apply-remote.mjs         @role-data-owner @role-security-owner
+/supabase/tests/lib/push-guard.mjs       @role-data-owner @role-security-owner
+/supabase/tests/lib/migrations.mjs       @role-data-owner @role-security-owner
+/supabase/tests/db-push-guard.mjs        @role-data-owner @role-security-owner

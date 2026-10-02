@@ -61,12 +61,12 @@ Each unit ends with: tests written, all gates in §5 green (or a stop), a focuse
 - `supabase/migrations/README.md` (new): 001–019 are "applied on live, history only, never re-run"; new work starts at `020_`, on the baseline.
 - No change to `supabase/tests/baseline.sql`, which `schema-drift.mjs` and `verify-011` still use.
 
-### U2: `db:push` safeguard (DEC-2026-023 S1)
-- `apply-remote.mjs` refuses before any network call unless `SUPABASE_PROJECT_REF` is in a committed non-production allowlist, or `--i-know-this-is-not-production` is passed.
+### U2: `db:push` safeguard (DEC-2026-023 S1, as narrowed by amendment A-1): DONE 2026-10-02
+- `apply-remote.mjs` refuses before any network call unless `SUPABASE_PROJECT_REF` is in the committed non-production allowlist. **Amendment A-1 (owner, 2026-10-02): there is no override flag**; `--i-know-this-is-not-production` is refused like any other argument. A missing or malformed allowlist refuses every project.
   - The allowlist is `supabase/non-production-projects.json`, empty by default.
 - Under Option A it applies **only `020+`**, never 001–019.
-- The refusal message stops recommending `APPLY_ALL.sql` (the same replay hazard by hand).
-- The guard is tested without network access.
+- Text only (owner, 2026-10-02): every recommendation to paste `APPLY_ALL.sql` is replaced with a warning (the `db:push` message, `README.md`, `PRODUCTION.md` §5, the header text `db:bundle` writes, `supabase/migrations/README.md`). The file and `db:bundle`'s bundling are unchanged (M0.4).
+- Tested without network access (`npm run test:push-guard`, 18 checks), including a no-network-on-refusal check for every refusal path. CODEOWNERS protects the allowlist and guard files (Data + Security).
 
 ### U3: F1, customer cannot un-suspend their own Tap or account (DEC-2026-022 Position A)
 - **Verify first** on the baseline (expected, STATIC): an owner can clear `tap_profiles.suspended_at/_reason/_by` and `profiles.suspended_at/_reason` by direct UPDATE (`*_update_own` policies; `GRANT ALL` to `authenticated`; no guard trigger).
@@ -134,7 +134,9 @@ Each has a header (purpose, decision, rollback SQL, dependencies, data class). E
 
 **Modified files:**
 - `supabase/tests/apply.mjs`, `verify.mjs`, `rls-adversarial.mjs` (builder + live-shape fixtures; F1 tests added to `rls-adversarial.mjs` per doc 12)
-- `supabase/tests/apply-remote.mjs` (S1)
+- `supabase/tests/apply-remote.mjs` (S1 + A-1); new `supabase/tests/lib/push-guard.mjs` and `lib/migrations.mjs` (U2; `lib/live-db.mjs` re-exports the latter)
+- `supabase/tests/bundle.mjs` (comment and generated-header text only; bundling unchanged), `README.md`, `PRODUCTION.md` §5 (APPLY_ALL warnings, U2)
+- `.github/CODEOWNERS` (allowlist and guard files: Data + Security, U2)
 - `package.json` (scripts only)
 - `.github/workflows/ci.yml` (new steps)
 - `docs/CHANGELOG.md`, `docs/DECISIONS.md`
@@ -159,7 +161,7 @@ Each has a header (purpose, decision, rollback SQL, dependencies, data class). E
 | Identity and fulfilment (`identity-contract.mjs`) | Successful paid claim for a first-time buyer (I-1) creates the persona with the correct `customers.id`. A claim for a buyer who already has a persona leaves it unchanged. A failed payment (`payment_status='failed'`) fires no provisioning. Fulfilment failure leaves no partial persona (the transaction rolls back). A retry (`retry → paid`) is idempotent. A duplicate claim or duplicate webhook matches 0 rows and creates no second persona. **Missing customer:** a user with no `customers` row gets one created, exactly one. **Missing Tap profile:** provisioned on claim. A profile save with `customer_id = auth user id` succeeds and stores `customers.id` (I-2). A client sending another customer's id is refused with `42501`. The safety-net insert stores `customers.id` (I-3). A sign-up still creates the customer and profile. Every run is executed twice (idempotency). |
 | Golden `/t/` (`golden-public-tap.mjs`) | `get_public_profile` and `get_public_tap_state` JSON are byte-identical before and after `020` and `021`, including the F3 characterization cases |
 | Admin contract (`admin-contract.mjs`) | The signature and return type of every `admin_*` function and the doc 12 §2 frozen functions are unchanged |
-| `db:push` guard (`db-push-guard.mjs`) | Refused without the allowlist or flag. Refused with an unknown ref. No network call is attempted. Only `020+` is selected. |
+| `db:push` guard (`db-push-guard.mjs`) | Refused without the allowlist (there is no flag; amendment A-1). Refused with an unknown ref. No network call is attempted. Only `020+` is selected. |
 
 **Gates run after every unit (local), then once on a clean clone with no `.env`:**
 1. `npm run lint`

@@ -1,50 +1,72 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { MIGRATIONS_DIR, newMigrations } from './lib/migrations.mjs';
+import { checkArgs, checkTarget, loadAllowlist } from './lib/push-guard.mjs';
 
 /**
- * Applies every migration to a real Supabase project through the Management
- * API, so nobody has to paste SQL by hand.
+ * `npm run db:push`: applies NEW migrations to a NON-PRODUCTION Supabase
+ * project through the Management API.
  *
- * Needs two things, neither of which is stored in this repo:
+ * Guarded by DEC-2026-023 S1, as narrowed by amendment A-1 (2026-10-02):
+ *   - the committed allowlist supabase/non-production-projects.json is the
+ *     only gate, with no override flag. A project ref that is not on it is
+ *     refused, and so is any project if the file is missing or malformed.
+ *     The production project is never listed. Production changes go through
+ *     the approved pipeline or documented break-glass, never this script;
+ *   - only migrations numbered 020 and up are sent. 001–019 are history
+ *     (applied on live before the live baseline was captured) and are never
+ *     re-applied;
+ *   - every check runs before any network call.
  *
- *   SUPABASE_ACCESS_TOKEN   a personal access token from
- *                           https://supabase.com/dashboard/account/tokens
- *   SUPABASE_PROJECT_REF    the 20-character ref in your project URL,
- *                           https://<ref>.supabase.co
+ * Needs, from the environment only (nothing is stored in this repo):
+ *   SUPABASE_PROJECT_REF    the 20-character ref of an ALLOWLISTED project
+ *   SUPABASE_ACCESS_TOKEN   a personal access token (a full-account credential:
+ *                           never put it in a file, and never print it)
  *
- * Run it as:
- *   SUPABASE_ACCESS_TOKEN=sbp_… SUPABASE_PROJECT_REF=abcd… npm run db:push
- *
- * The token is read from the environment and never written anywhere. It is a
- * full-account credential — do not paste it into a file that gets committed.
+ *   SUPABASE_ACCESS_TOKEN=sbp_… SUPABASE_PROJECT_REF=<allowlisted ref> npm run db:push
  */
 
-const HERE = fileURLToPath(new URL('.', import.meta.url));
-const MIGRATIONS = path.join(HERE, '..', 'migrations');
 const API = 'https://api.supabase.com';
-
-const token = process.env.SUPABASE_ACCESS_TOKEN?.trim();
-const ref = process.env.SUPABASE_PROJECT_REF?.trim();
 
 function die(message) {
   console.error(`\n${message}\n`);
   process.exit(1);
 }
 
-if (!token || !ref) {
+// --- 1. the guard: no network call happens before every check passes --------
+const args = checkArgs(process.argv.slice(2));
+if (!args.ok) die(`REFUSED: ${args.reason}`);
+
+const target = checkTarget(process.env.SUPABASE_PROJECT_REF, loadAllowlist());
+if (!target.ok) {
   die(
     [
-      'Missing credentials.',
+      `REFUSED: ${target.reason}`,
       '',
-      '  SUPABASE_ACCESS_TOKEN  ' + (token ? 'set' : 'NOT SET — https://supabase.com/dashboard/account/tokens'),
-      '  SUPABASE_PROJECT_REF   ' + (ref ? ref : 'NOT SET — the 20 chars in https://<ref>.supabase.co'),
-      '',
-      'Then: SUPABASE_ACCESS_TOKEN=sbp_… SUPABASE_PROJECT_REF=… npm run db:push',
-      '',
-      'No token? Paste supabase/APPLY_ALL.sql into the dashboard SQL editor instead.',
+      'db:push only targets projects listed in supabase/non-production-projects.json.',
+      'To use a NON-production project, add it there in a reviewed commit',
+      '(Data Owner + Security Owner; DEC-2026-023 amendment A-1). Never list production.',
+      'Production changes go through the approved pipeline or documented break-glass.',
     ].join('\n'),
   );
+}
+const ref = target.ref;
+
+// --- 2. the plan: 020 onward only ------------------------------------------
+const migrations = newMigrations(MIGRATIONS_DIR);
+console.log(`\nTarget: ${ref} (on the non-production allowlist)`);
+console.log(
+  `Plan: ${migrations.length} migration(s) numbered 020 or higher. ` +
+    '001–019 are history and are never sent.',
+);
+for (const { name } of migrations) console.log(`  - ${name}`);
+if (migrations.length === 0) {
+  console.log('\nNothing to apply.\n');
+  process.exit(0);
+}
+
+// --- 3. the credential, from the environment only ----------------------------
+const token = process.env.SUPABASE_ACCESS_TOKEN?.trim();
+if (!token) {
+  die('Missing SUPABASE_ACCESS_TOKEN: a personal access token from https://supabase.com/dashboard/account/tokens');
 }
 
 async function api(pathname, init = {}) {
@@ -70,7 +92,7 @@ async function api(pathname, init = {}) {
   return body;
 }
 
-// --- confirm the project exists and is reachable before changing anything ---
+// --- 4. confirm the project exists and is reachable before changing anything --
 let project;
 try {
   project = await api(`/v1/projects/${ref}`);
@@ -89,16 +111,11 @@ if (project.status !== 'ACTIVE_HEALTHY') {
   console.log(`WARNING: status is ${project.status}. A paused project must be resumed first.`);
 }
 
-const files = fs
-  .readdirSync(MIGRATIONS)
-  .filter((f) => f.endsWith('.sql'))
-  .sort();
+// --- 5. apply, in order, stopping at the first failure ------------------------
+console.log(`Applying ${migrations.length} migration(s)…\n`);
 
-console.log(`Applying ${files.length} migrations…\n`);
-
-for (const file of files) {
-  const query = fs.readFileSync(path.join(MIGRATIONS, file), 'utf8');
-  process.stdout.write(`  ${file} … `);
+for (const { name, sql: query } of migrations) {
+  process.stdout.write(`  ${name} … `);
   try {
     await api(`/v1/projects/${ref}/database/query`, {
       method: 'POST',
@@ -114,7 +131,7 @@ for (const file of files) {
   }
 }
 
-// --- report what landed ------------------------------------------------------
+// --- 6. report what landed -----------------------------------------------------
 const rows = await api(`/v1/projects/${ref}/database/query`, {
   method: 'POST',
   body: JSON.stringify({

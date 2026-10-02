@@ -4,14 +4,15 @@ import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 
 /**
- * Concatenates every migration, in order, into `supabase/APPLY_ALL.sql` — one
- * file to paste into the Supabase SQL editor instead of four.
+ * Concatenates every migration, in order, into `supabase/APPLY_ALL.sql`, then
+ * proves the bundle by executing it as a single statement batch against a real
+ * Postgres.
  *
- * Then proves the bundle by executing it as a single statement batch against a
- * real Postgres, which is exactly how the SQL editor will run it. Applying the
- * four separately is already proven by `db:apply`; this proves the combined
- * form too, because "paste all four at once" is what a human will actually do
- * and it is not automatically equivalent — one transaction, one failure point.
+ * WARNING (DEC-2026-023, 2026-10-02): the bundle contains the 001–019 history,
+ * which was applied on live before the live schema baseline was captured and
+ * must never be re-applied. APPLY_ALL.sql is NOT to be pasted into any Supabase
+ * SQL editor. Only this text changed in M0.3 U2. What the script bundles is
+ * unchanged, and regenerating or deleting it is an M0.4 decision.
  */
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -29,11 +30,12 @@ const header = `-- =============================================================
 -- GENERATED FILE. Do not edit: change the numbered files in
 -- supabase/migrations/ and re-run \`npm run db:bundle\`.
 --
--- HOW TO APPLY
---   Supabase Dashboard → SQL Editor → New query → paste this whole file → Run.
---
--- It is one transaction, so either all of it lands or none of it does. Every
--- statement is idempotent, so running it again is safe.
+-- DO NOT PASTE THIS FILE INTO ANY SUPABASE SQL EDITOR (DEC-2026-023).
+--   It contains the 001–019 history. Those migrations were applied on live
+--   before the live schema baseline was captured, and replaying them onto live
+--   changes dozens of objects and breaks sign-up
+--   (docs/governance/SCHEMA_DRIFT_REPORT.md). New work starts at 020 and is
+--   applied only through the approved path (supabase/migrations/README.md).
 --
 -- Source files, in the order they appear below:
 ${files.map((f, i) => `--   ${i + 1}. ${f}`).join('\n')}

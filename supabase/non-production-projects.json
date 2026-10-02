@@ -1,0 +1,4 @@
+{
+  "description": "The ONLY projects `npm run db:push` may target (DEC-2026-023 S1, amendment A-1). Non-production projects only; the production project is never listed. Adding one is a reviewed commit (CODEOWNERS: Data Owner + Security Owner; DEC-2026-018: 24-hour cool-off + checklist). Each entry: { \"ref\": \"<20-char project ref>\", \"label\": \"...\", \"approved_by\": \"...\", \"approved_on\": \"YYYY-MM-DD\", \"decision\": \"DEC-...\" }. Empty: db:push refuses every project.",
+  "projects": []
+}

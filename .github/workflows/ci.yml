@@ -61,6 +61,12 @@ jobs:
       - name: bundle check (public Tap entry JS <= 90 kB gz; DEC-2026-019)
         run: npm run test:bundle
 
+      # DEC-2026-023 S1 (amendment A-1): db:push refuses every project not on
+      # the committed allowlist, sends only 020+, and checks before any network
+      # call. Runs with outbound network denied; no credential is involved.
+      - name: db:push guard
+        run: npm run test:push-guard
+
       # apply.mjs already runs every migration a second time to prove
       # idempotency, so one invocation is the "db:apply twice" gate.
       # Since DEC-2026-023 (Option A) the database suites start from the live
