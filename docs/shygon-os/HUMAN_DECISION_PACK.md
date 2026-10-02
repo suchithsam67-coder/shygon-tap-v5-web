@@ -382,7 +382,7 @@ Per E-3 (STATIC), `fulfil_order()` also omits the NOT NULL `card_id`, so directi
 - the payment/fulfilment abstraction milestone's fix scope.
 
 **Human approval**
-- Decision (I-1…I-3): **APPROVED: Option A** (database-side `customer_id` resolution). Recorded from "the documented … fix direction"; the owner should confirm A was meant. **Live payments remain OFF and NOT AUTHORIZED.**
+- Decision (I-1…I-3): **APPROVED: Option A** (database-side `customer_id` resolution). Recorded from "the documented … fix direction"; **confirmed by the owner on 2026-10-02**. **Live payments remain OFF and NOT AUTHORIZED.**
 - Decision (I-4): **OPEN** (needs DEC-2026-028 + DEC-2026-002)
 - Approved by: repository owner, in session
 - Date: 2026-10-02
@@ -875,7 +875,7 @@ DEC-2026-002:  __________________
 DEC-2026-018:  APPROVED — Option B (one-person control model; 24 h cool-off + checklist for L3)
 DEC-2026-022:  APPROVED — Position A (F1 + F3 + F4; F2 to backlog); Q2 and Q3 OPEN
 DEC-2026-023:  APPROVED — Option A (live baseline is the origin) + S1 (db:push allowlist guard)
-DEC-2026-024:  APPROVED — Option A for I-1…I-3 (to be confirmed); I-4 OPEN; live payments OFF
+DEC-2026-024:  APPROVED — Option A for I-1…I-3 (confirmed by owner 2026-10-02); I-4 OPEN; live payments OFF
 DEC-2026-025:  __________________
 DEC-2026-026:  __________________
 DEC-2026-027:  __________________

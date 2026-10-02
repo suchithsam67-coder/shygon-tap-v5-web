@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Date | 2026-10-02 |
-| Status | **Scope recorded. Implementation NOT started.** It begins only on the owner's explicit go-ahead. |
+| Status | **Scope recorded; points 1–5 confirmed; go-ahead given 2026-10-02.** Implementation proceeds unit by unit and stops on any stop condition (§7). |
 | Authorized by | The approvals recorded on 2026-10-02 (repository owner, in session); see §1 |
 | Branch (proposed) | `feat/m0.3-security-identity`, created from the approvals commit on `feat/m0-governance-ci`. Nothing is merged to `main`; there is no remote. |
 | Control model | DEC-2026-018 Option B. Every L3 unit below gets a 24-hour cool-off and a checklist review by the owner before approval. Claude Code never merges, applies migrations or deploys. |
@@ -25,7 +25,7 @@
 
 ---
 
-## 2. Points that need the owner's confirmation before the affected unit starts
+## 2. Points confirmed by the owner (2026-10-02, explicit answer "Confirm 1–5, start U1")
 
 1. **DEC-2026-024 = Option A.** You approved "the documented … fix direction". The record documents Option A as its advisory direction, so it was recorded as Option A. If you meant B, C or D, say so before unit U4.
 2. **DEC-2026-024 and DEC-2026-029 are scheduled inside M0.3.**

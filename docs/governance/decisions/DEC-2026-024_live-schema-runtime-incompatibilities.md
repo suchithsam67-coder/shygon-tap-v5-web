@@ -92,7 +92,7 @@ Each item was CONFIRMED in an isolated rebuild of the live baseline and compared
 ## Decision
 - **Decision: Option A, database-side `customer_id` resolution, for I-1, I-2 and I-3.** Approved by the repository owner, in session, 2026-10-02, as "the documented P1 payment/fulfilment defect fix direction, with live payments remaining OFF".
   - **Interpretation note:** this record documents one direction as advisory, Option A ("the smallest change that leaves the frozen V5 surfaces intact"). Claude Code recorded the approval as Option A on that basis.
-  - If the owner meant B, C or D, this line must be corrected **before** implementation of this unit starts.
+  - **Confirmed by the repository owner, 2026-10-02 (in session, explicit answer "Confirm 1–5, start U1"):** Option A was meant.
 - **What Option A covers:**
   - customer-record id resolution in the database for `profiles.customer_id` and `tap_profiles.customer_id`;
   - frozen V5 code is unchanged: `fulfilment.mjs`, `Settings.tsx`, `Checkout.tsx`, `create-order.mjs`;
