@@ -1,32 +1,23 @@
-import { PGlite } from '@electric-sql/pglite';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
+import { createLiveDb, newMigrations, MIGRATIONS_DIR } from './lib/live-db.mjs';
 
 /**
  * Executes the SHYGON migrations against a real Postgres (PGlite/WASM) to prove
  * they run, rather than only reading them.
  *
- * Two things Supabase provides that a bare Postgres does not, shimmed below:
- *   - the `auth` schema (`auth.users`, `auth.uid()`)
- *   - the `anon` / `authenticated` / `service_role` roles that GRANT targets
+ * Since DEC-2026-023 (Option A) the database starts from the authoritative
+ * live schema baseline, not from the old hand-written stand-in:
+ *   live-platform-shim.sql + supabase/baseline/000_live_baseline.sql
+ *   + live-auth-shim.sql   (see ./lib/live-db.mjs)
+ * and only migrations 020 onward are applied. 001–019 were applied to live
+ * before the baseline was captured; they are history and are never re-run.
  *
- * And the four tables the live project already had before migration 001 — the
- * migrations only ALTER those, they never create them. The column list comes
- * from the header comment in 002, which recorded what was actually live.
+ *   node supabase/tests/apply.mjs [migrations-dir] [only-number]
  */
 
-// fileURLToPath, not `.pathname` — the latter leaves %20 in place, and this
-// project lives under a directory with a space in its name.
-const MIGRATIONS_DIR =
-  process.argv[2] ?? fileURLToPath(new URL('../migrations', import.meta.url));
+const DIR = process.argv[2] ?? MIGRATIONS_DIR;
 const ONLY = process.argv[3] ? Number(process.argv[3]) : null;
 
-const BASELINE = fs.readFileSync(new URL('./baseline.sql', import.meta.url), 'utf8');
-
-const db = await PGlite.create();
-
-async function run(label, sql) {
+async function run(db, label, sql) {
   try {
     await db.exec(sql);
     console.log(`  PASS  ${label}`);
@@ -50,34 +41,32 @@ async function run(label, sql) {
   }
 }
 
-console.log('\n=== baseline (what the live project already had) ===');
-if (!(await run('baseline', BASELINE))) process.exit(1);
+console.log('\n=== baseline: the live schema (supabase/baseline/000_live_baseline.sql) ===');
+let db;
+try {
+  db = await createLiveDb();
+  console.log('  PASS  live baseline loaded');
+} catch (error) {
+  console.log(`  FAIL  live baseline\n        ${error.message}`);
+  process.exit(1);
+}
 
-const files = fs
-  .readdirSync(MIGRATIONS_DIR)
-  .filter((f) => f.endsWith('.sql'))
-  .sort();
+const migrations = newMigrations(DIR, ONLY);
 
-console.log('\n=== migrations ===');
+console.log('\n=== migrations (020 onward; 001–019 are history and are not re-run) ===');
+if (migrations.length === 0) console.log('  (none yet)');
 let failed = 0;
-for (const file of files) {
-  const n = Number(file.slice(0, 3));
-  if (ONLY !== null && n !== ONLY) continue;
-  const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
-  const ok = await run(file, sql);
-  if (!ok) {
+for (const { name, sql } of migrations) {
+  if (!(await run(db, name, sql))) {
     failed++;
     break; // later files assume earlier ones landed
   }
 }
 
-if (failed === 0) {
+if (failed === 0 && migrations.length > 0) {
   console.log('\n=== idempotency: running every migration a second time ===');
-  for (const file of files) {
-    const n = Number(file.slice(0, 3));
-    if (ONLY !== null && n !== ONLY) continue;
-    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
-    if (!(await run(file + ' (re-run)', sql))) {
+  for (const { name, sql } of migrations) {
+    if (!(await run(db, name + ' (re-run)', sql))) {
       failed++;
       break;
     }

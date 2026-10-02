@@ -5,6 +5,23 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M0.3 U1 complete: database suites on the live baseline (2026-10-02), branch `feat/m0.3-security-identity`
+**Decided** by the repository owner, in session:
+- **D-U4:** the first-payment Tap is created as a draft. `provision_tap_on_payment` changes in U4; this reverses scope point 5.
+- **D-U1-a:** the catalogue checks are kept as history tests.
+- **D-U1-b:** for 4 anonymous-read checks, "error OR 0 rows" counts as denial, and any returned row fails. RLS is unchanged.
+
+**Changed** (DEC-2026-023 Option A)
+- `apply.mjs`, `verify.mjs` and `rls-adversarial.mjs` now build from the live baseline via `lib/live-db.mjs` and apply `020+`. 001–019 are never re-run.
+- `rls-adversarial` fixtures are adapted to the live table shapes (`cards.card_id`, NOT NULL `customer_id`); its assertions are unchanged apart from D-U1-b.
+- New `history-seed.mjs` + `test:db:history` (in `test:db` and CI).
+- New `supabase/migrations/README.md`.
+
+**Results**
+- `db:apply` passes; `rls-adversarial` 48/48 (with a negative control); history 2/2.
+- **`db:verify` is 6/21 until U4.** All 15 failures cascade from the I-1 production defect.
+- `test:db` and `ci` are therefore red on this branch until U4. Nothing is weakened.
+
 ### M0.3 U1 started, then stopped at its stop rule (2026-10-02), branch `feat/m0.3-security-identity`
 **Added** (tooling only; not yet wired into any script or CI)
 - `supabase/tests/lib/live-db.mjs`: builds an isolated PGlite database from the live baseline (DEC-2026-023 Option A). It loads `live-platform-shim.sql`, then `000_live_baseline.sql`, then `live-auth-shim.sql`, then migrations `020+`. 001–019 are never re-run.

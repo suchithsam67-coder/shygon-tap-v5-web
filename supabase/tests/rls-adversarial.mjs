@@ -1,7 +1,5 @@
-import { PGlite } from '@electric-sql/pglite';
-import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createMigratedDb, ROOT as REPO_ROOT } from './lib/live-db.mjs';
 
 /**
  * Adversarial RLS suite.
@@ -12,18 +10,15 @@ import { fileURLToPath } from 'node:url';
  * Supabase hands anon/authenticated by default. Anything that still succeeds
  * here is something a customer could actually do with nothing but the
  * publishable key and a signed-in session.
+ *
+ * Since DEC-2026-023 (Option A) the database is the live schema baseline plus
+ * migrations 020 onward (./lib/live-db.mjs), so these checks describe the RLS
+ * that production actually has.
  */
 
-// Project root: first argument, or two levels up from this file (the same
-// default as verify-011-admin-notes.mjs). It used to crash with no argument.
-const ROOT = process.argv[2] ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const MIG = path.join(ROOT, 'supabase', 'migrations');
-const db = await PGlite.create();
-
-await db.exec(fs.readFileSync(path.join(ROOT, 'supabase', 'tests', 'baseline.sql'), 'utf8'));
-for (const f of fs.readdirSync(MIG).filter((f) => f.endsWith('.sql')).sort()) {
-  await db.exec(fs.readFileSync(path.join(MIG, f), 'utf8'));
-}
+// Project root: first argument, or the repository this file lives in.
+const ROOT = process.argv[2] ?? REPO_ROOT;
+const db = await createMigratedDb(path.join(ROOT, 'supabase', 'migrations'));
 
 // What Supabase itself grants. Without this, a refusal would be a plain
 // permission error and would prove nothing about RLS.
@@ -43,11 +38,11 @@ await db.exec(`
     ('${BOB}',   'bob@example.com'),
     ('${ADMIN}', 'admin@example.com');
 
-  -- A trigger on auth.users already creates the profile row; fill in the name.
-  INSERT INTO public.profiles (id, email, full_name) VALUES
-    ('${ALICE}', 'alice@example.com', 'Alice'),
-    ('${BOB}',   'bob@example.com',   'Bob')
-  ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, email = EXCLUDED.email;
+  -- The sign-up trigger on auth.users already created the customers and
+  -- profile rows; fill in the names. (On live, profiles.customer_id is NOT
+  -- NULL, so an upsert that omits it is refused before ON CONFLICT applies.)
+  UPDATE public.profiles SET full_name = 'Alice', email = 'alice@example.com' WHERE id = '${ALICE}';
+  UPDATE public.profiles SET full_name = 'Bob',   email = 'bob@example.com'   WHERE id = '${BOB}';
 
   INSERT INTO public.orders (id, order_id, user_id, customer_id, product_name, amount, amount_in_paise, payment_status, order_status)
   VALUES ('aaaaaaaa-0000-0000-0000-000000000001', 'ST-ALICE', '${ALICE}', '${ALICE}', 'Metal Card', 2999, 299900, 'pending', 'placed'),
@@ -55,12 +50,18 @@ await db.exec(`
 
   INSERT INTO public.entitlements (user_id, type, key) VALUES ('${BOB}', 'digital_plan', 'goat');
 
-  INSERT INTO public.cards (user_id, order_id, sku) VALUES ('${BOB}', 'bbbbbbbb-0000-0000-0000-000000000001', 'card-x');
+  -- Live cards need the legacy card_id. The activation code is given because
+  -- where pgcrypto lives on live is unverified (DEC-2026-024 I-5), so this
+  -- stand-in does not provide gen_random_bytes() to the issuing trigger.
+  INSERT INTO public.cards (user_id, order_id, sku, card_id, activation_code)
+  VALUES ('${BOB}', 'bbbbbbbb-0000-0000-0000-000000000001', 'card-x', 'TEST-CARD-BOB', 'SHY-TEST-BOB1');
 
   INSERT INTO public.notifications (user_id, category, title) VALUES ('${BOB}', 'order', 'Bob secret notification');
 
+  -- On live, tap_profiles.customer_id references customers.id (not the user id).
   INSERT INTO public.tap_profiles (user_id, customer_id, slug, username, display_name, published, status)
-  VALUES ('${BOB}', '${BOB}', 'bob-slug', 'bob-slug', 'Bob', true, 'active');
+  VALUES ('${BOB}', (SELECT id FROM public.customers WHERE user_id = '${BOB}'),
+          'bob-slug', 'bob-slug', 'Bob', true, 'active');
 
   INSERT INTO public.admin_users (user_id) VALUES ('${ADMIN}');
 `);
@@ -351,10 +352,30 @@ await check('a customer cannot promote themselves by UPDATE on admin_users', () 
 
 console.log('\n=== anonymous visitor ===');
 
+// Denial may arrive as 0 rows or as a refusal (owner decision D-U1-b,
+// 2026-10-02). On the live baseline, orders / profiles / tap_profiles /
+// notifications have `*_select_owner_or_admin` policies that apply to every
+// role and call is_admin(), which anon may not execute — so an anonymous read
+// is refused with "permission denied for function is_admin" rather than
+// filtered to 0 rows. That is a legitimate denial: no row is returned. The
+// policies are deliberately NOT changed here (that is the M0.4 policy
+// clean-up, doc 12 §3, which says "0 rows, no error is acceptable but error
+// also ok"). The check still FAILS if any row comes back, and on any error
+// that is not a permission / RLS refusal.
+// Only these four checks accept a refusal (the scope of D-U1-b); entitlements
+// must still return 0 rows.
+const DENIAL = /permission denied|row-level security/i;
+const REFUSAL_ACCEPTED = new Set(['orders', 'profiles', 'tap_profiles', 'notifications']);
 for (const [label, tbl] of [['orders', 'orders'], ['profiles', 'profiles'], ['entitlements', 'entitlements'], ['tap_profiles', 'tap_profiles'], ['notifications', 'notifications']]) {
   await check(`anon cannot read ${label}`, () =>
     asRole('anon', null, async () => {
-      const r = await db.query(`SELECT * FROM public.${tbl}`);
+      let r;
+      try {
+        r = await db.query(`SELECT * FROM public.${tbl}`);
+      } catch (e) {
+        if (REFUSAL_ACCEPTED.has(tbl) && DENIAL.test(e.message)) return `refused (${e.message.slice(0, 60)})`;
+        throw e;
+      }
       assert(r.rows.length === 0, `LEAK — ${r.rows.length} row(s)`);
       return '0 rows';
     }));

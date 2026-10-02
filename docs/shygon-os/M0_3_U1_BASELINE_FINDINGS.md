@@ -4,8 +4,8 @@
 |---|---|
 | Date | 2026-10-02 |
 | Unit | U1 (DEC-2026-023 Option A) |
-| Status | **Stopped at the U1 stop rule** (`M0_3_IMPLEMENTATION_SCOPE.md` §3 U1, §7). The suites are **not** rewired yet, and CI still runs them on the history chain, where they pass. |
-| Committed so far | `supabase/tests/lib/live-db.mjs` (the live-baseline builder) and `supabase/tests/live-auth-shim.sql` (the sign-up trigger the dump omits). Neither is wired into any script yet. |
+| Status | **U1 complete** (2026-10-02, after the owner decided D-U1-a, D-U1-b and D-U4; §5). Earlier it stopped at the U1 stop rule. The suites now run on the live baseline. **`db:verify` is red until U4**, because of the I-1 production defect: all 15 failures cascade from it. Nothing is weakened to hide it. |
+| Delivered | `supabase/tests/lib/live-db.mjs`, `live-auth-shim.sql`; `apply.mjs`, `verify.mjs`, `rls-adversarial.mjs` on the baseline; `history-seed.mjs` (D-U1-a); `supabase/migrations/README.md`; `test:db:history` script and CI step. |
 | Method | The suites were copied to scratch and their database prelude was replaced with the builder. Only fixtures that cannot exist on the live table shapes were adapted: `cards.card_id`, NOT NULL `customer_id`, and filling profile names by UPDATE. **No assertion was changed.** A second verify run applied a scratch-only prototype of the DEC-2026-024 fix, to see past the I-1 cascade. The prototype is not committed. |
 
 ## 1. Results
@@ -59,3 +59,24 @@
 3. Something else you define.
 
 Nothing else in U1 is blocked. When D-U1-a and D-U1-b are answered, U1 completes with the suites rewired.
+
+## 5. Decisions (repository owner, 2026-10-02, in session)
+
+| Decision | Choice | Effect |
+|---|---|---|
+| **D-U4 (O-12)** | **Create the Tap as an unpublished draft.** | `provision_tap_on_payment` (a frozen function) is changed in U4 so that the Tap provisioned on first payment is a draft: `status='draft'`, `published=false`. That matches the repository's intent and V5's fulfilment safety net. **This reverses scope point 5.** The verify check "paying the order provisions a draft Tap" is kept as written and becomes the regression test. |
+| **D-U1-a** | **Keep the two catalogue checks as history tests.** | They move out of `verify.mjs` into a separate migration-history check. That check runs on the old stand-in plus 001–019, in isolated PGlite only, and never against live. |
+| **D-U1-b** | **Accept "refused with an error OR 0 rows" as no access** for the four anonymous-read checks. | Either a permission/RLS error or a zero-row result counts as successful denial. **The check fails if any protected row is returned**, and on any other kind of error. The assertion change and its reason (the live baseline legitimately refuses these queries with an error) are documented in the test. **RLS policies are not modified, and the M0.4 policy clean-up is not pulled into M0.3.** The checks stay in `rls-adversarial.mjs`. |
+
+Owner instruction: "Proceed with D-U1-b and continue U1 only." So U1 completes, and work then **stops before U2**.
+
+## 6. U1 result (after the decisions)
+
+| Suite | On the live baseline |
+|---|---|
+| `db:apply` | live baseline loads; no `020+` migrations yet; **PASS** |
+| `rls-adversarial` | **48 / 48.** The four anon checks report "refused (permission denied for function is_admin)" under D-U1-b; entitlements still gets 0 rows. **Negative control:** with a deliberate anon SELECT policy on `orders`, the check fails with `LEAK — 2 row(s)` (scratch run, not committed). |
+| `test:db:history` | **2 / 2** (catalogue seed data on 001–019, isolated) |
+| `db:verify` | **6 pass, 15 fail. Every failure cascades from I-1** (`23503 tap_profiles_customer_id_fkey` when the order is marked paid). The earlier scratch-prototype run, together with D-U4, indicates all checks pass once U4 lands. |
+
+**Consequence:** `npm run test:db` and `npm run ci` fail on this branch until U4. That is the DEC-2026-023 handling: real findings are reported, not weakened, and a finding fixed inside M0.3 turns green with its fix.

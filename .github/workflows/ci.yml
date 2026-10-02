@@ -63,14 +63,21 @@ jobs:
 
       # apply.mjs already runs every migration a second time to prove
       # idempotency, so one invocation is the "db:apply twice" gate.
-      - name: db:apply (with the built-in idempotency pass)
+      # Since DEC-2026-023 (Option A) the database suites start from the live
+      # schema baseline and apply migrations 020 onward only.
+      - name: db:apply (live baseline + 020 onward, with the idempotency pass)
         run: npm run db:apply
 
-      - name: db:verify
+      - name: db:verify (live baseline)
         run: npm run db:verify
 
-      - name: rls-adversarial
+      - name: rls-adversarial (live baseline)
         run: node supabase/tests/rls-adversarial.mjs
+
+      # Catalogue seed data inserted by 001–019 (owner decision D-U1-a):
+      # isolated PGlite, history chain only, never live.
+      - name: migration-history seed checks
+        run: npm run test:db:history
 
       - name: test:payments (outbound network denied)
         run: npm run test:payments:ci

@@ -1,24 +1,18 @@
-import { PGlite } from '@electric-sql/pglite';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
+import { createMigratedDb, MIGRATIONS_DIR } from './lib/live-db.mjs';
 
 /**
  * Exercises the rules the migrations are supposed to enforce, against a real
  * Postgres. Everything here is a behaviour a customer or an attacker could
  * actually attempt.
+ *
+ * Since DEC-2026-023 (Option A) it runs on the live schema baseline plus
+ * migrations 020 onward (./lib/live-db.mjs). The two catalogue checks test
+ * seed data that 001–019 inserted, which a schema-only baseline does not hold;
+ * they moved to history-seed.mjs (owner decision D-U1-a, 2026-10-02).
  */
 
-// fileURLToPath, not `.pathname` — the latter leaves %20 in place, and this
-// project lives under a directory with a space in its name.
-const DIR = process.argv[2] ?? fileURLToPath(new URL('../migrations', import.meta.url));
-const db = await PGlite.create();
-
-const BASELINE = fs.readFileSync(new URL('./baseline.sql', import.meta.url), 'utf8');
-await db.exec(BASELINE);
-for (const f of fs.readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()) {
-  await db.exec(fs.readFileSync(path.join(DIR, f), 'utf8'));
-}
+const DIR = process.argv[2] ?? MIGRATIONS_DIR;
+const db = await createMigratedDb(DIR);
 
 let pass = 0;
 let fail = 0;
@@ -73,37 +67,8 @@ const { rows: [order] } = await q(
 );
 
 console.log('\n=== catalog ===');
-
-await check('four experiences + the Pass are the active digital SKUs', async () => {
-  const { rows } = await q(
-    `SELECT sku, ui_tier FROM public.products
-     WHERE product_type IN ('digital_plan','lifetime_plan') AND active
-     ORDER BY sort_order`,
-  );
-  const skus = rows.map((r) => r.sku);
-  assert(
-    JSON.stringify(skus) ===
-      JSON.stringify([
-        'plan-essential',
-        'plan-business',
-        'plan-premium',
-        'plan-goat',
-        'pass-customization',
-      ]),
-    'got ' + skus.join(', '),
-  );
-  return skus.join(', ');
-});
-
-await check('retired SKUs are delisted, not deleted', async () => {
-  const { rows } = await q(
-    `SELECT sku, active FROM public.products
-     WHERE sku IN ('plan-pro','plan-3d','plan-custom','plan-lifetime') ORDER BY sku`,
-  );
-  assert(rows.length === 4, `expected 4 retired rows, got ${rows.length}`);
-  assert(rows.every((r) => r.active === false), 'some retired SKU is still active');
-  return rows.map((r) => r.sku).join(', ') + ' all inactive';
-});
+// The two seed-data checks (active digital SKUs; retired SKUs delisted) live in
+// history-seed.mjs (D-U1-a).
 
 await check('experience ranks are essential<business<premium<goat', async () => {
   const { rows: [r] } = await q(
