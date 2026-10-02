@@ -5,6 +5,18 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M1 decision gate report (2026-10-02), review only
+**Added**
+- `docs/shygon-os/M1_DECISION_GATE_REPORT.md`, which contains:
+  - a register of 13 decisions (DEC-2026-002, 018, 022–032) with dependencies, approve/defer effects and what each blocks;
+  - an identity key map (every live table, FK, policy, function and code path for U / C / P / D);
+  - a card-lifecycle conflict matrix (C1–C11; no model chosen);
+  - the payment/fulfilment defect analysis (not fixed);
+  - migration preconditions;
+  - M1.1 readiness classification.
+
+**Not changed:** no schema, RLS, auth, payment, deployment or production change. No decision resolved.
+
 ### M1.0: Architecture & Implementation Readiness Package (2026-10-02), planning only
 **Added** (documentation only)
 - `docs/shygon-os/M1_ARCHITECTURE_PLAN.md` (36 sections).
