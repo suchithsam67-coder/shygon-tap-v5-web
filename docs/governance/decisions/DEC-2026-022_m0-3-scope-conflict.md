@@ -2,6 +2,8 @@
 
 > G§11 decision record (template: `docs/governance/DECISION_RECORD.md`). Written because two instructions conflict materially (doc 12 §0 rules 8 and 11; G§69–70).
 > **Claude Code has not chosen between the positions, and has implemented neither.** Until this is decided, F1, F3 and F4 are verify-only: no RLS, auth or card-routing change, no `/d/:code`, no `tap_routes`, no verified-contact redesign (owner instruction, 2026-09-30).
+>
+> **Update 2026-10-02:** the repository owner APPROVED **Position A** (see Decision). Questions 2 and 3 are still unanswered, so F3 and F4 remain verify-only (F4 also design-only) until they are answered.
 
 | Field | Value |
 |---|---|
@@ -17,7 +19,7 @@
 | Responsible (R) | Claude Code (implements the chosen scope after approval) |
 | Consulted (C) | Security Owner (F1/F4 are RLS/auth, L3); Product Owner (card semantics); Data Owner (baseline). All UNASSIGNED. |
 | Informed (I) | QA Owner, Release Owner (UNASSIGNED) |
-| State | **OPEN — HUMAN DECISION REQUIRED** |
+| State | **APPROVED: Position A** (repository owner, 2026-10-02, in session). Sub-questions 2 (F3 semantics) and 3 (F4 factor) are **OPEN**. |
 
 ## Priority (G§13–15)
 | Impact 0–3 | Urgency 0–3 | Irreversibility 0–3 | Risk 0–3 | Score | Score → P | Matrix → P | **Final P** |
@@ -96,12 +98,26 @@ Which findings does M0.3 remediate, and in what form?
 - Irreversible? Possibly. F3 under Position A is physical-card-visible; if chosen, complete G§78.
 
 ## Decision
-- Decision: ________ (HUMAN DECISION REQUIRED)
-- Expected outcome: ________
-- Required approvals: the Accountable Owner (UNASSIGNED); the Security Owner for any F1/F3/F4 implementation (L3); the Product Owner for card semantics
-- Blockers: M0.2 baseline (OQ-3); role roster (OQ-16); DEC-2026-002 (for F3 lifecycle semantics)
-- Next action: the Founder names the Accountable Owner and decides
-- Decision date: ________
+- **Decision: Position A. M0.3 = F1 + F3 + F4; F2 goes to the backlog.** Approved by the repository owner, in session, 2026-10-02. The owner holds every governance role under DEC-2026-018 Option B.
+- **Answers recorded with the approval:**
+  - **Q1:** F1, F3 and F4 are in M0.3.
+  - **Q4:** F2 goes to `docs/governance/SECURITY_REMEDIATION_BACKLOG.md` (owner specification §11).
+  - **Q5:** doc 12 §3 M0.3 is **amended** (the approved doc says F1 + F2). The deviation is recorded in `docs/DECISIONS.md` (doc 12 §5 item 5).
+- **Still OPEN. Implementation of these parts waits for the owner's answer:**
+  - **Q2 (F3):**
+    - Is doc 12 §0 rule 4 (the `/t/<slug>` byte-compatibility freeze) amended?
+    - What does `/t/<slug>` return when one of several cards is lost, suspended or deactivated, or has expired?
+    - This also needs DEC-2026-002 (expiry) and the doc 08 §6 OQ-2b rule.
+    - Until answered: F3 is **verify only** (characterization tests + verification report). No change to `/t/<slug>` or `get_public_profile`.
+  - **Q3 (F4):**
+    - Is F4 an interim control or the start of M1.3?
+    - What is the trusted factor for existing users with no verified phone?
+    - Until answered: F4 is **verify and design only** (owner specification §9–§10: a factor-binding design with its own test list). No change to `card-otp`, auth or the card activation RPCs.
+- **Scope note:** in the same instruction, the owner also approved DEC-2026-024 (Option A) and DEC-2026-029 (Option A) as part of the approval set to unblock M0.3. Their implementation is therefore scheduled in M0.3, as written in `docs/shygon-os/M0_3_IMPLEMENTATION_SCOPE.md`. This is a further deviation from doc 12 §3, recorded in the same place.
+- Expected outcome: F1 closed with positive and adversarial tests; F3 and F4 verified, with decision requests for their fixes; F2 tracked in the backlog.
+- Required approvals: the repository owner, under the DEC-2026-018 Option B controls (24-hour cool-off + checklist for each L3 change).
+- Blockers remaining: Q2 + DEC-2026-002 (the F3 fix); Q3 (the F4 fix).
+- Decision date: 2026-10-02
 
 ## Result (filled at review date)
 - Observed result:

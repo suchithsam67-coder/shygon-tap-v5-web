@@ -5,7 +5,7 @@
 | Domain / Level | Security (authorization model) + Architecture / **L3** |
 | **Accountable Owner** | Security Owner: **UNASSIGNED — HUMAN ACTION REQUIRED** |
 | Consulted | Principal Architect, Data Owner |
-| State | **PROPOSED — HUMAN DECISION REQUIRED** |
+| State | **APPROVED: Option A** (rules B1–B7 binding). Repository owner, 2026-10-02, in session. |
 | Priority | I3 U2 Irr1 R2 = 8 → P1 · matrix P0 · **P1** (no active harm; DEC-2026-024 tracks the defect) · before M1.2 |
 | Related | DEC-2026-024 (fix of the current breakages) |
 
@@ -42,4 +42,10 @@ V5 code writes U into C columns; the drift report §11 shows the resulting failu
 - Every module depends on this.
 - Irreversible? Changing the key after data exists is costly.
 
-**Decision:** ________ **Approved by:** ________ **Date:** ________
+**Decision:** **Option A.** The identity contract in `M1_DOMAIN_MODEL.md` §2.1, rules B1–B7, is binding. The owner's words: "do not interchange auth user ID and customer record ID; use the correct key at each boundary". In practice:
+- authorization is always by U (`auth.users.id`);
+- C (`customers.id`) is resolved server-side from U and never accepted from a client;
+- new person-owned tables carry U;
+- `orders.customer_id` (which holds U) is legacy, documented, never joined to `customers`, and not renamed.
+
+Enforcement in M0.3 is the DEC-2026-024 Option A resolution, plus contract tests. **Approved by:** repository owner, in session. **Date:** 2026-10-02.

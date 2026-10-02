@@ -14,6 +14,7 @@
 | Priority | **P0 triage (provisional)** until the exposure history is established. The pack's classification was I3 U3 Irr1 R2 = 9 → P1 · matrix P0 · Final P1 (doc 13 §1.1). See the priority change below. |
 | Deadline | Immediate |
 | Credential rotation | **NOT DONE.** Assume this until a human explicitly confirms otherwise. |
+| doc 12 §2A gate ("any work at all") | **WAIVED FOR M0.3 ONLY** by the repository owner, 2026-10-02, in session. See "Waiver" below. Rotation remains required. |
 | Production data | **UNKNOWN — HUMAN CONFIRMATION REQUIRED.** It has not been inspected, and must not be inspected just to answer this question. |
 
 ## Priority change (G§76)
@@ -84,6 +85,16 @@ Any one of these confirms a P0:
 - Benefits: no change effort.
 - Risks: the exposure continues while investigating.
 - Reversibility: poor if the key is misused.
+
+## Waiver of the doc 12 §2A rotation gate (2026-10-02)
+| Field | Value |
+|---|---|
+| What is waived | Only the doc 12 §2A first row ("Any work at all — blocked until DEC-2026-001 rotation completed"), and only for milestone **M0.3**, as scoped in `docs/shygon-os/M0_3_IMPLEMENTATION_SCOPE.md` |
+| Waived by | Repository owner, in session, 2026-10-02 |
+| What is NOT waived | **Rotation itself:** it remains required and NOT DONE, and this record stays OPEN. **G-PAY:** live payments still need rotation done (M1 plan §34). M0.4 onward, M1, any production migration apply, any deployment, and the G2 launch gate. |
+| Conditions | 1. Live payments stay OFF (Razorpay test mode only; no `rzp_live_`). 2. No credential from `.env`, `.env.*` or any ZIP is read, loaded or used. All work runs on local PGlite and on clean clones without `.env`. 3. No production access, migration apply or deployment by Claude Code. 4. Nothing produced in M0.3 is applied to production until the owner has rotated, or explicitly extends this waiver in writing. |
+| Expires | When M0.3 is reported complete, or earlier if the owner withdraws it |
+| Risk accepted | Development continues while the exposure history of `.claude (2).zip` and the other project ZIPs is unestablished. M0.3 adds no new use of any credential. |
 
 ## Decision
 - **Decision:** ________ (HUMAN ACTION REQUIRED)

@@ -7,7 +7,7 @@
 | Purpose | Turn the 13 open decisions into concrete, approvable choices |
 | Sources | The decision records in `docs/governance/decisions/`; `docs/DECISIONS.md`; the approved pack (docs 00–14); `M1_*.md`; `docs/governance/SCHEMA_DRIFT_REPORT.md`; the live baseline `supabase/baseline/000_live_baseline.sql`; repository code |
 | Companions | `IDENTITY_DECISION_SUMMARY.md` · `CARD_LIFECYCLE_DECISION_SUMMARY.md` · `PHASE_GATE_DECISION_SUMMARY.md` |
-| Status | **Nothing is approved and no winner is selected.** The options are those written in the records, plus, where a record has no file (DEC-2026-018), those written in the approved documents. |
+| Status | **As written on 2026-10-02 (`b627070`): nothing approved and no winner selected.** **Update 2026-10-02:** the repository owner then approved DEC-2026-018, 022, 023, 024 (I-1…I-3) and 029, and waived the DEC-2026-001 §2A gate for M0.3 only (see §16–§17). The other decisions remain unapproved. The options are those written in the records, plus, where a record has no file (DEC-2026-018), those written in the approved documents. |
 | Evidence labels | **OBSERVED** · **CONFIRMED** (reproduced in isolated PGlite) · **STATIC** (read from source, not executed) · **VERIFY ON LIVE** |
 
 **How to read each decision.**
@@ -23,15 +23,15 @@
 | Decision | Question (short) | Accountable role (all UNASSIGNED) | Priority | State | Needed before |
 |---|---|---|---|---|---|
 | DEC-2026-002 | Does a card stop working 14 days after activation? | Product Owner | P1 (→ P0 if paying customers' cards auto-suspend) | PROPOSED | Card lifecycle work |
-| DEC-2026-018 | Who holds each governance role? | Founder / Product Owner | P1 (launch gate) | PROPOSED (index row only) | Any L3 approval; G2 |
-| DEC-2026-022 | What does M0.3 contain? | UNASSIGNED (Founder names the A) | P1 | OPEN | M0.3 |
-| DEC-2026-023 | Migration origin + `db:push` safeguard | Data Owner | P1 | OPEN | **Any new migration** |
-| DEC-2026-024 | Fix for V5 paths that fail on the live schema (P1 paid-claim defect) | Security Owner | P1 (→ P0 on trigger) | OPEN | **Live payments** |
+| DEC-2026-018 | Who holds each governance role? | Founder / Product Owner | P1 (launch gate) | **APPROVED (B), 2026-10-02** | Any L3 approval; G2 |
+| DEC-2026-022 | What does M0.3 contain? | UNASSIGNED (Founder names the A) | P1 | **APPROVED (Position A), 2026-10-02**; Q2/Q3 OPEN | M0.3 |
+| DEC-2026-023 | Migration origin + `db:push` safeguard | Data Owner | P1 | **APPROVED (A + S1), 2026-10-02** | **Any new migration** |
+| DEC-2026-024 | Fix for V5 paths that fail on the live schema (P1 paid-claim defect) | Security Owner | P1 (→ P0 on trigger) | **APPROVED (A, I-1…I-3), 2026-10-02**; I-4 OPEN | **Live payments** |
 | DEC-2026-025 | When are organisations built? | Product Owner | P1 | PROPOSED | Any organisation table |
 | DEC-2026-026 | M1 sequence + the "M0 green before M1" rule | Product Owner | P1 | PROPOSED | **Start of M1.1** |
 | DEC-2026-027 | Staging / Control environments vs "no new Supabase project" | Principal Architect | P1 | PROPOSED | M1.11–M1.13; G2; the G1 restore drill |
 | DEC-2026-028 | Canonical card states and status column | Product Owner | P1 | PROPOSED | Card lifecycle; routing |
-| DEC-2026-029 | Identity key contract (U vs C) | Security Owner | P1 | PROPOSED | Identity work; any module that writes `customer_id` |
+| DEC-2026-029 | Identity key contract (U vs C) | Security Owner | P1 | **APPROVED (A), 2026-10-02** | Identity work; any module that writes `customer_id` |
 | DEC-2026-030 | What is the "OS dashboard"? | Product Owner | P2 | PROPOSED | OS dashboard milestone |
 | DEC-2026-031 | Email provider, WhatsApp, push timing | Principal Architect | P2 | PROPOSED | Email / WhatsApp adapters |
 | DEC-2026-032 | Vertical taxonomy as data | Principal Architect | P2 | PROPOSED | Persona abstraction |
@@ -179,9 +179,9 @@ O-7 is reported here for the Security Owner to classify. F1, the analogous findi
 - the G2 launch gate.
 
 **Human approval**
-- Decision:
-- Approved by:
-- Date:
+- Decision: **APPROVED: Option B, the one-person control model** (doc 13 §2.2). The repository owner holds the roles. No external reviewer is named, so L3 changes get a 24-hour cool-off plus a checklist review. The secondary Incident Lead is still UNASSIGNED. Record: `docs/governance/decisions/DEC-2026-018_role-holders.md`
+- Approved by: repository owner, in session
+- Date: 2026-10-02
 
 ---
 
@@ -244,9 +244,9 @@ The record's other blocker, the M0.2 baseline, is now available.
 Until decided, F1, F3 and F4 are verify-only.
 
 **Human approval**
-- Decision:
-- Approved by:
-- Date:
+- Decision: **APPROVED: Position A (F1 + F3 + F4; F2 to the backlog).** Doc 12 §3 is amended (deviation D-1). **Q2 (F3 semantics) and Q3 (F4 trusted factor) are still OPEN**, so F3 is verify-only and F4 verify + design only until they are answered.
+- Approved by: repository owner, in session
+- Date: 2026-10-02
 
 ---
 
@@ -304,10 +304,10 @@ Until decided, F1, F3 and F4 are verify-only.
 Until decided, no new migrations are written, and `db:push` must not be run against production.
 
 **Human approval**
-- Decision (origin):
-- Safeguard (S1 / S2 / S3):
-- Approved by:
-- Date:
+- Decision (origin): **APPROVED: Option A** (the live baseline is the origin; 001–019 are history, never re-run)
+- Safeguard (S1 / S2 / S3): **S1** (allowlist guard on `db:push`)
+- Approved by: repository owner, in session
+- Date: 2026-10-02
 
 ---
 
@@ -382,10 +382,10 @@ Per E-3 (STATIC), `fulfil_order()` also omits the NOT NULL `card_id`, so directi
 - the payment/fulfilment abstraction milestone's fix scope.
 
 **Human approval**
-- Decision (I-1…I-3):
-- Decision (I-4):
-- Approved by:
-- Date:
+- Decision (I-1…I-3): **APPROVED: Option A** (database-side `customer_id` resolution). Recorded from "the documented … fix direction"; the owner should confirm A was meant. **Live payments remain OFF and NOT AUTHORIZED.**
+- Decision (I-4): **OPEN** (needs DEC-2026-028 + DEC-2026-002)
+- Approved by: repository owner, in session
+- Date: 2026-10-02
 
 ---
 
@@ -691,9 +691,9 @@ Full comparison: `CARD_LIFECYCLE_DECISION_SUMMARY.md`.
 - G-ID, and so the identity, card and persona milestones.
 
 **Human approval**
-- Decision:
-- Approved by:
-- Date:
+- Decision: **APPROVED: Option A** (rules B1–B7 binding): "do not interchange auth user ID and customer record ID; use the correct key at each boundary"
+- Approved by: repository owner, in session
+- Date: 2026-10-02
 
 ---
 
@@ -856,19 +856,31 @@ The interface and the in-app/SMS outbox can proceed without it (doc 12 §2A, M1.
 
 ---
 
-## 16. Approval Checklist
+## 16. Approval record (2026-10-02)
+
+Recorded by Claude Code from the repository owner's instruction in session.
+
+**What is recorded:**
+- **DEC-2026-001 (not in the checklist below):** the doc 12 §2A rotation gate is waived for M0.3 only. Rotation is still NOT DONE and the record stays OPEN.
+- **Production data modification: NOT AUTHORIZED.**
+- "Database / RLS / payment changes authorized" means repository files and local PGlite only. Applying a migration to production remains a human action, after the 24-hour cool-off (DEC-2026-018), and after rotation or a written extension of the DEC-2026-001 waiver.
+- **Auth changes and M1.1 were not authorized** in the instruction, so they are recorded as NO.
+
+**Owner confirmation requested:** DEC-2026-024 was recorded as Option A, from "the documented … fix direction". The scope is in `M0_3_IMPLEMENTATION_SCOPE.md`.
+
+## 17. Approval Checklist
 
 ```text
 DEC-2026-002:  __________________
-DEC-2026-018:  __________________
-DEC-2026-022:  __________________
-DEC-2026-023:  __________________
-DEC-2026-024:  __________________
+DEC-2026-018:  APPROVED — Option B (one-person control model; 24 h cool-off + checklist for L3)
+DEC-2026-022:  APPROVED — Position A (F1 + F3 + F4; F2 to backlog); Q2 and Q3 OPEN
+DEC-2026-023:  APPROVED — Option A (live baseline is the origin) + S1 (db:push allowlist guard)
+DEC-2026-024:  APPROVED — Option A for I-1…I-3 (to be confirmed); I-4 OPEN; live payments OFF
 DEC-2026-025:  __________________
 DEC-2026-026:  __________________
 DEC-2026-027:  __________________
 DEC-2026-028:  __________________
-DEC-2026-029:  __________________
+DEC-2026-029:  APPROVED — Option A (identity contract B1–B7)
 DEC-2026-030:  __________________
 DEC-2026-031:  __________________
 DEC-2026-032:  __________________
@@ -877,17 +889,17 @@ DEC-2026-032:  __________________
 ```text
 IMPLEMENTATION AUTHORIZATION:
 
-M1.1 authorized: YES / NO
+M1.1 authorized: NO
 
-Database changes authorized: YES / NO
+Database changes authorized: YES
 
-RLS changes authorized: YES / NO
+RLS changes authorized: YES
 
-Auth changes authorized: YES / NO
+Auth changes authorized: NO
 
-Payment changes authorized: YES / NO
+Payment changes authorized: YES (test mode only; live activation NOT AUTHORIZED)
 
-Live payments authorized: YES / NO
+Live payments authorized: NO
 
-Production deployment authorized: YES / NO
+Production deployment authorized: NO
 ```

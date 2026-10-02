@@ -5,6 +5,28 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### Owner approvals recorded; M0.3 scope defined (2026-10-02), governance only
+**Recorded** (repository owner, in session):
+- DEC-2026-018 **APPROVED, Option B:** the one-person control model. The new record file is `DEC-2026-018_role-holders.md`; `ROLE_ROSTER.md` is updated with no invented names or handles.
+- DEC-2026-022 **APPROVED, Position A:** F1 + F3 + F4; F2 to the backlog. Q2 and Q3 remain OPEN.
+- DEC-2026-023 **APPROVED, Option A + S1.**
+- DEC-2026-024 **APPROVED, Option A for I-1…I-3:** an interpretation of "the documented fix direction", for the owner to confirm. I-4 OPEN.
+- DEC-2026-029 **APPROVED, Option A** (B1–B7).
+- DEC-2026-001: the doc 12 §2A gate is **waived for M0.3 only**. Rotation is still NOT DONE; the record stays OPEN.
+- Authorization:
+  - database, RLS and payment changes **YES** (repository and local only; test mode);
+  - auth, M1.1, live payments, deployment and production data modification **NO**.
+
+**Added**
+- `docs/shygon-os/M0_3_IMPLEMENTATION_SCOPE.md`:
+  - units U1–U7;
+  - the files and the two planned migrations (`020_guard_suspension_columns`, `021_resolve_customer_id`);
+  - tests and gates;
+  - blocked items and stop conditions.
+- `docs/DECISIONS.md`: owner-approval record and deviations D-1 (M0.3 = F1 + F3 + F4) and D-2 (DEC-024/029 scheduled in M0.3).
+
+**Not changed:** no code, schema, migration, RLS, auth, payment, deployment or production change. **Implementation has not started.**
+
 ### Human Decision Pack (2026-10-02), review only
 **Added**
 - `docs/shygon-os/HUMAN_DECISION_PACK.md`: the 13 open decisions (DEC-2026-002, 018, 022–032), each with:

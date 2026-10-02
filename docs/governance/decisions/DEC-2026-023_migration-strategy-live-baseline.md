@@ -12,7 +12,7 @@
 | **Accountable Owner (A)** | Data Owner: **UNASSIGNED — HUMAN ACTION REQUIRED** |
 | Consulted (C) | Security Owner, Principal Architect, Release Owner (all UNASSIGNED) |
 | Informed (I) | Engineering Owner, QA Owner (UNASSIGNED) |
-| State | **OPEN — HUMAN DECISION REQUIRED** |
+| State | **APPROVED: Option A (the live baseline is the origin) + safeguard S1 (allowlist guard)**. Repository owner, 2026-10-02, in session. |
 
 ## Priority (G§13–15)
 | Impact | Urgency | Irreversibility | Risk | Score | Score → P | Matrix → P | **Final P** |
@@ -76,12 +76,20 @@ Deadline: before any new migration (`020_…`) is written.
 - Irreversible? No.
 
 ## Decision
-- Decision: ________ (HUMAN DECISION REQUIRED). Option A / B, plus safeguard S1 / S2 / S3.
+- **Decision: Option A + S1.** Approved by the repository owner, in session, 2026-10-02. The owner acts as Data Owner and Security Owner under DEC-2026-018 Option B.
+- **Option A, as approved:**
+  - local and CI databases are built from `supabase/tests/live-platform-shim.sql` + `supabase/baseline/000_live_baseline.sql`;
+  - new migrations start at `020_`;
+  - 001–019 stay in the repository, unedited, as history, marked "applied on live, never re-run" in `supabase/migrations/README.md`;
+  - the database suites (`db:apply`, `db:verify`, `rls-adversarial`) move to the baseline.
+- **S1, as approved:** `npm run db:push` (`supabase/tests/apply-remote.mjs`) refuses to run unless `SUPABASE_PROJECT_REF` is on an explicit non-production allowlist, or `--i-know-this-is-not-production` is passed.
+  - **Consequence of Option A:** the script must never re-run 001–019, so it applies only `020+`.
+- **Handling real findings (from this record):** when the suites move to the baseline, any check that fails because of a real live finding is reported, never weakened.
+  - A finding fixed inside M0.3 (for example F1) turns green with its fix.
+  - A finding outside M0.3 scope is a **stop condition**: the owner decides how to handle it before CI is changed.
 - Expected outcome: new migrations are tested against the live schema, and `db:push` cannot reach production.
-- Required approvals: Data Owner (UNASSIGNED); Security Owner consulted
-- Blockers: role roster (OQ-16)
-- Next action: owner decision. Until then, **no new migrations are written** and `db:push` must not be run against production.
-- Decision date: ________
+- Remaining limitation (not in this decision): `supabase/APPLY_ALL.sql` and `npm run db:bundle` still bundle 001–019 for manual pasting into the dashboard. That is the same replay hazard by hand. Proposed for M0.4 (doc 12 M0.4: regenerate from baseline + 020+, or delete and document).
+- Decision date: 2026-10-02
 
 ## Result (filled at review date)
 - Observed result:

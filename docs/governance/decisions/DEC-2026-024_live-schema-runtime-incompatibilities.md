@@ -2,6 +2,8 @@
 
 > G§11 decision record (template: `docs/governance/DECISION_RECORD.md`). Evidence: `docs/governance/SCHEMA_DRIFT_REPORT.md` §11–12.
 > **Nothing in this record has been fixed.** Payments and the database are frozen until this decision is APPROVED. Live payments stay disabled (Razorpay test mode) by owner instruction of 2026-10-02.
+>
+> **Update 2026-10-02:** APPROVED for I-1…I-3 (Option A; see Decision). I-4 and I-5 remain open. Live payments remain **OFF and NOT AUTHORIZED**.
 
 | Field | Value |
 |---|---|
@@ -13,7 +15,7 @@
 | **Accountable Owner (A)** | Security Owner: **UNASSIGNED — HUMAN ACTION REQUIRED** |
 | Consulted (C) | Data Owner, Principal Architect, Product Owner (card semantics) — all UNASSIGNED |
 | Informed (I) | Release Owner, QA Owner (UNASSIGNED) |
-| State | **OPEN — HUMAN DECISION REQUIRED** |
+| State | **APPROVED for I-1…I-3: Option A** (repository owner, 2026-10-02, in session; see the interpretation note). **I-4: OPEN** (needs DEC-2026-028 + DEC-2026-002). **I-5: VERIFY ON LIVE.** |
 
 ## Priority (G§13–15)
 | Impact | Urgency | Irreversibility | Risk | Score | Score → P | Matrix → P | **Final P** |
@@ -88,10 +90,24 @@ Each item was CONFIRMED in an isolated rebuild of the live baseline and compared
 3. Never run `npm run db:push` against production (DEC-2026-023).
 
 ## Decision
-- Decision: ________ (HUMAN DECISION REQUIRED)
-- Required approvals: Security Owner (UNASSIGNED). Data Owner for C. Product Owner for I-4 semantics.
-- Blockers: DEC-2026-023 (migration origin); OQ-16 (roles); DEC-2026-002 / DEC-2026-022 (I-4)
-- Decision date: ________
+- **Decision: Option A, database-side `customer_id` resolution, for I-1, I-2 and I-3.** Approved by the repository owner, in session, 2026-10-02, as "the documented P1 payment/fulfilment defect fix direction, with live payments remaining OFF".
+  - **Interpretation note:** this record documents one direction as advisory, Option A ("the smallest change that leaves the frozen V5 surfaces intact"). Claude Code recorded the approval as Option A on that basis.
+  - If the owner meant B, C or D, this line must be corrected **before** implementation of this unit starts.
+- **What Option A covers:**
+  - customer-record id resolution in the database for `profiles.customer_id` and `tap_profiles.customer_id`;
+  - frozen V5 code is unchanged: `fulfilment.mjs`, `Settings.tsx`, `Checkout.tsx`, `create-order.mjs`;
+  - the fix follows the DEC-2026-029 contract (Option A, B1–B7).
+- **Not covered, still OPEN:**
+  - **I-4** card-record creation: depends on DEC-2026-028 + DEC-2026-002, and on finding E-3 (`fulfil_order()` also omits `card_id`).
+  - **I-5:** VERIFY ON LIVE where `pgcrypto` lives.
+  - **The trigger state:** `ascii(tgenabled::text)` should be 79.
+- **Unchanged:**
+  - **Live payments remain OFF and NOT AUTHORIZED.** The P0 escalation triggers above still apply.
+  - Interim controls 1–3 stay in force.
+  - Nothing is applied to production by Claude Code.
+- Required approvals: the repository owner under the DEC-2026-018 Option B controls (24-hour cool-off + checklist; L3).
+- Blockers remaining: none for I-1…I-3 beyond the M0.3 sequence. I-4 is blocked as above.
+- Decision date: 2026-10-02
 
 ## Result (filled at review date)
 - Observed result:
