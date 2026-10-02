@@ -111,7 +111,7 @@ export async function recordTapEvent(
 }
 
 /**
- * What a tapped card opens (migration 019): its page's address and the card's
+ * What a tapped card opens (migration 022): its page's address and the card's
  * design, or why it opens nothing. Never names the owner or the card's history.
  */
 export async function fetchPublicCard(code: string): Promise<PublicCard> {
@@ -119,7 +119,7 @@ export async function fetchPublicCard(code: string): Promise<PublicCard> {
   try {
     value = await rpc<PublicCard | null>('get_public_card', { p_code: code });
   } catch (error) {
-    // A database without migration 019 has no card lookup (404): no card can
+    // A database without migration 022 has no card lookup (404): no card can
     // exist there, so it is "not found", not a connection failure.
     if (error instanceof Error && / failed: 404$/.test(error.message)) return { state: 'unavailable' };
     throw error;

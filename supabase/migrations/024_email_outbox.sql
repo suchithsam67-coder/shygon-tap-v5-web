@@ -1,7 +1,7 @@
 -- ============================================================================
--- 021 — CUSTOMER EMAILS: AN OUTBOX FILLED BY THE DATABASE
+-- 024 — CUSTOMER EMAILS: AN OUTBOX FILLED BY THE DATABASE
 -- ============================================================================
--- Run AFTER 020. Idempotent.
+-- Run AFTER 023. Idempotent.
 --
 -- Every email a customer gets is queued here by a trigger, in the same
 -- transaction as the change it describes, so it goes out no matter which path

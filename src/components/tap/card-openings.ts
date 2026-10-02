@@ -6,7 +6,7 @@ import type { CardLook, Experience } from '../../lib/database.types';
  * of light across, Copper Lotus blooms, Emerald Arch opens its doors, Ivory
  * Bloom scatters review stars, and so on.
  *
- * The design comes from the card itself (get_public_card, migration 019), so
+ * The design comes from the card itself (get_public_card, migration 022), so
  * it is decided by the physical card and not by anything the page owner or a
  * visitor can change. The customer's own "no opening animation" setting and
  * the visitor's reduced-motion setting both still switch it off.

@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-/** Verified-buyer reviews (migration 025). */
+/** Verified-buyer reviews (migration 028). */
 
 export interface Review {
   id: string;
@@ -29,11 +29,11 @@ const missing = (code?: string) => code === 'PGRST202' || code === '42883' || co
 
 export const EMPTY_SUMMARY: ReviewSummary = { count: 0, average: null, stars: {}, reviews: [] };
 
-// Before migration 025 the functions do not exist: ask once per visit, not on every render.
+// Before migration 028 the functions do not exist: ask once per visit, not on every render.
 let unavailable = false;
 const inflight = new Map<string, Promise<ReviewSummary>>();
 
-/** Public. Before 025 there are simply no reviews. */
+/** Public. Before 028 there are simply no reviews. */
 export function fetchReviews(productId: string): Promise<ReviewSummary> {
   if (unavailable) return Promise.resolve(EMPTY_SUMMARY);
   // The rating link and the reviews section ask at the same time: one request.

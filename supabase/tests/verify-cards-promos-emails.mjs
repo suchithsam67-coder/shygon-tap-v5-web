@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 /**
- * Behaviour checks for migrations 019–021: one page per card, permanent Card
+ * Behaviour checks for migrations 022–024: one page per card, permanent Card
  * IDs, card management, the public card path, per-card analytics, promo codes
  * and the email outbox. Same harness as verify.mjs — a real Postgres (PGlite)
  * with every migration applied — and every check is something a customer, a
@@ -496,7 +496,7 @@ await check('admin app: cards, emails and promo codes are listable', async () =>
   return `lost cards=${c.total}, emails=${e.total}, promos=${p.length}; customer refused (${msg.slice(0, 30)})`;
 });
 
-console.log('\n=== GST, stock, timeline, cancellation, funnel (023) ===');
+console.log('\n=== GST, stock, timeline, cancellation, funnel (026) ===');
 
 const owner = async () => (await one(`SELECT user_id FROM public.admin_users WHERE role = 'owner' LIMIT 1`)).user_id;
 
@@ -596,7 +596,7 @@ await check('support tickets and replies are emailed', async () => {
   return templates.join(', ');
 });
 
-console.log('\n=== 024: buttons by tier, card details ===');
+console.log('\n=== 027: buttons by tier, card details ===');
 
 await check('Essential shows WhatsApp but not Instagram; Business shows both', async () => {
   const carol = await newCustomer('carol@example.com', 'Carol Das');
@@ -652,7 +652,7 @@ await check('orders keep the card details the customer typed', async () => {
   return 'stored';
 });
 
-console.log('\n=== 025: verified-buyer reviews ===');
+console.log('\n=== 028: verified-buyer reviews ===');
 
 await check('only a paying customer can review a card, once, and the public sees a first name only', async () => {
   const buyer = await newCustomer('rev@example.com', 'Ravi Kumar');

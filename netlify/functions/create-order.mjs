@@ -17,7 +17,7 @@ import { assertLiveKeysAllowed, PaymentNotConfirmedError } from '../lib/razorpay
 const MAX_QUANTITY = 10;
 /** Razorpay rejects anything under ₹1. */
 const MIN_AMOUNT_IN_PAISE = 100;
-/** The delivery charge's catalogue row (migration 020), and its price if that row is missing. */
+/** The delivery charge's catalogue row (migration 023), and its price if that row is missing. */
 const DELIVERY_SKU = 'delivery-standard';
 const DELIVERY_FALLBACK_IN_PAISE = 4900;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -156,7 +156,7 @@ export default async (request) => {
       return json({ error: 'Enter a valid billing email address.' }, 400);
     }
 
-    // --- GST: from tax_settings (migration 023), never from the browser ------
+    // --- GST: from tax_settings (migration 026), never from the browser ------
     const { data: taxSettings } = await admin.from('tax_settings').select('*').limit(1).maybeSingle();
     const taxRate = taxSettings?.enabled ? Number(taxSettings.rate_percent) || 0 : 0;
     const taxInclusive = taxSettings ? taxSettings.prices_include_tax !== false : true;
@@ -279,7 +279,7 @@ export default async (request) => {
         shipping_state: isPhysical ? shipping.state : null,
         shipping_pincode: isPhysical ? shipping.pincode : null,
     };
-    // Migration 020's columns. A database without them still takes an order
+    // Migration 023's columns. A database without them still takes an order
     // with no discount and no replacement; one that needs them is refused
     // rather than charged a total the order row cannot explain.
     const moneyRow = {
@@ -289,7 +289,7 @@ export default async (request) => {
       promo_code: promoCode || null,
       replaces_card_id: replacesCardId,
     };
-    // Migration 023: the GST used for THIS order, and the addresses.
+    // Migration 026: the GST used for THIS order, and the addresses.
     const billingSource = billingSame ? { ...shipping, company: billing.company } : billing;
     const taxRow = {
       tax_in_paise: taxInPaise,
@@ -316,7 +316,7 @@ export default async (request) => {
       billing_country: billingSource.country || (billingSource.address ? 'India' : null),
     };
 
-    // Migration 024: the Card details page (name on card, contact buttons).
+    // Migration 027: the Card details page (name on card, contact buttons).
     // Plain text only, trimmed and length-capped; never payment data.
     const profileDetails = isPhysical && !replacesCardId ? cleanProfileDetails(body?.profile) : null;
     const profileRow = profileDetails ? { profile_details: profileDetails } : {};
@@ -327,7 +327,7 @@ export default async (request) => {
       .select('id, order_id')
       .single();
 
-    // Before 024 the details are simply not kept; the customer fills the page in later.
+    // Before 027 the details are simply not kept; the customer fills the page in later.
     if (insertError && MISSING_COLUMN.has(insertError.code) && profileDetails) {
       ({ data: created, error: insertError } = await admin
         .from('orders')
@@ -336,11 +336,11 @@ export default async (request) => {
         .single());
     }
 
-    // A database without 023: tax that is added on top cannot be charged on an
+    // A database without 026: tax that is added on top cannot be charged on an
     // order row that cannot record it; included tax changes nothing charged.
     if (insertError && MISSING_COLUMN.has(insertError.code)) {
       if (!taxInclusive && taxInPaise > 0) {
-        console.error('Order insert needs migration 023', insertError.message);
+        console.error('Order insert needs migration 026', insertError.message);
         return json({ error: 'Checkout is being updated. Please try again shortly.' }, 503);
       }
       ({ data: created, error: insertError } = await admin
@@ -352,7 +352,7 @@ export default async (request) => {
 
     if (insertError && MISSING_COLUMN.has(insertError.code)) {
       if (discountInPaise > 0 || replacesCardId) {
-        console.error('Order insert needs migration 020', insertError.message);
+        console.error('Order insert needs migration 023', insertError.message);
         return json({ error: 'This checkout option is being set up. Please try again shortly.' }, 503);
       }
       ({ data: created, error: insertError } = await admin
@@ -583,7 +583,7 @@ async function resolveLineItems(admin, { body, orderType, quantity, str, user })
 
   // A replacement re-makes one of the customer's own cards: the design comes
   // from that card, never from the request, and the new card opens the same
-  // page (migration 019).
+  // page (migration 022).
   const replacesCardId = str(body?.replacesCardId);
   let replacing = null;
   if (replacesCardId) {

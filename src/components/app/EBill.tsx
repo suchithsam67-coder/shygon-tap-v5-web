@@ -29,11 +29,11 @@ interface OrderRecord {
   shipping_city: string | null;
   shipping_state: string | null;
   shipping_pincode: string | null;
-  // Migration 020: cart value before the promo, the discount, the code.
+  // Migration 023: cart value before the promo, the discount, the code.
   subtotal_in_paise?: number | null;
   discount_in_paise?: number | null;
   promo_code?: string | null;
-  // Migration 023: the GST used at purchase time, and the billing address.
+  // Migration 026: the GST used at purchase time, and the billing address.
   tax_in_paise?: number | null;
   taxable_value_in_paise?: number | null;
   tax_rate_percent?: number | null;
@@ -97,7 +97,7 @@ export default function EBill({ orderId, paymentId, email }: { orderId?: string;
         const read = (columns: string) =>
           supabase.from('orders').select(columns).eq('order_id', orderId).maybeSingle();
         let { data: orderRow, error } = await read(BILL_COLUMNS + BILL_MONEY_COLUMNS + BILL_TAX_COLUMNS);
-        // Databases without migration 023 / 020 have fewer columns.
+        // Databases without migration 026 / 023 have fewer columns.
         if (error?.code === '42703') ({ data: orderRow, error } = await read(BILL_COLUMNS + BILL_MONEY_COLUMNS));
         if (error?.code === '42703') ({ data: orderRow, error } = await read(BILL_COLUMNS));
         const { data: sellerRow } = await supabase

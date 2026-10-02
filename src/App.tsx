@@ -38,7 +38,7 @@ function AccountAppRoute() {
 /**
  * The app's own screens under /shygontap/. Anything else there is a customer's
  * page: shygontech.com/shygontap/<name>. The database reserves these names
- * (tap_slug_reserved, migration 019), so no page can take one.
+ * (tap_slug_reserved, migration 022), so no page can take one.
  */
 const APP_SCREENS = new Set([
   'auth', 'store', 'account', 'tap', 'tiers', 'customize', 'qr', 'cards', 'customizations',

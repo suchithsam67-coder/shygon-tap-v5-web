@@ -1,4 +1,4 @@
--- 025: verified-buyer product reviews
+-- 028: verified-buyer product reviews
 --
 -- Star ratings and short reviews on each card's product page.
 --   * Only a customer with a PAID order for that card design can review it

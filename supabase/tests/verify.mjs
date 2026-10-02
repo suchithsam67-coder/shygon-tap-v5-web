@@ -127,7 +127,7 @@ await check('a customer cannot mark their own order paid', async () => {
   return msg.slice(0, 60);
 });
 
-// Since 019 a page is published the moment it is created ("automatic
+// Since 022 a page is published the moment it is created ("automatic
 // deployment"); before that it was provisioned as a draft.
 await check('paying the order provisions a live Tap', async () => {
   await q(`UPDATE public.orders SET payment_status = 'paid' WHERE id = $1`, [order.id]);
@@ -196,7 +196,7 @@ await check('Essential unlocks exactly 4 palettes; the Pass unlocks 12', async (
   return `essential=4, +pass=12, goat=12`;
 });
 
-// 024: WhatsApp is included in Essential; Instagram starts at Business.
+// 027: WhatsApp is included in Essential; Instagram starts at Business.
 await check('cannot enable a button above the page tier that was never bought', async () => {
   const msg = await asUser(uid, () =>
     refused(

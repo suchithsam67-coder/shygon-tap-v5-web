@@ -3,7 +3,7 @@ import { tapLabel } from '../../services/tap';
 
 /**
  * Which page the screen is working on, for customers with more than one card
- * (every card has its own page since migration 019). Renders nothing for a
+ * (every card has its own page since migration 022). Renders nothing for a
  * customer with a single page, so their screens look exactly as before.
  */
 export function TapPagePicker() {

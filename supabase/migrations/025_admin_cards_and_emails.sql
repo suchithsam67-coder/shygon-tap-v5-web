@@ -1,10 +1,10 @@
 -- ============================================================================
--- 022 — ADMIN APP: CARDS AND EMAILS
+-- 025 — ADMIN APP: CARDS AND EMAILS
 -- ============================================================================
--- Run AFTER 021. Idempotent. Additive: nothing existing is changed.
+-- Run AFTER 024. Idempotent. Additive: nothing existing is changed.
 --
 -- The Admin app reads only through SECURITY DEFINER RPCs (013's pattern), so
--- the cards (with their Card IDs, 019) and the customer email outbox (021) get
+-- the cards (with their Card IDs, 022) and the customer email outbox (024) get
 -- the same: a paged list for each, and a retry for an email that failed.
 -- ============================================================================
 

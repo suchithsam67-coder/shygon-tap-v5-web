@@ -6,7 +6,7 @@ Added to the existing site. The design, routes and existing flows are unchanged.
 
 1. **Database first.** Run `supabase/migrations/019_…` through `025_…` in the SQL editor, in order
    (or paste the regenerated `supabase/APPLY_ALL.sql`). All are idempotent.
-   019 stops with a clear message if the live database has a function that still assumes one page per
+   022 stops with a clear message if the live database has a function that still assumes one page per
    customer (`ON CONFLICT (user_id)` on `tap_profiles`); fix that function, then re-run.
 2. **Razorpay webhook:** add the events `refund.processed` and `refund.failed` to the existing webhook
    (keep `payment.captured`, `order.paid`, `payment.failed`).
@@ -38,7 +38,7 @@ Added to the existing site. The design, routes and existing flows are unchanged.
 | Sign out of all other devices | Settings → Security |
 | Webhook refuses to fulfil if the captured amount ≠ the order amount | `razorpay-webhook` |
 
-## Production-readiness additions (migration 023)
+## Production-readiness additions (migration 026)
 
 | Feature | Where |
 |---|---|
@@ -52,7 +52,7 @@ Added to the existing site. The design, routes and existing flows are unchanged.
 | Store funnel: visit → view → cart → checkout → payment → purchase (anonymous session ids) | `track_store_event`; Admin: Store funnel |
 | Support emails: request received, reply | `email_outbox` |
 
-## Store and checkout additions (migrations 024–025)
+## Store and checkout additions (migrations 027–028)
 
 | Feature | Where |
 |---|---|

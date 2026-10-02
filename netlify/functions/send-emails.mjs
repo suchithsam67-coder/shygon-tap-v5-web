@@ -3,7 +3,7 @@ import { drainEmailOutbox, emailProvider } from '../lib/email.mjs';
 
 /**
  * GET|POST /api/send-emails — sends the customer emails that are due
- * (public.email_outbox, migration 021).
+ * (public.email_outbox, migration 024).
  *
  * Most emails go out the moment they are queued, from the function that made
  * the change (verify-payment, the Razorpay webhook, card-otp). This endpoint

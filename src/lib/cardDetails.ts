@@ -3,7 +3,7 @@
  *
  * What the customer types here rides along in the pending order
  * (`shygon_pending_order.profile`), is sent to create-order with the purchase,
- * kept on the order (orders.profile_details, migration 024) and copied into
+ * kept on the order (orders.profile_details, migration 027) and copied into
  * the card's new page once the payment is verified. Plain contact details
  * only — never anything to do with payment.
  */

@@ -98,7 +98,7 @@ interface BillingForm extends ShippingForm {
 
 const EMPTY_BILLING: BillingForm = { ...EMPTY_SHIPPING, company: '' };
 
-/** The GST settings checkout shows (migration 023). The server charges from the same row. */
+/** The GST settings checkout shows (migration 026). The server charges from the same row. */
 interface TaxSettings {
   enabled: boolean;
   rate_percent: number;

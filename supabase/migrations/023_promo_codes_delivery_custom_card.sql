@@ -1,7 +1,7 @@
 -- ============================================================================
--- 020 — PROMO CODES, DELIVERY CHARGE, THE CUSTOM CARD, THE YOUTUBE ADD-ON
+-- 023 — PROMO CODES, DELIVERY CHARGE, THE CUSTOM CARD, THE YOUTUBE ADD-ON
 -- ============================================================================
--- Run AFTER 019. Idempotent.
+-- Run AFTER 022. Idempotent.
 --
 --   * Promo codes: percentage off the cart value (the items, before delivery),
 --     with optional start/expiry dates, a total usage limit, a per-customer

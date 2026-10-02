@@ -1,5 +1,5 @@
 -- ============================================================================
--- 019 — ONE PAGE PER CARD, PERMANENT CARD IDS, CARD MANAGEMENT, TAP ANALYTICS
+-- 022 — ONE PAGE PER CARD, PERMANENT CARD IDS, CARD MANAGEMENT, TAP ANALYTICS
 -- ============================================================================
 -- Run AFTER 001–018. Idempotent: safe to run twice.
 --
@@ -588,7 +588,7 @@ BEGIN
     AND p.prosrc ILIKE '%tap_profiles%'
     AND p.prosrc ~* 'on\s+conflict\s*\(\s*user_id\s*\)';
   IF v_names IS NOT NULL THEN
-    RAISE EXCEPTION 'These functions insert into tap_profiles with ON CONFLICT (user_id), which needs one page per customer: %. Update them before applying 019.', v_names;
+    RAISE EXCEPTION 'These functions insert into tap_profiles with ON CONFLICT (user_id), which needs one page per customer: %. Update them before applying 022.', v_names;
   END IF;
 END $$;
 

@@ -32,7 +32,7 @@ const ORDER_TRACKING_COLUMNS =
   'cancelled_at, cancellation_reason, refunded_at, refund_amount_in_paise';
 
 /**
- * The checkout's money (migration 020): cart value, promo discount, delivery,
+ * The checkout's money (migration 023): cart value, promo discount, delivery,
  * and the card a replacement order replaces.
  */
 const ORDER_MONEY_COLUMNS =
@@ -50,7 +50,7 @@ let trackingColumnsUnavailable = false;
 let moneyColumnsUnavailable = false;
 let taxColumnsUnavailable = false;
 
-/** Migration 023: GST, billing address and a cancellation request. */
+/** Migration 026: GST, billing address and a cancellation request. */
 const ORDER_TAX_COLUMNS =
   ', tax_in_paise, tax_rate_percent, tax_inclusive, tax_split, customer_gstin, billing_same_as_shipping, ' +
   'billing_name, billing_company, billing_address, billing_address_line2, billing_locality, billing_city, ' +
@@ -67,7 +67,7 @@ export interface OrderHistoryRow {
 
 export interface OrderWithItems extends OrderRow {
   items: OrderItemRow[];
-  /** Every status the order passed through, oldest first (migration 023). */
+  /** Every status the order passed through, oldest first (migration 026). */
   history: OrderHistoryRow[];
 }
 
@@ -90,7 +90,7 @@ export async function fetchOrders(userId: string, limit?: number): Promise<Order
 
   let { data, error } = await run(columns());
 
-  // A database without 020 (or 003/006) still has every base column. Show the
+  // A database without 023 (or 003/006) still has every base column. Show the
   // orders with less detail rather than refusing to show them at all. Only
   // this one error code falls back — anything else is a real failure.
   if (!taxColumnsUnavailable && error?.code === UNDEFINED_COLUMN) {
@@ -125,7 +125,7 @@ export async function fetchOrders(userId: string, limit?: number): Promise<Order
     byOrder.set(item.order_id, list);
   }
 
-  // The timeline is an enhancement too: a database without 023 has none.
+  // The timeline is an enhancement too: a database without 026 has none.
   const { data: historyRows } = await supabase
     .from('order_status_history')
     .select('order_id, kind, status, note, created_at')
@@ -160,7 +160,7 @@ export async function requestCancellation(orderId: string, reason: string): Prom
 /** Whether the customer may ask to cancel this order. */
 export function canRequestCancellation(order: OrderRow): boolean {
   return (
-    // Only offered once the database can take the request (migration 023's columns are present).
+    // Only offered once the database can take the request (migration 026's columns are present).
     order.cancellation_requested_at !== undefined &&
     order.payment_status === 'paid' &&
     ['placed', 'processing', 'packed'].includes(order.order_status ?? 'placed') &&

@@ -18,7 +18,7 @@ export interface AccountContextValue {
    * edits this one.
    */
   tap: TapProfileRow | null;
-  /** Every page the customer owns (one per card since migration 019), oldest first. */
+  /** Every page the customer owns (one per card since migration 022), oldest first. */
   taps: TapProfileRow[];
   /** Switches the page the account screens work on. Remembered on this device. */
   selectTap: (tapId: string) => void;

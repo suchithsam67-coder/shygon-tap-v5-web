@@ -1,8 +1,8 @@
 -- ============================================================================
--- 023 — GST, BILLING ADDRESS, ORDER TIMELINE, PHYSICAL CARD STOCK,
+-- 026 — GST, BILLING ADDRESS, ORDER TIMELINE, PHYSICAL CARD STOCK,
 --       CANCELLATION REQUESTS, STORE FUNNEL, SUPPORT EMAILS
 -- ============================================================================
--- Run AFTER 022. Idempotent. Additive: no existing table, column or function
+-- Run AFTER 025. Idempotent. Additive: no existing table, column or function
 -- that the website or the Admin app reads is changed.
 -- ============================================================================
 
@@ -180,7 +180,7 @@ WHERE NOT EXISTS (SELECT 1 FROM public.order_status_history h WHERE h.order_id =
 -- ---------------------------------------------------------------------------
 -- 4. PHYSICAL CARD STOCK (blank NFC cards before they belong to anyone)
 -- ---------------------------------------------------------------------------
--- `cards` (002/019) is a customer's card, created when an order is paid. This
+-- `cards` (002/022) is a customer's card, created when an order is paid. This
 -- is the shelf: blank cards with their chip ids, imported in batches, then
 -- assigned to a paid order's card — which writes the chip id onto it.
 --
@@ -377,7 +377,7 @@ $$;
 
 -- An administrator switching a customer's card on or off, or marking it lost
 -- or damaged — for a customer who phones in. Audited; the customer is emailed
--- by the card triggers (021).
+-- by the card triggers (024).
 CREATE OR REPLACE FUNCTION public.admin_set_card_state(p_card_id UUID, p_action TEXT, p_reason TEXT DEFAULT NULL)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -415,7 +415,7 @@ BEGIN
 END;
 $$;
 
--- A card's whole story: its own events (019's account log), the admin actions
+-- A card's whole story: its own events (022's account log), the admin actions
 -- on it, and the chain of cards it replaced or was replaced by.
 CREATE OR REPLACE FUNCTION public.admin_card_history(p_card_id UUID)
 RETURNS JSONB
@@ -611,7 +611,7 @@ GRANT EXECUTE ON FUNCTION public.admin_store_funnel(INT) TO authenticated;
 
 
 -- ---------------------------------------------------------------------------
--- 7. SUPPORT EMAILS (the 021 outbox)
+-- 7. SUPPORT EMAILS (the 024 outbox)
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.support_queue_emails()
 RETURNS TRIGGER

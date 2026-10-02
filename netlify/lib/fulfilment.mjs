@@ -97,7 +97,7 @@ export async function markPaymentFailed(admin, { orderId, amountInPaise, provide
 export async function fulfilOrder(admin, orderId) {
   const { data: order, error: orderError } = await admin
     .from('orders')
-    // Every column, so the fields added later (replaces_card_id, migration 020)
+    // Every column, so the fields added later (replaces_card_id, migration 023)
     // come along when present without failing on a database that lacks them.
     .select('*')
     .eq('id', orderId)
@@ -217,7 +217,7 @@ async function grantFromLineItems(admin, order, items) {
         break;
       }
       case 'delivery':
-        // The delivery charge (migration 020): paid for, nothing to grant.
+        // The delivery charge (migration 023): paid for, nothing to grant.
         break;
       default:
         console.warn('[fulfilment] unknown product_type', item.product_type, item.sku);
@@ -270,7 +270,7 @@ async function grantEntitlement(admin, userId, type, key, sourceOrderId) {
 
 /**
  * One card record per purchased card line. The database gives it its permanent
- * Card ID and its own page (migration 019); a replacement order links the new
+ * Card ID and its own page (migration 022); a replacement order links the new
  * card to the replaced card's page instead.
  *
  * A plain insert, not an upsert: the unique index on cards(order_id, sku) is
@@ -317,7 +317,7 @@ async function decrementStock(admin, orderItemId, sku, quantity) {
 /**
  * Safety net: every paying customer ends up with a Tap page.
  *
- * Since migration 019 the database does this itself: the payment trigger
+ * Since migration 022 the database does this itself: the payment trigger
  * provisions a customer's first page, and every issued card gets its own page
  * (published automatically) when its row is written. This covers a database
  * where neither trigger ran, and keeps the reference "edit window started"
@@ -342,7 +342,7 @@ async function ensureTapProfile(admin, order) {
       p_experience: (order.order_type ?? 'physical') === 'physical' ? order.plan_id ?? order.plan ?? 'essential' : null,
     });
     if (!provisionError) return;
-    // Before migration 019: the one-page-per-customer path.
+    // Before migration 022: the one-page-per-customer path.
     if (provisionError.code === 'PGRST202' || provisionError.code === '42883') {
       await legacyProvision(admin, order);
       return;
@@ -365,7 +365,7 @@ async function ensureTapProfile(admin, order) {
   }
 }
 
-/** The pre-019 provisioning: one draft Tap per customer, keyed on user_id. */
+/** The pre-022 provisioning: one draft Tap per customer, keyed on user_id. */
 async function legacyProvision(admin, order) {
   const userId = order.user_id;
   const { data: profile } = await admin
@@ -400,7 +400,7 @@ async function legacyProvision(admin, order) {
   if (error) console.error('[fulfilment] tap profile provisioning failed', error.message);
 }
 
-// Migration 024's public.tier_buttons(), mirrored: the buttons a tier includes.
+// Migration 027's public.tier_buttons(), mirrored: the buttons a tier includes.
 const TIER_BUTTONS = {
   essential: ['phone', 'email', 'whatsapp'],
   business: ['phone', 'email', 'whatsapp', 'instagram', 'linkedin', 'website'],

@@ -65,7 +65,7 @@ type Outcome =
 
 export default function PublicTap({ slug: slugProp }: { slug?: string } = {}) {
   // /t/<slug> (a page's address, what the QR encodes) or /c/<Card ID> (one
-  // card's own link, what a new card's NFC chip encodes — migration 019).
+  // card's own link, what a new card's NFC chip encodes — migration 022).
   const params = useParams();
   // /shygontap/<name> is matched in App.tsx and passes the name in.
   const slug = slugProp ?? params.username;

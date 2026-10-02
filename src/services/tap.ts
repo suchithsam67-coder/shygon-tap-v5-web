@@ -80,7 +80,7 @@ export function themeOf(tap: TapProfileRow | null): TapTheme {
 }
 
 /**
- * Every page the customer owns, oldest first. Since migration 019 each card
+ * Every page the customer owns, oldest first. Since migration 022 each card
  * gets its own page, so a customer with three cards has three.
  */
 export async function fetchMyTaps(userId: string): Promise<TapProfileRow[]> {
@@ -218,7 +218,7 @@ function isMissingFunction(error: unknown): boolean {
 /**
  * Claims or changes the public address of one page. Runs server-side so
  * uniqueness is checked without granting the caller read access to anyone
- * else's Tap. Changing an address keeps the old one working (migration 019).
+ * else's Tap. Changing an address keeps the old one working (migration 022).
  */
 export async function claimSlug(slug: string, tapId?: string): Promise<string> {
   if (tapId) {
@@ -238,7 +238,7 @@ export async function claimSlug(slug: string, tapId?: string): Promise<string> {
  */
 export async function fetchEditState(tapId?: string): Promise<TapEditStateRow | null> {
   if (tapId) {
-    // Per page since migration 019: each page has its own 14-day window.
+    // Per page since migration 022: each page has its own 14-day window.
     const { data, error } = await supabase.rpc('tap_page_edit_state', { p_tap_id: tapId });
     if (!error) {
       const rows = (data ?? []) as TapEditStateRow[];
@@ -307,7 +307,7 @@ export function tapUrl(slug: string): string {
 }
 
 /**
- * A card's own address — what a new card's NFC chip carries (migration 019).
+ * A card's own address — what a new card's NFC chip carries (migration 022).
  * It opens whichever page the card belongs to, counts the tap against the
  * card, and stops working the moment the card is deactivated or reported
  * lost, without affecting the page's other cards or its QR.

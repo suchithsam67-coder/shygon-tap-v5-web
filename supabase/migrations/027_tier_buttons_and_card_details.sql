@@ -1,4 +1,4 @@
--- 024: contact buttons by tier, card details before checkout
+-- 027: contact buttons by tier, card details before checkout
 --
 -- 1. public.tier_buttons(tier): the buttons each digital experience includes.
 --    Essential: call, email, WhatsApp. Business: + Instagram, LinkedIn, website.
@@ -9,13 +9,13 @@
 -- 2. get_public_profile / get_public_tap / enforce_tap_edit_rules use it: a
 --    button shows (and may be switched on) when the PAGE's tier includes it
 --    or the customer bought it. Bodies are otherwise unchanged (from 009, 013
---    and 019).
+--    and 022).
 -- 3. orders.profile_details: what the customer typed on the Card details page
 --    (name on card, title, contact buttons). The server copies it into the
 --    new page when the order is paid. No payment data, ever.
 --
 -- Idempotent. Rollback: re-run 009's get_public_profile, 013's get_public_tap
--- and 019's enforce_tap_edit_rules; DROP FUNCTION public.tier_buttons(TEXT);
+-- and 022's enforce_tap_edit_rules; DROP FUNCTION public.tier_buttons(TEXT);
 -- ALTER TABLE public.orders DROP COLUMN profile_details.
 
 CREATE OR REPLACE FUNCTION public.tier_buttons(p_tier TEXT)
@@ -84,7 +84,7 @@ BEGIN
   FROM public.entitlements e
   WHERE e.user_id = NEW.user_id AND e.is_active AND e.type = 'customization';
 
-  -- 024: a button is allowed when the page's tier includes it OR it was bought.
+  -- 027: a button is allowed when the page's tier includes it OR it was bought.
   IF EXISTS (
     SELECT 1 FROM unnest(NEW.enabled_customizations) AS k(key)
     WHERE k.key <> ALL (v_owned || public.tier_buttons(NEW.selected_ui_tier))
@@ -179,7 +179,7 @@ BEGIN
     ELSE v_tier
   END;
 
-  -- 024: the page's own tier includes its buttons; add-ons add more.
+  -- 027: the page's own tier includes its buttons; add-ons add more.
   v_shown := ARRAY(
     SELECT unnest(v_tap.enabled_customizations)
     INTERSECT
@@ -279,7 +279,7 @@ BEGIN
   v_max := public.user_max_ui_tier(v_tap.user_id);
   SELECT COALESCE(array_agg(e.key),'{}') INTO v_owned
   FROM public.entitlements e WHERE e.user_id=v_tap.user_id AND e.is_active AND e.type='customization';
-  -- 024: the page's tier includes its buttons.
+  -- 027: the page's tier includes its buttons.
   v_owned := v_owned || public.tier_buttons(CASE WHEN public.tier_rank(v_tap.selected_ui_tier)<=public.tier_rank(v_max) THEN v_tap.selected_ui_tier ELSE v_max END);
   RETURN QUERY SELECT v_tap.slug,v_tap.display_name,v_tap.headline,v_tap.bio,v_tap.avatar_url,v_tap.location,
     CASE WHEN 'phone'=ANY(v_tap.enabled_customizations) THEN v_tap.phone END,
@@ -301,7 +301,7 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS profile_details JSONB;
 COMMENT ON COLUMN public.orders.profile_details IS
   'Card details page: name on card, title, company and contact buttons. Copied into the new page on payment. Never payment data.';
 
--- 019's reserved names plus the new /shygontap/card-details screen.
+-- 022's reserved names plus the new /shygontap/card-details screen.
 CREATE OR REPLACE FUNCTION public.tap_slug_reserved(p_slug TEXT)
 RETURNS BOOLEAN
 LANGUAGE sql

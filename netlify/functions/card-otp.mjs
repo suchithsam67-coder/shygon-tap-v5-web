@@ -235,7 +235,7 @@ async function requestCode(cfg, user, body, request) {
       body: { ...challenge, channel },
     });
   } catch (error) {
-    // Before migration 019 there is no channel column.
+    // Before migration 022 there is no channel column.
     if (error.code !== 'PGRST204' && error.code !== '42703') throw error;
     await rest(cfg, 'card_otp_challenges', { method: 'POST', prefer: 'return=minimal', body: challenge });
   }

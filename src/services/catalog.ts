@@ -64,7 +64,7 @@ export interface Catalog {
   customizations: CustomizationProduct[];
   /** The one-time ₹999 Customization Pass. */
   pass: PassProduct | null;
-  /** The delivery charge on every order with a physical card (migration 020). */
+  /** The delivery charge on every order with a physical card (migration 023). */
   deliveryInPaise: number;
 }
 

@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Promo codes (migration 020): a percentage off the cart value, before
+ * Promo codes (migration 023): a percentage off the cart value, before
  * delivery. This only asks the database whether a code applies and what it
  * would take off, so checkout can show it. The discount a customer is charged
  * is decided again by /api/create-order, which reserves the code against the

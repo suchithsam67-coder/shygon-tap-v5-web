@@ -30,7 +30,7 @@ import { useAsync } from '../hooks/useAsync';
 /**
  * Tap analytics — card taps, profile views, QR scans, button clicks, unique
  * visitors, devices, and every card's own taps — aggregated server-side by
- * `get_page_analytics()` (migration 019). It filters on the caller's own pages,
+ * `get_page_analytics()` (migration 022). It filters on the caller's own pages,
  * so this page can only ever show the customer's own numbers.
  */
 

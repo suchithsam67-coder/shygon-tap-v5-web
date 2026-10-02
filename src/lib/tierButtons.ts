@@ -3,7 +3,7 @@ import { EXPERIENCE_ORDER, experienceRank, toExperience, type Experience } from 
 /**
  * Which contact buttons each digital experience includes — the single source
  * of truth on the website. The database has the same table in
- * public.tier_buttons() (migration 024), which is what actually decides what a
+ * public.tier_buttons() (migration 027), which is what actually decides what a
  * visitor sees; this copy only drives the editor, the store and checkout.
  *
  * Each tier includes everything below it. A button a tier does not include can

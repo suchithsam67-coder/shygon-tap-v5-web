@@ -151,7 +151,7 @@ export interface CardLook {
   finish?: string | null;
 }
 
-/** What `get_public_card()` (migration 019) says about a tapped card. */
+/** What `get_public_card()` (migration 022) says about a tapped card. */
 export interface PublicCard extends Partial<CardLook> {
   state: 'active' | 'not_activated' | 'inactive' | 'paused' | 'unavailable';
   code?: string;
@@ -344,13 +344,13 @@ export interface OrderRow {
   cancellation_reason?: string | null;
   refunded_at?: string | null;
   refund_amount_in_paise?: number | null;
-  // Checkout money (migration 020): cart value, promo discount and delivery.
+  // Checkout money (migration 023): cart value, promo discount and delivery.
   subtotal_in_paise?: number | null;
   discount_in_paise?: number | null;
   delivery_fee_in_paise?: number | null;
   promo_code?: string | null;
   replaces_card_id?: string | null;
-  // Migration 023: GST at purchase time, billing address, cancellation request.
+  // Migration 026: GST at purchase time, billing address, cancellation request.
   tax_in_paise?: number | null;
   tax_rate_percent?: number | null;
   tax_inclusive?: boolean | null;
@@ -411,7 +411,7 @@ export interface CardRow {
   edition_serial?: number | null;
   edition_count?: number | null;
   edition_chapter_size?: number | null;
-  /** Permanent Card ID (migration 019): what the NFC chip's /c/<code> link carries. */
+  /** Permanent Card ID (migration 022): what the NFC chip's /c/<code> link carries. */
   card_code?: string | null;
   nickname?: string | null;
   /** Set when the customer reported the card lost; the card is then `suspended`. */

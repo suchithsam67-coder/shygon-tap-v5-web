@@ -1,6 +1,6 @@
 /**
  * Customer email: sending, the templates, and the worker that drains
- * public.email_outbox (migration 021).
+ * public.email_outbox (migration 024).
  *
  * The database decides WHAT to send — a trigger queues a row whenever an order
  * is paid, shipped, delivered, cancelled or refunded, or a card is activated,
@@ -267,7 +267,7 @@ function billTable(order, items) {
 <tr><td style="padding:12px 0 0;font-size:14px;font-weight:800;">Total paid</td><td style="padding:12px 0 0;font-size:16px;font-weight:800;text-align:right;">${rupees(order.amount_in_paise)}</td></tr></table>`;
 }
 
-/** GST recorded on the order at purchase time (migration 023). */
+/** GST recorded on the order at purchase time (migration 026). */
 function taxLines(order) {
   const tax = Number(order.tax_in_paise ?? 0);
   if (tax <= 0) return [];
@@ -330,7 +330,7 @@ const ORDER_TAX_FIELDS =
   'billing_company,billing_email,billing_address,billing_address_line2,billing_locality,billing_city,billing_state,' +
   'billing_pincode,shipping_address_line2,shipping_locality';
 
-/** Reads an order with its GST fields, or without them before migration 023. */
+/** Reads an order with its GST fields, or without them before migration 026. */
 async function loadOrder(cfg, id) {
   try {
     const [order] = (await rest(cfg, `orders?id=eq.${id}&select=${ORDER_FIELDS}${ORDER_TAX_FIELDS}`)) ?? [];

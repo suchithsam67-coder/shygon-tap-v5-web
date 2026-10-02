@@ -96,7 +96,7 @@ export function verifyCardOtp(challengeId: string, code: string): Promise<{ card
 
 /**
  * Names a card ("Front desk", "Priya's card"). Cosmetic, so it needs only the
- * signed-in owner (customer_set_card_nickname, migration 019). Empty clears it.
+ * signed-in owner (customer_set_card_nickname, migration 022). Empty clears it.
  */
 export async function setCardNickname(cardId: string, nickname: string): Promise<CardRow> {
   const { data, error } = await supabase.rpc('customer_set_card_nickname', {
@@ -118,7 +118,7 @@ export async function reportCardLost(cardId: string): Promise<CardRow> {
   return data as CardRow;
 }
 
-/** A database without migration 019 has no such function: say so in plain words. */
+/** A database without migration 022 has no such function: say so in plain words. */
 function notYetLive(error: { code?: string; message?: string }): Error | typeof error {
   return error.code === 'PGRST202' || error.code === '42883'
     ? new Error('This option is being switched on for your account. Please try again later.')

@@ -91,7 +91,7 @@ export function densify(series: TapAnalyticsRow[], days: number): TapAnalyticsRo
 }
 
 /* -------------------------------------------------------------------------
-   Page and card analytics (migration 019): one call returns everything the
+   Page and card analytics (migration 022): one call returns everything the
    Analytics page shows, for one page, one card, or all of them.
    ------------------------------------------------------------------------- */
 
@@ -124,7 +124,7 @@ export interface PageAnalytics {
     lastTappedAt: string | null;
   }[];
   lastTap: { at: string; event: string; device: string | null; cardCode: string | null; cardNickname: string | null } | null;
-  /** False when the database predates migration 019 and only the basic series is available. */
+  /** False when the database predates migration 022 and only the basic series is available. */
   detailed: boolean;
 }
 
@@ -159,7 +159,7 @@ export async function fetchPageAnalytics(
 
   if (error) {
     if (!isMissingFunction(error)) throw error;
-    // Before 019: the per-customer series and link clicks, nothing per card.
+    // Before 022: the per-customer series and link clicks, nothing per card.
     const summary = await fetchAnalytics(days);
     return {
       days,

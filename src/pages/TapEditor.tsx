@@ -110,7 +110,7 @@ export default function TapEditor() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [changingSlug, setChangingSlug] = useState(false);
 
-  // The cards that open this page (one page per card since migration 019).
+  // The cards that open this page (one page per card since migration 022).
   const { data: myCards } = useAsync(
     () => (user ? fetchMyCards(user.id) : Promise.resolve([] as CardRow[])),
     { enabled: Boolean(user), deps: [user?.id] },
@@ -176,7 +176,7 @@ export default function TapEditor() {
   // The edit-state RPC is authoritative. Never turn an unknown state into an
   // unlocked editor; a real database error must fail closed.
   const canEdit = editState?.can_edit === true;
-  // Buttons this page may show: what its tier includes (migration 024) plus add-ons bought.
+  // Buttons this page may show: what its tier includes (migration 027) plus add-ons bought.
   const pageTier: Experience = tap
     ? experienceRank(toExperience(tap.selected_ui_tier)) <= experienceRank(entitlements.maxExperience)
       ? toExperience(tap.selected_ui_tier)

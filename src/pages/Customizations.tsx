@@ -35,7 +35,7 @@ export default function Customizations() {
   } = useAsync<Catalog>(fetchCatalog, { onError: (err) => describeError(err) });
 
   // A button every one of the customer's pages already gets from its tier
-  // (migration 024) is not worth selling to them.
+  // (migration 027) is not worth selling to them.
   const includedEverywhere = useMemo(() => {
     const tiers = (taps.length ? taps.map((t) => t.selected_ui_tier) : [entitlements.maxExperience]).map((t) =>
       experienceRank(toExperience(t)) <= experienceRank(entitlements.maxExperience) ? toExperience(t) : entitlements.maxExperience,

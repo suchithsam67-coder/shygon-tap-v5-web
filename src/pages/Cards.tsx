@@ -40,7 +40,7 @@ import { cardUrl, formatCardCode, tapLabel } from '../services/tap';
 /**
  * The customer's NFC cards.
  *
- * Every card has a permanent Card ID (migration 019): its chip opens
+ * Every card has a permanent Card ID (migration 022): its chip opens
  * /c/<Card ID>, which opens the card's own page and counts the tap against
  * the card. From here a customer names a card, activates or deactivates it
  * (confirmed by a one-time code — card-otp, migration 015), reports it lost,

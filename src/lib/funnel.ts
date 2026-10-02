@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { supabase } from './supabase';
 
 /**
- * Store conversion funnel (migration 023): visit → product view → configured →
+ * Store conversion funnel (migration 026): visit → product view → configured →
  * cart → checkout → payment → purchase. Anonymous by design: a random session
  * id, never a name, email or anything typed into a form. Money numbers in the
  * admin funnel come from paid orders, not from these events.
@@ -21,7 +21,7 @@ export type StoreEvent =
 
 const SESSION_KEY = 'shygon_funnel_session';
 const sent = new Set<string>();
-/** Off for this visit once the database says the function is missing (before migration 023). */
+/** Off for this visit once the database says the function is missing (before migration 026). */
 let disabled = false;
 
 function sessionId(): string | null {
