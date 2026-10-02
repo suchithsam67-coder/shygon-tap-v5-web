@@ -5,6 +5,39 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### Human Decision Pack (2026-10-02), review only
+**Added**
+- `docs/shygon-os/HUMAN_DECISION_PACK.md`: the 13 open decisions (DEC-2026-002, 018, 022–032), each with:
+  - what must be decided and why it matters;
+  - the options named in its record (definition, consequences, affected V5 and SHYGON OS components, migration and security implications);
+  - evidence, dependencies and what it blocks;
+  - a blank human-approval block;
+  - and, at the end, the approval checklist and the implementation-authorization form.
+- `docs/shygon-os/IDENTITY_DECISION_SUMMARY.md`: 15 identity relationships (U, C, persona, card, order, payment, fulfilment), each with current key, intended key, current usage, risk and the future contract per DEC-029 option.
+- `docs/shygon-os/CARD_LIFECYCLE_DECISION_SUMMARY.md`: doc 08 vs live database vs V5 app vs M1 proposal. Covers:
+  - activation paths, status writers, and expiry, replacement, suspension and delivery behaviour;
+  - owner step-up;
+  - `/t/:slug` and `/d/:code` implications.
+- `docs/shygon-os/PHASE_GATE_DECISION_SUMMARY.md`: M0 completion first vs M1 foundations in parallel, and which M1 work is genuinely parallel-safe.
+
+**Corrected**
+- `M1_DECISION_GATE_REPORT.md` C2 / C4 and the related rows:
+  - `admin_update_card` validates five status values; it does not accept any string (E-1);
+  - there are four writers of `status='active'`, not three (E-2).
+  Each corrected line is marked.
+
+**Recorded, not fixed**
+- E-3: live `fulfil_order()` omits the NOT NULL `cards.card_id` (static reading).
+- New observations O-7…O-11 for triage:
+  - O-7: an owner can undo any card suspension;
+  - O-8: the Terms text vs F3;
+  - O-9: the expiry sweeper's schedule is unknown;
+  - O-10: card↔persona link columns are never written;
+  - O-11: unused email columns on live `orders`.
+  None meets a P0 criterion.
+
+**Not changed:** no code, schema, migration, RLS, auth, payment, deployment or production change. No decision approved or selected.
+
 ### M1 decision gate report (2026-10-02), review only
 **Added**
 - `docs/shygon-os/M1_DECISION_GATE_REPORT.md`, which contains:

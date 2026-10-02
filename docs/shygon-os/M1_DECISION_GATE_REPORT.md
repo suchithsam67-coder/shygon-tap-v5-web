@@ -22,7 +22,7 @@
 | **DEC-2026-025** (PROPOSED, Product Owner) | When are organisations, members and organisation roles built? | future `organizations`, `memberships`, `org_role_permissions`; `org_id` columns | G3; OQ-9; DEC-018 | A: deferred (documents stand). B: nullable `org_id` columns only. C: override and build now (waives G3/OQ-9) | The approved plan applies (Phase 2 after G3) | Organisation build; tenant RBAC; organisation verticals |
 | **DEC-2026-026** (PROPOSED, Product Owner) | Which M1 sequence governs, and must M0.3–M0.7 finish first? | milestone plan; M0.3–M0.7 | DEC-022 (M0.3) | Plan §35 (or another option) becomes binding; deviations from doc 12 are recorded | doc 12 Phase 1 (M1.1 = device layer) plus rule 5 stay binding | **Start of M1.1** |
 | **DEC-2026-027** (PROPOSED, Principal Architect) | Staging and Control environments vs "no new Supabase project" | staging, M1.13 pipeline, kill-switch drills, restore drill, SHYGON Control | DEC-018; cost | A (local only), B (branching), C (exception) or D (hybrid) | Staging stays local-only; G2 drill evidence is weaker | M1.11–M1.13; G2 |
-| **DEC-2026-028** (PROPOSED, Product Owner) | Canonical card states; `status` vs `card_status`; ACTIVATED/ISSUED/EXPIRED | `cards`; 9 live functions that write `status` (§3); `Cards.tsx`; `card-otp.mjs`; Admin APK | DEC-002; OQ-2/2b; DEC-022 (F3) | `device_transition()` and the `status` CHECK can be designed concretely | Lifecycle stays undefined; `status` stays unconstrained (any string via `admin_update_card`) | Card lifecycle; routing; the I-4 fix |
+| **DEC-2026-028** (PROPOSED, Product Owner) | Canonical card states; `status` vs `card_status`; ACTIVATED/ISSUED/EXPIRED | `cards`; 9 live functions that write `status` (§3); `Cards.tsx`; `card-otp.mjs`; Admin APK | DEC-002; OQ-2/2b; DEC-022 (F3) | `device_transition()` and the `status` CHECK can be designed concretely | Lifecycle stays undefined; `status` stays unconstrained at column level (no CHECK). *Corrected 2026-10-02: `admin_update_card` itself accepts only 5 values; see `HUMAN_DECISION_PACK.md` §2 E-1* | Card lifecycle; routing; the I-4 fix |
 | **DEC-2026-029** (PROPOSED, Security Owner) | Binding identity key contract (U vs C) | every new module; RLS patterns; contract tests | DEC-024 (the current breakage) | Rules B1–B7 are binding; adapters per §2.4 | New modules risk repeating the U-into-C bug | Identity mapping; every module that writes `customer_id` |
 | **DEC-2026-030** (PROPOSED, Product Owner) | What is the "OS dashboard"? | `/app` shell, or the Command Center, web admin, or organisation console | DEC-025 (for the organisation console); G3 (for the Command Center) | A defined target milestone | Not buildable: undefined | OS dashboard |
 | **DEC-2026-031** (PROPOSED, Principal Architect) | Email provider (OQ-8); WhatsApp channel; push timing | `NotificationProvider` adapters; DPDP processor list | DEC-018; cost; WhatsApp Business onboarding | Adapters can be built per the chosen providers | In-app + SMS only; the interface is ready, no new adapters | Email/WhatsApp notifications |
@@ -113,7 +113,7 @@ public resolver: get_public_profile(p_slug) → tap_profiles by lower(slug); tie
 | suspended | ✔ (reversible) | value; legacy `card_status='suspended'` | **writers:** `customer_deactivate_card`, `card_apply_verified_action`, **`expire_tap_cards` (expiry)**, `admin_cancel_order` (pending/shipped), **`request_card_replacement`** (also writes `card_status`) | `Cards.tsx` | `suspended` | SUSPENDED |
 | lost | ✔ | — | — | — | `lost` | LOST |
 | transfer_pending | ✔ | — | — | — | optional | — |
-| replaced | ✔ terminal | value is read; legacy uses **`'replacement'`** | **no live writer** except free-form `admin_update_card`; read by activate/deactivate/OTP | `Cards.tsx`, `card-otp.mjs` read it | `replaced` | REPLACED |
+| replaced | ✔ terminal | value is read; legacy uses **`'replacement'`** | **only writer:** admin manual `admin_update_card` (validated list; *corrected 2026-10-02, E-1*); read by activate/deactivate/OTP | `Cards.tsx`, `card-otp.mjs` read it | `replaced` | REPLACED |
 | retired | ✔ terminal | legacy `card_status='retired'` only | — | — | `retired` | RETIRED |
 | expired | — | implicit: `activation_expires_at` + `suspended` | `expire_tap_cards` | — | DEC-002 | — |
 | inventory / assigned | — | legacy `card_status` only | — | — | mapped / frozen | — |
@@ -123,9 +123,9 @@ public resolver: get_public_profile(p_slug) → tap_profiles by lower(slug); tie
 | # | Conflict | Sources |
 |---|---|---|
 | C1 | **Two state columns.** `status` (V5, unconstrained, written by 9 live functions: 8 updates + the `fulfil_order` insert, plus the V5 `fulfilment.mjs` insert) vs `card_status` (legacy, CHECK, written only by `request_card_replacement`) | live schema |
-| C2 | **`status` has no CHECK.** `admin_update_card(p_status)` can store any string | live |
+| C2 | **`status` has no CHECK** at column level. *Corrected 2026-10-02 (E-1): `admin_update_card` rejects any `p_status` outside `pending, shipped, active, suspended, replaced`; it does not store any string.* | live |
 | C3 | **ACTIVATED** is a state in the brief, but a transition in doc 08 and the M1 proposal | brief vs doc 08 |
-| C4 | **Three activation paths with different semantics:** OTP (`card-otp` → `card_apply_verified_action`) and printed code (`customer_activate_card`) both set **+14-day expiry**; **delivery auto-activation** (`admin_update_order_status`) sets `active` with **no owner action, no OTP and no expiry**. doc 08 requires owner activation with A3. | live vs doc 08 |
+| C4 | **Three activation paths with different semantics:** OTP (`card-otp` → `card_apply_verified_action`) and printed code (`customer_activate_card`) both set **+14-day expiry**; **delivery auto-activation** (`admin_update_order_status`) sets `active` with **no owner action, no OTP and no expiry**. doc 08 requires owner activation with A3. *Corrected 2026-10-02 (E-2): a fourth writer, admin manual `admin_update_card(p_status='active')`, also activates with no expiry and no owner action; see `CARD_LIFECYCLE_DECISION_SUMMARY.md` §2.* | live vs doc 08 |
 | C5 | **Expiry conflated with suspension:** `expire_tap_cards` writes `suspended`. EXPIRED exists in none of doc 08, the brief or the schema. | live vs all |
 | C6 | **A replacement request suspends instead of replacing:** `request_card_replacement` sets `suspended` (+ `card_status='suspended'`); nothing sets `replaced`, yet the UI and OTP check for it. | live vs doc 08 / code |
 | C7 | **Vocabulary drift:** `replaced` (doc 08, V5) vs `replacement` (legacy CHECK); `inventory`/`assigned` vs `unassigned`/`pending` | live legacy vs doc 08 |
@@ -212,7 +212,7 @@ public resolver: get_public_profile(p_slug) → tap_profiles by lower(slug); tie
   5. **DEC-2026-018**, role holders, without whom no L3 change has a valid approver.
 - **Then:** DEC-029 (before identity work), and DEC-028 + DEC-002 (before cards and routing).
 - **New facts recorded by this report** (not in earlier documents):
-  - three live activation paths with conflicting expiry semantics, one of them automatic on delivery (C4);
+  - three live activation paths with conflicting expiry semantics, one of them automatic on delivery (C4); *corrected 2026-10-02: four writers of `active`, counting admin manual `admin_update_card` (E-2)*;
   - nothing sets `replaced`, and the replacement request suspends instead (C6);
   - `tap_profiles.user_id` is nullable while the resolver depends on it (§2.4);
   - `database.types.ts` is stale against live.

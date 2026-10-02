@@ -59,6 +59,7 @@ This is the index of every decision record (DEC). Doc 13 §4 and §11 define the
 | OQ-21 / OQ-22 | Name the internal operating layer; productize it or not | Founder (UNASSIGNED) | P2 | HUMAN ACTION REQUIRED |
 | GAP-1 … GAP-12 | Gaps in the governance spec (doc 13 §13), each with a proposed resolution | Product Owner / Founder (UNASSIGNED) | — | HUMAN ACTION REQUIRED |
 | M1 security observations O-1…O-6 | `require_admin` executable by anon; legacy `get_public_tap` returns contact columns; card OTP bypass via the readable `activation_code`; no CHECK on `cards.status`; stale Vercel deployment; pgcrypto location (`docs/shygon-os/M1_SECURITY_MODEL.md` §5) | Security Owner (UNASSIGNED) | — | HUMAN ACTION REQUIRED: triage |
+| Observations O-7…O-11 (2026-10-02) | Owner can re-activate any card suspension, including admin and expiry (O-7); Terms text vs F3 (O-8); expiry sweeper schedule unknown (O-9); card↔persona link columns never written (O-10); unused email columns on live `orders` (O-11) (`docs/shygon-os/HUMAN_DECISION_PACK.md` §2) | Security Owner (O-7); Product Owner (O-8); Data Owner (O-9, O-10); Principal Architect (O-11), all UNASSIGNED | — | HUMAN ACTION REQUIRED: triage |
 | Other OQs | The remaining open questions in doc 11 Part D | per doc 11 | per doc 11 | HUMAN ACTION REQUIRED |
 
 ## Implementation notes for M0.0 / M0.1 (L0, PROPOSED; doc 12 §0 rule 8)
