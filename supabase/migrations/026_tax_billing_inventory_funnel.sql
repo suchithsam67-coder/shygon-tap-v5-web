@@ -2,8 +2,8 @@
 -- 026 — GST, BILLING ADDRESS, ORDER TIMELINE, PHYSICAL CARD STOCK,
 --       CANCELLATION REQUESTS, STORE FUNNEL, SUPPORT EMAILS
 -- ============================================================================
--- Run AFTER 025. Idempotent. Additive: no existing table, column or function
--- that the website or the Admin app reads is changed.
+-- Run AFTER 025. Idempotent. Additive: on live the only change to an existing
+-- table is the new `kind` column on order_status_history (section 3).
 -- ============================================================================
 
 
@@ -118,6 +118,14 @@ END $$;
 -- ---------------------------------------------------------------------------
 -- Every status an order passes through, with its time, so the customer and the
 -- Admin app can show "Paid 12 Oct 10:04 · Packed 13 Oct · Shipped 13 Oct …".
+--
+-- Live already has this table (uuid id, status, tracking_number,
+-- shipping_carrier, note, created_at) and its own trigger,
+-- orders_status_history_trigger, which records every order_status change. So
+-- the table is only created where it is missing, `kind` is added to the live
+-- one (its existing rows are all order-status rows), and the trigger below
+-- leaves order-status rows to the live trigger when that exists, instead of
+-- writing each one twice.
 CREATE TABLE IF NOT EXISTS public.order_status_history (
   id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   order_id    UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
@@ -127,6 +135,8 @@ CREATE TABLE IF NOT EXISTS public.order_status_history (
   note        TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE public.order_status_history ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'order';
+ALTER TABLE public.order_status_history ADD COLUMN IF NOT EXISTS note TEXT;
 CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON public.order_status_history (order_id, created_at);
 ALTER TABLE public.order_status_history ENABLE ROW LEVEL SECURITY;
 REVOKE INSERT, UPDATE, DELETE ON public.order_status_history FROM anon, authenticated;
@@ -143,15 +153,24 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  -- Live's own history trigger already records order_status (see above).
+  v_live_trigger BOOLEAN := EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid = 'public.orders'::regclass
+      AND tgname = 'orders_status_history_trigger'
+      AND NOT tgisinternal);
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    INSERT INTO public.order_status_history (order_id, kind, status) VALUES (NEW.id, 'order', COALESCE(NEW.order_status, 'placed'));
+    IF NOT v_live_trigger THEN
+      INSERT INTO public.order_status_history (order_id, kind, status) VALUES (NEW.id, 'order', COALESCE(NEW.order_status, 'placed'));
+    END IF;
     RETURN NEW;
   END IF;
   IF NEW.payment_status IS DISTINCT FROM OLD.payment_status THEN
     INSERT INTO public.order_status_history (order_id, kind, status) VALUES (NEW.id, 'payment', NEW.payment_status);
   END IF;
-  IF NEW.order_status IS DISTINCT FROM OLD.order_status THEN
+  IF NEW.order_status IS DISTINCT FROM OLD.order_status AND NOT v_live_trigger THEN
     INSERT INTO public.order_status_history (order_id, kind, status, note)
     VALUES (NEW.id, 'order', NEW.order_status,
             CASE WHEN NEW.order_status = 'shipped' THEN
@@ -557,8 +576,13 @@ BEGIN
        'purchase_completed') THEN
     RETURN;
   END IF;
-  -- A runaway or hostile client cannot flood the table.
+  -- A runaway or hostile client cannot flood the table: 300 events a day per
+  -- session, and — because anyone can invent session ids — a ceiling for the
+  -- whole store per minute, far above real traffic.
   IF (SELECT count(*) FROM public.store_events WHERE session_id = p_session AND occurred_at > NOW() - interval '1 day') >= 300 THEN
+    RETURN;
+  END IF;
+  IF (SELECT count(*) FROM public.store_events WHERE occurred_at > NOW() - interval '1 minute') >= 600 THEN
     RETURN;
   END IF;
   INSERT INTO public.store_events (session_id, event, product, value_paise, user_id)

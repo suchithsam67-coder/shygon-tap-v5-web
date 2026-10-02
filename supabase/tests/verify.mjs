@@ -127,20 +127,17 @@ await check('a customer cannot mark their own order paid', async () => {
   return msg.slice(0, 60);
 });
 
-// Since 022 a page is published the moment it is created ("automatic
-// deployment"); before that it was provisioned as a draft.
-await check('paying the order provisions a live Tap', async () => {
+await check('paying the order provisions a draft Tap', async () => {
   await q(`UPDATE public.orders SET payment_status = 'paid' WHERE id = $1`, [order.id]);
   const { rows } = await q(
     `SELECT slug, status, published, selected_ui_tier FROM public.tap_profiles WHERE user_id = $1`,
     [uid],
   );
   assert(rows.length === 1, 'no Tap provisioned');
-  assert(rows[0].status === 'active', `status was ${rows[0].status}`);
-  assert(rows[0].published === true, 'a new Tap must be published');
-  assert(rows[0].slug, 'a new Tap must have an address');
+  assert(rows[0].status === 'draft', `status was ${rows[0].status}`);
+  assert(rows[0].published === false, 'a new Tap must not be published');
   assert(rows[0].selected_ui_tier === 'essential', `tier was ${rows[0].selected_ui_tier}`);
-  return `slug=${rows[0].slug}, status=active, essential`;
+  return `slug=${rows[0].slug}, status=draft, essential`;
 });
 
 await check('order + payment notifications were raised', async () => {

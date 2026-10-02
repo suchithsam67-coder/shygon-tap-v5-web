@@ -1,7 +1,7 @@
 -- ============================================================================
 -- 022 — ONE PAGE PER CARD, PERMANENT CARD IDS, CARD MANAGEMENT, TAP ANALYTICS
 -- ============================================================================
--- Run AFTER 001–018. Idempotent: safe to run twice.
+-- Idempotent: safe to run twice.
 --
 -- WHAT CHANGES
 --   1. Every card gets a permanent Card ID (cards.card_code, 8 characters, e.g.
@@ -10,9 +10,11 @@
 --      and it ties together the physical card, the customer, the card's page,
 --      the order that bought it and its tap analytics.
 --   2. One page per card. The one-Tap-per-customer unique index is lifted; each
---      newly issued card gets its own page (created and published automatically),
---      linked through cards.tap_profile_id. Cards issued before this migration
---      keep opening the page they always opened, so no printed card changes.
+--      newly issued card gets its own page, created as an unpublished draft
+--      (owner decision D-U4, observation O-12: nothing goes public until the
+--      customer publishes it), linked through cards.tap_profile_id. Cards
+--      issued before this migration keep opening the page they always opened,
+--      so no printed card changes.
 --   3. Card management for the customer: nickname, report lost (a lost card is
 --      `suspended` with lost_at set — no new status value, so every existing
 --      reader and constraint keeps working), replacement (a replacement card
@@ -31,7 +33,45 @@
 --
 -- ORDERING: re-run this file after any re-run of 002, 004, 005 or 013 — each of
 -- those redefines a function this file replaces.
+--
+-- ORIGIN (DEC-2026-023): written for the live schema baseline
+-- (supabase/baseline/000_live_baseline.sql) after M0.3's 020 and 021. It is NOT
+-- applied to production by tooling, and it refuses to run while the live
+-- constraints below make one page per card impossible (section -1).
 -- ============================================================================
+
+
+-- ---------------------------------------------------------------------------
+-- -1. PRECONDITIONS (fail closed, before anything changes)
+-- ---------------------------------------------------------------------------
+-- Two live-schema facts break this feature midway, after part of it would
+-- already have been applied. Both are owner decisions, not something this
+-- file may change on its own (DEC-2026-033):
+--   * tap_profiles_customer_id_key: UNIQUE (customer_id) allows ONE page per
+--     customer record, so a second card's page can never be inserted
+--     (identity contract DEC-2026-029; page model).
+--   * cards.card_id NOT NULL with no default (I-4, DEC-2026-024; card model
+--     DEC-2026-028): every card insert that does not invent a legacy card_id
+--     fails, so no card (and no page) is ever issued.
+DO $$
+DECLARE
+  v_problems TEXT[] := '{}';
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid = 'public.tap_profiles'::regclass
+               AND conname = 'tap_profiles_customer_id_key') THEN
+    v_problems := v_problems || 'tap_profiles_customer_id_key (one page per customer record)'::text;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'cards' AND column_name = 'card_id'
+               AND is_nullable = 'NO' AND column_default IS NULL) THEN
+    v_problems := v_problems || 'cards.card_id NOT NULL without a default (I-4)'::text;
+  END IF;
+  IF array_length(v_problems, 1) > 0 THEN
+    RAISE EXCEPTION 'Migration 022 cannot run on this database: %. These need an owner decision first (DEC-2026-033). Nothing was changed.',
+      array_to_string(v_problems, '; ');
+  END IF;
+END $$;
 
 
 -- ---------------------------------------------------------------------------
@@ -391,11 +431,14 @@ GRANT EXECUTE ON FUNCTION public.claim_tap_slug(TEXT) TO authenticated;
 
 
 -- ---------------------------------------------------------------------------
--- 3. PROVISIONING: A PAGE PER CARD, PUBLISHED AUTOMATICALLY
+-- 3. PROVISIONING: A PAGE PER CARD, AS A DRAFT
 -- ---------------------------------------------------------------------------
--- Creates a live page for a customer. The advisory lock serialises every
--- provisioning path for one customer (payment trigger, card issue, fulfilment
--- safety net) now that no unique index does it.
+-- Creates a draft page for a customer. Drafts are never public: the customer
+-- publishes the page themselves (owner decision D-U4; observation O-12 —
+-- publishing on payment would put the account's name and email in front of
+-- anonymous visitors without any action from the customer). The advisory
+-- lock serialises every provisioning path for one customer (payment trigger,
+-- card issue, fulfilment safety net) now that no unique index does it.
 DROP FUNCTION IF EXISTS public.provision_tap_page(UUID, TIMESTAMPTZ);
 
 -- p_experience: the digital experience bought with the card (the order's
@@ -412,27 +455,49 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_slug  TEXT;
-  v_name  TEXT;
-  v_email TEXT;
-  v_tier  TEXT;
-  v_id    UUID;
+  v_slug     TEXT;
+  v_name     TEXT;
+  v_email    TEXT;
+  v_tier     TEXT;
+  v_id       UUID;
+  v_customer UUID;
 BEGIN
+  -- DEC-2026-029 (B1, B2): the page belongs to the auth user (user_id); its
+  -- customer_id is the customer RECORD, resolved here from the user and never
+  -- taken from a caller. On live, customers.id is a random id created at
+  -- sign-up, so writing the user id there fails the foreign key (I-1,
+  -- DEC-2026-024). A database without a customers table (the repository's
+  -- history chain) keys it on the user, as it always did.
+  IF to_regclass('public.customers') IS NOT NULL THEN
+    EXECUTE 'SELECT c.id FROM public.customers c WHERE c.user_id = $1' INTO v_customer USING p_user;
+    IF v_customer IS NULL THEN
+      RAISE EXCEPTION 'No customer record for this account, so no page can be created (DEC-2026-029).'
+        USING ERRCODE = 'P0002';
+    END IF;
+  ELSE
+    v_customer := p_user;
+  END IF;
+
   v_slug := public.generate_tap_slug(p_user);
   SELECT p.full_name, p.email INTO v_name, v_email FROM public.profiles p WHERE p.id = p_user;
   v_tier := public.canonical_experience(
     COALESCE(NULLIF(btrim(COALESCE(p_experience, '')), ''), public.user_max_ui_tier(p_user)));
+  -- Same guard as live provision_tap_on_payment: anything else fails
+  -- tap_profiles_experience_valid.
+  IF v_tier IS NULL OR v_tier NOT IN ('essential', 'business', 'premium', 'goat') THEN
+    v_tier := 'essential';
+  END IF;
 
   INSERT INTO public.tap_profiles
     (user_id, customer_id, status, published, published_at, slug, username, display_name,
      email, selected_ui_tier, enabled_customizations, edit_window_started_at)
-  VALUES (p_user, p_user, 'active', true, NOW(), v_slug, v_slug, v_name,
-          v_email, COALESCE(v_tier, 'essential'), ARRAY['phone', 'email'], p_started)
+  VALUES (p_user, v_customer, 'draft', false, NULL, v_slug, v_slug, v_name,
+          v_email, v_tier, ARRAY['phone', 'email'], p_started)
   RETURNING id INTO v_id;
 
   INSERT INTO public.notifications (user_id, category, title, body, link, metadata)
-  VALUES (p_user, 'tap', 'Your Tap page is live',
-          'shygontech.com/shygontap/' || v_slug || ' is published. Add your details and it updates instantly.',
+  VALUES (p_user, 'tap', 'Your new Tap page is ready',
+          'A page for your card is waiting as a draft. Add your details and publish it when you are ready; nobody can see it until then.',
           '/shygontap/tap', jsonb_build_object('tap_profile_id', v_id, 'slug', v_slug));
 
   RETURN v_id;
@@ -453,7 +518,8 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_tap UUID := NEW.tap_profile_id;
+  v_tap  UUID := NEW.tap_profile_id;
+  v_plan TEXT;
 BEGIN
   IF NEW.replaces_card_id IS NOT NULL THEN
     UPDATE public.cards
@@ -475,10 +541,19 @@ BEGIN
   ORDER BY t.created_at, t.id
   LIMIT 1;
 
+  v_plan := (SELECT COALESCE(o.plan_id, o.plan, 'essential') FROM public.orders o WHERE o.id = NEW.order_id);
+
   IF v_tap IS NULL THEN
-    v_tap := public.provision_tap_page(
-      NEW.user_id, NEW.created_at,
-      (SELECT COALESCE(o.plan_id, o.plan, 'essential') FROM public.orders o WHERE o.id = NEW.order_id));
+    v_tap := public.provision_tap_page(NEW.user_id, NEW.created_at, v_plan);
+  ELSE
+    -- An existing page with no card yet takes the experience bought with this
+    -- card, never a lower one (live raised the customer's page on payment).
+    v_plan := public.canonical_experience(v_plan);
+    IF v_plan IN ('business', 'premium', 'goat') THEN
+      UPDATE public.tap_profiles t
+      SET selected_ui_tier = v_plan
+      WHERE t.id = v_tap AND public.tier_rank(v_plan) > public.tier_rank(t.selected_ui_tier);
+    END IF;
   END IF;
 
   UPDATE public.cards SET tap_profile_id = v_tap WHERE id = NEW.id;
@@ -495,16 +570,22 @@ CREATE TRIGGER trg_cards_link_page
   AFTER INSERT ON public.cards
   FOR EACH ROW EXECUTE FUNCTION public.cards_after_insert();
 
--- Replaces 004's version. The only differences: the page is created live, and
--- there is no `ON CONFLICT (user_id)` — that needed the unique index this file
--- drops. A customer who already has a page gets nothing here; a card they buy
--- gets its own page from cards_after_insert().
+-- Replaces the live version (and 004's). Differences: the page comes from
+-- provision_tap_page() — a draft (D-U4) with a resolved customer_id
+-- (DEC-2026-029) — and there is no `ON CONFLICT (user_id)`, which needed the
+-- unique index this file drops. A customer who already has a page gets no new
+-- one here; a card they buy gets its own page from cards_after_insert().
+-- Kept from live: buying a higher experience as a digital upgrade raises the
+-- customer's pages to it. (With a card, it goes to that card's page:
+-- provision_tap_page / cards_after_insert.)
 CREATE OR REPLACE FUNCTION public.provision_tap_on_payment()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_experience TEXT;
 BEGIN
   IF NEW.payment_status <> 'paid'
      OR OLD.payment_status IS NOT DISTINCT FROM NEW.payment_status
@@ -519,6 +600,17 @@ BEGIN
       NEW.user_id, NEW.created_at,
       CASE WHEN COALESCE(NEW.order_type, 'physical') = 'physical'
            THEN COALESCE(NEW.plan_id, NEW.plan, 'essential') END);
+  END IF;
+
+  -- Live behaviour: a paid digital upgrade switches the customer's pages up
+  -- to the experience it bought. Never down, and a paused page stays paused.
+  v_experience := public.canonical_experience(COALESCE(NULLIF(NEW.plan_id, ''), 'essential'));
+  IF COALESCE(NEW.order_type, 'physical') <> 'physical'
+     AND v_experience IN ('business', 'premium', 'goat') THEN
+    UPDATE public.tap_profiles
+    SET selected_ui_tier = v_experience
+    WHERE user_id = NEW.user_id
+      AND public.tier_rank(v_experience) > public.tier_rank(selected_ui_tier);
   END IF;
 
   -- A page that predates addresses may still lack one.

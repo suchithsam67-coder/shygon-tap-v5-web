@@ -32,7 +32,9 @@ CREATE INDEX IF NOT EXISTS idx_product_reviews_product ON public.product_reviews
 ALTER TABLE public.product_reviews ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.product_reviews FROM anon, authenticated;
 
--- Has this customer paid for a card of this design?
+-- Has this customer paid for a card of this design? The design id is checked
+-- before it goes into the pattern, so a caller cannot pass regex syntax
+-- (".*" would otherwise match every card they ever bought).
 CREATE OR REPLACE FUNCTION public.bought_product(p_user UUID, p_product TEXT)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -40,11 +42,13 @@ STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-  SELECT EXISTS (
+  -- CASE, not AND: Postgres does not promise to evaluate AND left to right.
+  SELECT CASE WHEN COALESCE(p_product ~ '^[a-z0-9-]{2,40}$', false) THEN EXISTS (
     SELECT 1 FROM public.orders o
     JOIN public.order_items i ON i.order_id = o.id
     WHERE o.user_id = p_user AND o.payment_status = 'paid'
-      AND i.sku ~ ('^card-' || p_product || '-(standard|premium)-(pvc|metal|transparent)$'));
+      AND i.sku ~ ('^card-' || p_product || '-(standard|premium)-(pvc|metal|transparent)$'))
+  ELSE false END;
 $$;
 REVOKE ALL ON FUNCTION public.bought_product(UUID, TEXT) FROM PUBLIC, anon, authenticated;
 

@@ -93,8 +93,11 @@ async function buyCard(uid, sku = 'card-business-standard-pvc', extra = {}) {
 }
 
 const cardRow = (id) => one(`SELECT * FROM public.cards WHERE id = $1`, [id]);
+/** What the customer does in the editor to make a draft page public (owner decision D-U4). */
+const publish = (uid, pageId) =>
+  asUser(uid, () => q(`UPDATE public.tap_profiles SET status = 'active', published = true, published_at = NOW() WHERE id = $1`, [pageId]));
 const pagesOf = async (uid) =>
-  (await q(`SELECT id, slug, status FROM public.tap_profiles WHERE user_id = $1 ORDER BY created_at, id`, [uid])).rows;
+  (await q(`SELECT id, slug, status, published FROM public.tap_profiles WHERE user_id = $1 ORDER BY created_at, id`, [uid])).rows;
 
 const alice = await newCustomer('alice@example.com', 'Alice Rao');
 const bob = await newCustomer('bob@example.com', 'Bob Iyer');
@@ -112,18 +115,19 @@ await check('the first card gets a Card ID and opens the page its order provisio
   assert(!/[01IO]/.test(card.card_code), 'the code uses a look-alike character');
   assert(pages.length === 1, `expected 1 page, got ${pages.length}`);
   assert(card.tap_profile_id === pages[0].id, 'card not linked to the page');
-  assert(pages[0].status === 'active', `page was ${pages[0].status}`);
-  return `card ${card.card_code} → /t/${pages[0].slug} (live)`;
+  // D-U4 / O-12: a page is never public until the customer publishes it.
+  assert(pages[0].status === 'draft' && pages[0].published === false, `page was ${pages[0].status}`);
+  return `card ${card.card_code} → /t/${pages[0].slug} (draft)`;
 });
 
-await check('a second card gets its own, separately addressed, live page', async () => {
+await check('a second card gets its own, separately addressed, draft page', async () => {
   second = await buyCard(alice, 'card-rose-marble-premium-metal');
   const card = await cardRow(second.id);
   const pages = await pagesOf(alice);
   assert(pages.length === 2, `expected 2 pages, got ${pages.length}`);
   assert(card.tap_profile_id === pages[1].id, 'second card not on the new page');
   assert(pages[0].slug !== pages[1].slug, 'two pages share an address');
-  assert(pages[1].status === 'active', 'second page is not live');
+  assert(pages[1].status === 'draft' && pages[1].published === false, 'second page must start as a draft');
   return `${pages[0].slug}, ${pages[1].slug}`;
 });
 
@@ -140,7 +144,7 @@ await check('a replayed card insert is refused and creates no page', async () =>
 
 await check('the page-created notification names the new address', async () => {
   const { rows } = await q(
-    `SELECT title FROM public.notifications WHERE user_id = $1 AND title = 'Your Tap page is live'`,
+    `SELECT title FROM public.notifications WHERE user_id = $1 AND title = 'Your new Tap page is ready'`,
     [alice],
   );
   assert(rows.length === 2, `expected 2, got ${rows.length}`);
@@ -168,16 +172,40 @@ await check('a new page opens in the experience bought with its card', async () 
   return `/shygontap/${pages[0].slug} essential, /shygontap/${pages[1].slug} business`;
 });
 
+await check('a paid digital upgrade raises every page, never lowers one (live behaviour kept)', async () => {
+  const erin = (await one(`SELECT id FROM auth.users WHERE email = 'erin@example.com'`)).id;
+  const o = await one(
+    `INSERT INTO public.orders (order_id, user_id, amount_in_paise, payment_status, order_type, plan_id)
+     VALUES ('ST-UPG-1', $1, 99900, 'pending', 'digitalUpgrade', 'premium') RETURNING id`, [erin]);
+  await q(`UPDATE public.orders SET payment_status = 'paid' WHERE id = $1`, [o.id]);
+  const tiers = (await q(`SELECT selected_ui_tier t FROM public.tap_profiles WHERE user_id = $1 ORDER BY created_at, id`, [erin])).rows.map((r) => r.t);
+  assert(tiers.length === 2 && tiers.every((t) => t === 'premium'), tiers.join());
+  const o2 = await one(
+    `INSERT INTO public.orders (order_id, user_id, amount_in_paise, payment_status, order_type, plan_id)
+     VALUES ('ST-UPG-2', $1, 69900, 'pending', 'digitalUpgrade', 'business') RETURNING id`, [erin]);
+  await q(`UPDATE public.orders SET payment_status = 'paid' WHERE id = $1`, [o2.id]);
+  const after = (await q(`SELECT selected_ui_tier t FROM public.tap_profiles WHERE user_id = $1`, [erin])).rows.map((r) => r.t);
+  assert(after.every((t) => t === 'premium'), `lowered: ${after.join()}`);
+  return 'premium on both pages; a later business order lowers nothing';
+});
+
 await check('a card that was never activated says so', async () => {
   const { r } = await one(`SELECT public.get_public_card($1) r`, [first.card_code]);
   assert(r.state === 'not_activated', JSON.stringify(r));
   return 'state=not_activated';
 });
 
-await check('an activated card resolves to its page with its design', async () => {
+await check('an activated card on a draft page opens nothing until the page is published', async () => {
   await q(`SELECT * FROM public.card_apply_verified_action($1, $2, 'activate')`, [alice, second.id]);
-  const { r } = await one(`SELECT public.get_public_card(lower($1)) r`, [second.card_code]);
+  const { r } = await one(`SELECT public.get_public_card($1) r`, [second.card_code]);
+  assert(r.state === 'unavailable' && !r.slug, JSON.stringify(r));
+  return 'state=unavailable, no address given out';
+});
+
+await check('an activated card resolves to its page with its design', async () => {
   const pages = await pagesOf(alice);
+  await publish(alice, pages[1].id);
+  const { r } = await one(`SELECT public.get_public_card(lower($1)) r`, [second.card_code]);
   assert(r.state === 'active', JSON.stringify(r));
   assert(r.slug === pages[1].slug, `slug was ${r.slug}`);
   assert(r.design === 'rose-marble' && r.finish === 'premium' && r.material === 'metal', JSON.stringify(r));
@@ -297,6 +325,7 @@ await check('a page address can be changed, and the old one keeps working', asyn
   const bobPages = await pagesOf(bob);
   assert(pages.length === 0 && bobPages.length === 1, 'setup');
   const old = bobPages[0].slug;
+  await publish(bob, bobPages[0].id);
   const claimed = await asUser(bob, () =>
     one(`SELECT public.claim_tap_slug('bob-builds', $1) s`, [bobPages[0].id]),
   );
@@ -602,6 +631,7 @@ await check('Essential shows WhatsApp but not Instagram; Business shows both', a
   const carol = await newCustomer('carol@example.com', 'Carol Das');
   await buyCard(carol);
   const [page] = await pagesOf(carol);
+  await publish(carol, page.id);
   // What fulfilment's applyProfileDetails writes, as the service role.
   await q(`UPDATE public.tap_profiles SET whatsapp = '+919876543210', instagram = '@carol',
              enabled_customizations = ARRAY['email','phone','instagram','whatsapp'] WHERE id = $1`, [page.id]);
@@ -672,6 +702,15 @@ await check('only a paying customer can review a card, once, and the public sees
   assert(r.reviews[0].author === 'Ravi K.', r.reviews[0].author);
   assert(!text.includes('rev@example.com') && !text.includes(buyer), 'review leaks identity');
   return `1 review, 5★ by ${r.reviews[0].author}; stranger refused; one per customer`;
+});
+
+await check('a pattern in place of a design id unlocks nothing', async () => {
+  const buyer = (await one(`SELECT id FROM auth.users WHERE email = 'rev@example.com'`)).id;
+  for (const pattern of ['.*', 'bus.*', '(']) {
+    const mine = await asUser(buyer, () => one(`SELECT public.my_product_review($1) r`, [pattern]));
+    assert(mine.r.eligible === false, `${pattern}: ${JSON.stringify(mine)}`);
+  }
+  return '".*", "bus.*" and "(" are not eligible';
 });
 
 await check('an admin can hide a review; other customers cannot', async () => {
