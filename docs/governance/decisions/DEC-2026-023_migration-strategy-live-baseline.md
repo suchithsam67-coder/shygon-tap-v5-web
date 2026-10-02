@@ -87,6 +87,15 @@ Deadline: before any new migration (`020_…`) is written.
 - **Handling real findings (from this record):** when the suites move to the baseline, any check that fails because of a real live finding is reported, never weakened.
   - A finding fixed inside M0.3 (for example F1) turns green with its fix.
   - A finding outside M0.3 scope is a **stop condition**: the owner decides how to handle it before CI is changed.
+- **Amendment A-1 (repository owner, in session, 2026-10-02, unit U2): S1 is narrowed to "allowlist only".**
+  - The `--i-know-this-is-not-production` override is **not** implemented.
+  - `db:push` refuses every project ref that is not in the committed allowlist `supabase/non-production-projects.json`. That file is empty today, so it refuses everything.
+  - Adding a project means a reviewed commit to that file (Data Owner + Security Owner per CODEOWNERS; under DEC-2026-018, a 24-hour cool-off plus a checklist review).
+  - **The production project is never added.**
+  - Reason: an override that unlocks any project conflicts with the owner's requirement to "block any attempt to target the production project unless it is explicitly on the approved allowlist".
+- **U2 decision on `APPLY_ALL.sql` (repository owner, 2026-10-02): text only.**
+  - Every recommendation to paste `APPLY_ALL.sql` is removed or replaced with a warning: the `db:push` message, `README.md`, `PRODUCTION.md` §5, and the header that `db:bundle` writes.
+  - The file itself and `db:bundle`'s bundling behaviour are unchanged. Regenerating or deleting them stays an M0.4 item.
 - Expected outcome: new migrations are tested against the live schema, and `db:push` cannot reach production.
 - Remaining limitation (not in this decision): `supabase/APPLY_ALL.sql` and `npm run db:bundle` still bundle 001–019 for manual pasting into the dashboard. That is the same replay hazard by hand. Proposed for M0.4 (doc 12 M0.4: regenerate from baseline + 020+, or delete and document).
 - Decision date: 2026-10-02
