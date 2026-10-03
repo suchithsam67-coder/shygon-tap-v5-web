@@ -16,7 +16,7 @@ import {
 import { cardPriceIndex, fetchCatalog } from '../../services/catalog';
 import { supabase } from '../../lib/supabase';
 import { SITE_URL } from '../../lib/site';
-import { productMeta, productPath } from '../../seo/meta';
+import { productMeta, productPath, type LiveOffer } from '../../seo/meta';
 import { usePageMeta } from '../../seo/usePageMeta';
 import StoreFooter from '../../components/StoreFooter';
 import { editionAvailability, useEditions } from '../../lib/editions';
@@ -45,7 +45,6 @@ function ProductDetailView({ productId }: { productId?: string }) {
   const navigate = useNavigate();
 
   const product = useMemo(() => products.find((p) => p.id === productId), [productId]);
-  usePageMeta(useMemo(() => (product ? productMeta(SITE_URL, product) : null), [product]));
 
   const [material, setMaterial] = useState<MaterialId>('pvc');
   const [tier, setTier] = useState<TierId>('standard');
@@ -56,7 +55,11 @@ function ProductDetailView({ productId }: { productId?: string }) {
 
   // Display prices come from the catalog, with the static copy as a fallback.
   // The server prices the order again at checkout regardless.
-  const [livePrices, setLivePrices] = useState<{ cards: Map<string, number>; experiences: Map<string, number> } | null>(null);
+  const [livePrices, setLivePrices] = useState<{
+    cards: Map<string, number>;
+    experiences: Map<string, number>;
+    inStock: Map<string, boolean>;
+  } | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetchCatalog()
@@ -65,11 +68,25 @@ function ProductDetailView({ productId }: { productId?: string }) {
         setLivePrices({
           cards: cardPriceIndex(catalog),
           experiences: new Map(catalog.experiences.map((item) => [item.id, item.priceInPaise])),
+          inStock: new Map(catalog.cards.map((card) => [card.category, card.inStock])),
         });
       })
       .catch(() => { /* the page still renders from its own copy */ });
     return () => { cancelled = true; };
   }, []);
+
+  // Search engines require the structured-data price to match the page. Once
+  // the catalogue loads, describe exactly the prices the selectors show
+  // (live, else the static copy, per configuration) and its stock.
+  const liveOffer = useMemo<LiveOffer | undefined>(() => {
+    if (!product || !livePrices) return undefined;
+    const prices = TIERS.flatMap((t) => MATERIALS.map((m) => {
+      const live = livePrices.cards.get(`${product.id}-${t}-${m}`);
+      return live === undefined ? product.pricing[t][m] : Math.round(live / 100);
+    }));
+    return { prices, inStock: livePrices.inStock.get(product.id) };
+  }, [product, livePrices]);
+  usePageMeta(useMemo(() => (product ? productMeta(SITE_URL, product, liveOffer) : null), [product, liveOffer]));
 
   // A mistyped or retired card id is a missing page, not the catalog.
   if (!product) return <NotFound />;

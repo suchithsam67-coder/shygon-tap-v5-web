@@ -2,6 +2,8 @@
 
 This answers §31 of the owner brief "Upgrade the existing e-commerce project into a complete, production-ready, full-stack e-commerce platform". The brief asks to inspect everything before changing anything. Nothing has been changed; the decision this feeds is **DEC-2026-034**.
 
+**Correction, 2026-10-03.** Row 23 (SEO) originally listed the sitemap, robots.txt and Product/Breadcrumb JSON-LD as missing. They exist: `src/seo/build.ts` generates them at build time. The inspection's search matched that file, but the file was not read before it was recorded as missing. Row 23 and phase C5 now state what was observed.
+
 Evidence labels follow G§67:
 - **OBSERVED**: read in code, the live schema dump or the branch.
 - **HYPOTHESIZED**: an inference, not verified.
@@ -98,7 +100,7 @@ It is **not deployable** until DEC-2026-033 Q1/Q2 are decided and M0.3's migrati
 | 20 | Vendors / marketplace | none | none | All | **Out of scope**: doc 10 §4 "Organizations / multi-tenancy: do not build", DEC-025 |
 | 21 | Analytics | Admin analytics + Tap analytics | Funnel (026) | Cohorts, profit, exports, date ranges | Medium |
 | 22 | Marketing | none | Promo codes | Campaigns, banners, landing pages | Low now |
-| 23 | SEO | Per-route meta, canonical, OG, prerender (`src/seo`) | n/a | Sitemap, robots.txt, Product/Breadcrumb JSON-LD | High; low risk |
+| 23 | SEO | Per-route title, description, canonical, OG/Twitter; prerendered HTML per public route; `sitemap.xml`, `robots.txt` and `llms.txt`; JSON-LD for Organization, WebSite, Store, FAQPage, ItemList, BreadcrumbList and Product (AggregateOffer). All generated at build by `src/seo/build.ts` | n/a | No CI check of the built output; 4 descriptions over 160 characters; product JSON-LD priced from the static copy while the page shows live prices. **All fixed in C5** | High; low risk |
 | 24 | Security | RLS (55 policies), adversarial suite, CSP, server-side pricing, HMAC webhooks, secret scan in CI | n/a | Rate limiting. **SEC-1 credential rotation NOT DONE (DEC-001)**; O-1…O-12 findings open | High |
 | 25 | Database | See §1 | 022–028 | Tables for every High row above | n/a |
 | 26 | Backend / API | 6 functions + 93 RPCs | Email senders | One per new capability | n/a |
@@ -140,7 +142,7 @@ Each phase ends at a gate (the PASS/BLOCKED report) and needs the owner's approv
 | C2 | Order lifecycle: customer cancel window, return/replacement request, refund records + Razorpay refund API (test mode), GST invoice | C1 |
 | C3 | Shipping: shipment + AWB + tracking events via one aggregator (provider decision), statuses packed / out for delivery, notifications | C2, DEC-031 for channels |
 | C4 | Admin parity in the Expo app for C1–C3, and permission strings for each | C1–C3 |
-| C5 | SEO: sitemap, robots, Product/Breadcrumb JSON-LD | none (can run any time) |
+| C5 | SEO verification: a CI gate on the built output (`npm run test:seo`), fixes for what it finds, and product JSON-LD that matches the live prices and stock the page shows | none (can run any time) |
 
 **Deferred, each with its own future DEC:**
 - vendors/marketplace;

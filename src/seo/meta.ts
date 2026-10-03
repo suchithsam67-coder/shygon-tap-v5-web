@@ -59,6 +59,12 @@ const abs = (site: string, path: string) => (/^https?:/.test(path) ? path : `${s
 const socials = () => [siteContent.contact.instagram, siteContent.contact.linkedin].filter((url) => url && url.trim());
 const contactEmail = (site: string) => `contact@${site.replace(/^https?:\/\//, '')}`;
 
+/**
+ * Search results show about 160 characters of a description and cut the rest
+ * mid-sentence (scripts/ci/check-seo.mjs enforces the limit on the build).
+ */
+export const DESCRIPTION_MAX = 160;
+
 export const productPath = (product: Product) => `/shygontap/store/${product.id}`;
 /** "Shygon Tap Business" -> "Business", so titles don't repeat the brand. */
 const shortName = (product: Product) => product.name.replace(/^shygon tap\s+/i, '');
@@ -145,7 +151,22 @@ export function breadcrumbList(site: string, trail: Array<[name: string, path: s
   };
 }
 
-function productLd(site: string, product: Product): JsonLd {
+/**
+ * What a product page shows once the live catalogue has loaded. Search engines
+ * require structured data to match the visible price, and the page shows the
+ * database's prices, which can differ from the static copy the build uses.
+ */
+export interface LiveOffer {
+  /** Rupee price of every material and finish the page offers. */
+  prices: number[];
+  /** From the catalogue's stock; undefined when the catalogue does not list it. */
+  inStock?: boolean;
+}
+
+function productLd(site: string, product: Product, live?: LiveOffer): JsonLd {
+  const prices = live?.prices.length
+    ? live.prices
+    : Object.values(product.pricing).flatMap((tier) => Object.values(tier));
   return {
     '@type': 'Product',
     '@id': `${site}${productPath(product)}#product`,
@@ -158,9 +179,13 @@ function productLd(site: string, product: Product): JsonLd {
     offers: {
       '@type': 'AggregateOffer',
       priceCurrency: 'INR',
-      lowPrice: lowestPrice(product),
-      highPrice: highestPrice(product),
-      offerCount: Object.values(product.pricing).length * MATERIALS.length,
+      lowPrice: Math.min(...prices),
+      highPrice: Math.max(...prices),
+      offerCount: prices.length,
+      // Only stated when the live catalogue says so; the static build doesn't know.
+      ...(live?.inStock === undefined
+        ? {}
+        : { availability: live.inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' }),
       url: abs(site, productPath(product)),
       seller: { '@id': `${site}/#organization` },
     },
@@ -209,17 +234,34 @@ export function storeMeta(site: string): PageMeta {
   };
 }
 
-export function productMeta(site: string, product: Product): PageMeta {
+/**
+ * The product's own description plus where it starts in price, stepping down
+ * to shorter wording until it fits a search result. The Design Collection
+ * descriptions are long enough that the full sentence ran past the limit.
+ */
+function productDescription(product: Product, fromPrice: number): string {
+  const offer = `In PVC, metal or transparent, from ${rupees(fromPrice)}.`;
+  const candidates = [
+    `${product.description} ${offer} Delivered across India.`,
+    `${product.description} ${offer}`,
+    `${product.shortDescription} ${offer} Delivered across India.`,
+  ];
+  return candidates.find((text) => text.length <= DESCRIPTION_MAX) ?? candidates[candidates.length - 1]!;
+}
+
+/** `live`: the prices and stock the page is showing, once the catalogue has loaded. */
+export function productMeta(site: string, product: Product, live?: LiveOffer): PageMeta {
+  const fromPrice = live?.prices.length ? Math.min(...live.prices) : lowestPrice(product);
   return {
     title: `${shortName(product)} NFC Card | ${BRAND}`,
-    description: `${product.description} In PVC, metal or transparent, from ${rupees(lowestPrice(product))}. Delivered across India.`,
+    description: productDescription(product, fromPrice),
     path: productPath(product),
     image: productShareImage(product),
     imageAlt: `${BRAND} ${shortName(product)} NFC card`,
     type: 'product',
     jsonLd: [
       breadcrumbList(site, [[BRAND, '/shygontap'], ['Store', '/shygontap/store'], [product.name, productPath(product)]]),
-      productLd(site, product),
+      productLd(site, product, live),
     ],
   };
 }
@@ -232,7 +274,7 @@ export const LEGAL_PAGES: Record<LegalPageId, { name: string; path: string; desc
     name: 'Privacy Policy',
     path: '/shygontap/privacy-policy',
     description:
-      'What personal data SHYGON Tap collects, why, who processes it, how long it is kept, and your rights under Indian law, including how to reach our Grievance Officer.',
+      'What personal data SHYGON Tap collects, why, who processes it, how long it is kept, and your rights under Indian law, and how to reach our Grievance Officer.',
   },
   terms: {
     name: 'Terms and Conditions',

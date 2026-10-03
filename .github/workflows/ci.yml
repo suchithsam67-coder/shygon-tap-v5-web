@@ -61,6 +61,10 @@ jobs:
       - name: bundle check (public Tap entry JS <= 90 kB gz; DEC-2026-019)
         run: npm run test:bundle
 
+      # DEC-2026-034 C5: sitemap, robots, per-page meta and JSON-LD of the build.
+      - name: SEO gate (sitemap, robots, meta, structured data)
+        run: npm run test:seo
+
       # DEC-2026-023 S1 (amendment A-1): db:push refuses every project not on
       # the committed allowlist, sends only 020+, and checks before any network
       # call. Runs with outbound network denied; no credential is involved.
