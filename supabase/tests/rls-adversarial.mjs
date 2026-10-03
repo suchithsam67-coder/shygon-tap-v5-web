@@ -350,6 +350,165 @@ await check('a customer cannot promote themselves by UPDATE on admin_users', () 
   asRole('authenticated', ALICE, () =>
     blockedWrite(`UPDATE public.admin_users SET role = 'owner' WHERE user_id = '${ADMIN}'`)));
 
+console.log('\n=== F1: only an administrator changes suspension (migration 020) ===');
+
+// Bob owns the Tap 'bob-slug' and his account; Alice is another customer;
+// ADMIN holds the 'admin' role (tap.moderate, customers.manage). Rows are read
+// back as the superuser so a refusal is proven by the data, not by the error.
+const bobTapId = (await db.query(`SELECT id FROM public.tap_profiles WHERE user_id = '${BOB}'`)).rows[0].id;
+const bobTap = async () =>
+  (await db.query(`SELECT suspended_at, suspended_reason, suspended_by FROM public.tap_profiles WHERE id = $1`, [bobTapId])).rows[0];
+const bobAccount = async () =>
+  (await db.query(`SELECT suspended_at, suspended_reason FROM public.profiles WHERE id = '${BOB}'`)).rows[0];
+const auditCount = async (action) =>
+  (await db.query(`SELECT count(*)::int AS n FROM public.admin_audit_log WHERE admin_id = '${ADMIN}' AND action = $1`, [action])).rows[0].n;
+
+/** The 020 guard must refuse with 42501 and leave the row exactly as it was. */
+async function refusedByGuard(sql, read) {
+  const before = JSON.stringify(await read());
+  let err = null;
+  try {
+    await asRole('authenticated', BOB, () => db.query(sql));
+  } catch (e) {
+    err = e;
+  }
+  assert(err, 'NOT REFUSED — the customer changed their own suspension');
+  assert(err.code === '42501', `refused with ${err.code}, expected 42501: ${err.message}`);
+  assert(/Suspension can only be changed by SHYGON support/.test(err.message), `unexpected refusal: ${err.message}`);
+  assert(JSON.stringify(await read()) === before, 'the row changed despite the refusal');
+  return 'refused 42501, row unchanged';
+}
+
+await check('admin suspends a Tap through admin_set_tap_suspension (positive)', async () => {
+  const audits = await auditCount('tap.suspended');
+  await asRole('authenticated', ADMIN, () =>
+    db.query(`SELECT public.admin_set_tap_suspension($1, true, 'F1 test: tap suspension')`, [bobTapId]));
+  const t = await bobTap();
+  assert(t.suspended_at !== null, 'suspended_at was not set');
+  assert(t.suspended_reason === 'F1 test: tap suspension', `reason was ${t.suspended_reason}`);
+  assert(t.suspended_by === ADMIN, `suspended_by was ${t.suspended_by}`);
+  assert((await auditCount('tap.suspended')) === audits + 1, 'no tap.suspended audit row');
+  const s = await asRole('anon', null, () => db.query(`SELECT public.get_public_tap_state('bob-slug') AS v`));
+  assert(s.rows[0].v === 'unavailable', `public state was ${s.rows[0].v}`);
+  return 'suspended_at, reason, admin recorded; audited; public state unavailable';
+});
+
+await check('customer cannot clear tap_profiles.suspended_at', () =>
+  refusedByGuard(`UPDATE public.tap_profiles SET suspended_at = NULL WHERE user_id = '${BOB}'`, bobTap));
+
+await check('customer cannot modify tap_profiles.suspended_reason', () =>
+  refusedByGuard(`UPDATE public.tap_profiles SET suspended_reason = 'changed by owner' WHERE user_id = '${BOB}'`, bobTap));
+
+await check('customer cannot modify tap_profiles.suspended_by', () =>
+  refusedByGuard(`UPDATE public.tap_profiles SET suspended_by = '${BOB}' WHERE user_id = '${BOB}'`, bobTap));
+
+await check('customer cannot clear all three Tap suspension columns at once', () =>
+  refusedByGuard(
+    `UPDATE public.tap_profiles SET suspended_at = NULL, suspended_reason = NULL, suspended_by = NULL WHERE user_id = '${BOB}'`,
+    bobTap,
+  ));
+
+await check("another customer cannot change Bob's Tap suspension (control)", async () => {
+  const r = await asRole('authenticated', ALICE, () =>
+    db.query(`UPDATE public.tap_profiles SET suspended_at = NULL WHERE user_id = '${BOB}'`));
+  assert((r.affectedRows ?? 0) === 0, `affected ${r.affectedRows} row(s)`);
+  assert((await bobTap()).suspended_at !== null, 'the suspension was cleared');
+  return '0 rows; still suspended';
+});
+
+await check('a non-admin cannot invoke admin_set_tap_suspension (control)', async () => {
+  let err = null;
+  try {
+    await asRole('authenticated', ALICE, () =>
+      db.query(`SELECT public.admin_set_tap_suspension($1, false, NULL)`, [bobTapId]));
+  } catch (e) {
+    err = e;
+  }
+  assert(err?.code === '42501', `expected 42501, got ${err ? err.code : 'success'}`);
+  assert((await bobTap()).suspended_at !== null, 'the suspension was cleared');
+  return `refused 42501 (${err.message.slice(0, 50)})`;
+});
+
+await check('admin restores the Tap through admin_set_tap_suspension (positive)', async () => {
+  const audits = await auditCount('tap.restored');
+  await asRole('authenticated', ADMIN, () =>
+    db.query(`SELECT public.admin_set_tap_suspension($1, false, NULL)`, [bobTapId]));
+  const t = await bobTap();
+  assert(t.suspended_at === null && t.suspended_reason === null && t.suspended_by === null, JSON.stringify(t));
+  assert((await auditCount('tap.restored')) === audits + 1, 'no tap.restored audit row');
+  const s = await asRole('anon', null, () => db.query(`SELECT public.get_public_tap_state('bob-slug') AS v`));
+  assert(s.rows[0].v === 'active', `public state was ${s.rows[0].v}`);
+  return 'all three cleared; audited; public state active';
+});
+
+await check('the owner can still update ordinary fields (positive)', async () => {
+  const tap = await asRole('authenticated', BOB, () =>
+    db.query(`UPDATE public.tap_profiles SET display_name = 'Bob (edited)' WHERE user_id = '${BOB}'`));
+  assert(tap.affectedRows === 1, `Tap update affected ${tap.affectedRows} row(s)`);
+  const acct = await asRole('authenticated', BOB, () =>
+    db.query(`UPDATE public.profiles SET full_name = 'Bob Edited' WHERE id = '${BOB}'`));
+  assert(acct.affectedRows === 1, `account update affected ${acct.affectedRows} row(s)`);
+  // An upsert that re-sends the suspension columns unchanged is not a change.
+  const same = await asRole('authenticated', BOB, () =>
+    db.query(`UPDATE public.profiles SET suspended_at = suspended_at, suspended_reason = suspended_reason, full_name = 'Bob' WHERE id = '${BOB}'`));
+  assert(same.affectedRows === 1, `unchanged re-send affected ${same.affectedRows} row(s)`);
+  return 'display_name, full_name and an unchanged re-send all succeed';
+});
+
+await check('admin suspends the account through admin_set_customer_suspension (positive)', async () => {
+  const audits = await auditCount('customer.suspended');
+  await asRole('authenticated', ADMIN, () =>
+    db.query(`SELECT public.admin_set_customer_suspension($1, true, 'F1 test: account suspension')`, [BOB]));
+  const a = await bobAccount();
+  const t = await bobTap();
+  assert(a.suspended_at !== null && a.suspended_reason === 'F1 test: account suspension', JSON.stringify(a));
+  assert(t.suspended_at !== null && t.suspended_by === ADMIN, `Tap not suspended with the account: ${JSON.stringify(t)}`);
+  assert((await auditCount('customer.suspended')) === audits + 1, 'no customer.suspended audit row');
+  return 'account and Tap suspended; admin recorded; audited';
+});
+
+await check('customer cannot clear profiles.suspended_at', () =>
+  refusedByGuard(`UPDATE public.profiles SET suspended_at = NULL WHERE id = '${BOB}'`, bobAccount));
+
+await check('customer cannot modify profiles.suspended_at', () =>
+  refusedByGuard(`UPDATE public.profiles SET suspended_at = now() - interval '1 day' WHERE id = '${BOB}'`, bobAccount));
+
+await check('customer cannot modify profiles.suspended_reason', () =>
+  refusedByGuard(`UPDATE public.profiles SET suspended_reason = 'changed by owner' WHERE id = '${BOB}'`, bobAccount));
+
+await check("another customer cannot change Bob's account suspension (control)", async () => {
+  const r = await asRole('authenticated', ALICE, () =>
+    db.query(`UPDATE public.profiles SET suspended_at = NULL WHERE id = '${BOB}'`));
+  assert((r.affectedRows ?? 0) === 0, `affected ${r.affectedRows} row(s)`);
+  assert((await bobAccount()).suspended_at !== null, 'the suspension was cleared');
+  return '0 rows; still suspended';
+});
+
+await check('a non-admin cannot invoke admin_set_customer_suspension (control)', async () => {
+  let err = null;
+  try {
+    await asRole('authenticated', ALICE, () =>
+      db.query(`SELECT public.admin_set_customer_suspension($1, false, NULL)`, [BOB]));
+  } catch (e) {
+    err = e;
+  }
+  assert(err?.code === '42501', `expected 42501, got ${err ? err.code : 'success'}`);
+  assert((await bobAccount()).suspended_at !== null, 'the suspension was cleared');
+  return `refused 42501 (${err.message.slice(0, 50)})`;
+});
+
+await check('admin restores the account through admin_set_customer_suspension (positive)', async () => {
+  const audits = await auditCount('customer.reactivated');
+  await asRole('authenticated', ADMIN, () =>
+    db.query(`SELECT public.admin_set_customer_suspension($1, false, NULL)`, [BOB]));
+  const a = await bobAccount();
+  const t = await bobTap();
+  assert(a.suspended_at === null && a.suspended_reason === null, JSON.stringify(a));
+  assert(t.suspended_at === null && t.suspended_reason === null && t.suspended_by === null, JSON.stringify(t));
+  assert((await auditCount('customer.reactivated')) === audits + 1, 'no customer.reactivated audit row');
+  return 'account and Tap cleared; audited';
+});
+
 console.log('\n=== anonymous visitor ===');
 
 // Denial may arrive as 0 rows or as a refusal (owner decision D-U1-b,

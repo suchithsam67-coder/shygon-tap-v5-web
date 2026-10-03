@@ -68,7 +68,7 @@ Each unit ends with: tests written, all gates in §5 green (or a stop), a focuse
 - Text only (owner, 2026-10-02): every recommendation to paste `APPLY_ALL.sql` is replaced with a warning (the `db:push` message, `README.md`, `PRODUCTION.md` §5, the header text `db:bundle` writes, `supabase/migrations/README.md`). The file and `db:bundle`'s bundling are unchanged (M0.4).
 - Tested without network access (`npm run test:push-guard`, 18 checks), including a no-network-on-refusal check for every refusal path. CODEOWNERS protects the allowlist and guard files (Data + Security).
 
-### U3: F1, customer cannot un-suspend their own Tap or account (DEC-2026-022 Position A)
+### U3: F1, customer cannot un-suspend their own Tap or account (DEC-2026-022 Position A): DONE locally 2026-10-03 (migration 020; not applied)
 - **Verify first** on the baseline (expected, STATIC): an owner can clear `tap_profiles.suspended_at/_reason/_by` and `profiles.suspended_at/_reason` by direct UPDATE (`*_update_own` policies; `GRANT ALL` to `authenticated`; no guard trigger).
 - **Migration `020_guard_suspension_columns.sql`** (name per doc 12 §3):
   - adds a BEFORE UPDATE trigger function and triggers on `tap_profiles` and `profiles`;

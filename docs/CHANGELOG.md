@@ -5,6 +5,35 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M0.3 U3 complete locally: F1 suspension guard (2026-10-03), branch `feat/m0.3-security-identity`
+**Added** (DEC-2026-022 Position A; L3)
+- `supabase/migrations/020_guard_suspension_columns.sql`. A BEFORE UPDATE trigger (`guard_suspension_columns()`) on `tap_profiles` and `profiles` refuses, with **42501**, any change made by a client role (`anon` / `authenticated`) to:
+  - `tap_profiles.suspended_at` / `suspended_reason` / `suspended_by`;
+  - `profiles.suspended_at` / `suspended_reason`.
+- How the guard works:
+  - It judges the caller's role, not `is_admin()`. The SECURITY DEFINER admin RPCs `admin_set_tap_suspension` and `admin_set_customer_suspension` run as their owner, so they keep working **unchanged**.
+  - It compares old and new values, so an unchanged re-send is allowed.
+  - The triggers are named `zz_` so they run last.
+  - No policy, grant or existing function changed.
+  - The migration includes rollback SQL and read-only VERIFY ON LIVE queries. It is idempotent.
+- `supabase/tests/rls-adversarial.mjs`: **16 F1 checks.**
+  - Refused, row unchanged: customer clears or changes each protected column, Tap and account.
+  - Admin suspend and restore still work: fields set and cleared, audit rows written, public state follows.
+  - The owner can still edit ordinary fields.
+  - Controls: another customer gets 0 rows; a non-admin calling either RPC gets 42501.
+  - The D-U1-b anonymous checks are unchanged.
+
+**Evidence**
+- The stage-1 probe (pre-implementation) confirmed F1 on the live baseline.
+- rls-adversarial: **64/64** with 020.
+- **Negative control:** without 020, the 9 refusal checks fail (scratch run).
+- `db:apply` applies 020 twice.
+- Bundle unchanged at 88.55 kB.
+
+**Known, unchanged:** `db:verify` is 6/21, entirely the I-1 cascade (fixed in U4).
+
+**Not done:** not applied to any real database; no production contact, deployment or push. It waits for the DEC-2026-018 24-hour cool-off and checklist approval. U4–U7 not started.
+
 ### Secret-scan finding classified (2026-10-02), governance only
 **Context:** the full-history secret scan (`npm run test:secrets`) reports one finding:
 - `generic-api-key` at `src/components/ProjectConsultation.tsx:75`, in commit `9c8caa7`;
