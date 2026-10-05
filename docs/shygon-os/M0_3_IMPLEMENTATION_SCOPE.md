@@ -78,7 +78,19 @@ Each unit ends with: tests written, all gates in §5 green (or a stop), a focuse
   - The legacy `tap_profiles.suspended` boolean: no live function or repository code reads it (OBSERVED). Whether the Admin APK does is unknown (DEC-2026-016).
   - `tap_profiles.status`: live has no "suspended" status value, so doc 12's "status moving out of a suspended state" does not apply.
 
-### U4: Identity contract + P1 payment/fulfilment defect (DEC-2026-029 A, DEC-2026-024 A)
+### U4: Identity contract + P1 payment/fulfilment defect (DEC-2026-029 A, DEC-2026-024 A): DONE locally 2026-10-05 (migration 021; committed, not applied)
+> **Implementation notes (2026-10-03, updated 2026-10-05):**
+> - The "trigger" is two triggers per table, `trg_*_customer_id_client` and `trg_*_customer_id_server`. Both call the SECURITY DEFINER function `resolve_customer_id()`. Each trigger's WHEN clause reads `current_user` as the caller, which is the 020 rule, and passes the caller class as a fixed argument.
+>   - The function must run as its owner, because `customers` is closed to the API roles.
+> - Behaviour beyond point 4, where point 4 is silent:
+>   - NULL and an unchanged UPDATE are left alone;
+>   - a client writing `customer_id` on another account's row is refused with 42501, before any customers row is created.
+> - Owner decisions (2026-10-05, superseding 2026-10-03; details in DEC-2026-024):
+>   - notification title "Your SHYGON Tap draft is ready", body unchanged from 2026-10-03;
+>   - customer-code collision fallback (O-13): deterministic, one hex digit longer at a time up to 32, then `-2` … `-1000`.
+> - Newly observed on the baseline:
+>   - `profiles.customer_id` and `tap_profiles.customer_id` are also UNIQUE;
+>   - O-14, a customer can insert their own active Tap without paying (pre-existing; recorded in `docs/DECISIONS.md`).
 - **Reproduce first** on the baseline:
   - I-1: the first-time-buyer claim fails with `23503`;
   - I-2: a profile save fails;

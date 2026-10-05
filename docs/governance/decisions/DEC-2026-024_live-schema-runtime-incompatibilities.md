@@ -101,6 +101,19 @@ Each item was CONFIRMED in an isolated rebuild of the live baseline and compared
   - **Decision:** the function is changed in U4 so that it **creates the Tap as an unpublished draft**. This reverses scope point 5.
   - Signature and trigger are unchanged.
   - **Open detail for U4, to be raised there:** the function's notification text, "Your SHYGON Tap is live", would no longer be accurate for a draft.
+- **Owner decisions for U4 (repository owner, in session; 2026-10-05 supersedes 2026-10-03 where they differ):**
+  1. **Notification wording.** This closes the open detail above. The Tap stays an unpublished draft.
+     - Title: "Your SHYGON Tap draft is ready" (2026-10-05). It replaces "Your SHYGON Tap is ready" (2026-10-03). There is no full stop, matching the other notification titles.
+     - Body: "Your Tap page has been created. Review and publish it from your SHYGON dashboard." (2026-10-03, unchanged).
+  2. **Customer-code collisions (observation O-13) in the `customer_id_for()` helper.**
+     - Keep the 10-hex-digit `CUST-` format for normal cases. On a collision, do not fail, and never overwrite an existing customer.
+     - **2026-10-05: the fallback is deterministic.** It lengthens the code one hex digit at a time (11 … 32, the whole user id) and keeps the first free code.
+     - If even the 32-digit code is taken, it appends `-2`, `-3` … `-1000`, then refuses with 23505. Every attempt is inserted with `ON CONFLICT DO NOTHING`.
+     - This replaces the 2026-10-03 version (16, then 32, then a random suffix).
+     - Sign-up (`handle_new_user`) is not changed, so O-13 stays open there.
+- **Implementation (local only):** `supabase/migrations/021_resolve_customer_id.sql`, plus the `identity-contract.mjs`, `golden-public-tap.mjs` and `admin-contract.mjs` suites. First built on 2026-10-03, updated on 2026-10-05 to the decisions above, and committed on branch `feat/m0.3-security-identity` once its gates passed.
+  - It has **not** been applied anywhere. It waits for the DEC-2026-018 24-hour cool-off and checklist review.
+  - Live payments stay OFF.
 - **Not covered, still OPEN:**
   - **I-4** card-record creation: depends on DEC-2026-028 + DEC-2026-002, and on finding E-3 (`fulfil_order()` also omits `card_id`).
   - **I-5:** VERIFY ON LIVE where `pgcrypto` lives.

@@ -5,6 +5,41 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### M0.3 U4 complete locally: customer_id resolution and the draft first-payment Tap (2026-10-05), branch `feat/m0.3-security-identity`
+**Added** (DEC-2026-024 Option A + D-U4, DEC-2026-029 Option A; L3; owner decisions of 2026-10-05, superseding 2026-10-03)
+- `supabase/migrations/021_resolve_customer_id.sql`:
+  - `customer_id_for(uuid)`, a SECURITY DEFINER helper executable by `service_role` only. It returns the account's `customers.id`, or creates the row.
+    - It uses the live `CUST-` + 10 hex digits code.
+    - On a collision it lengthens the code deterministically, one hex digit at a time up to all 32, then appends `-2` … `-1000`, then refuses with 23505. It never overwrites an existing customer (O-13).
+  - `resolve_customer_id()` with two WHEN-gated triggers per table on `profiles` and `tap_profiles` (BEFORE INSERT / UPDATE OF `customer_id`):
+    - the account's own user id is mapped to its `customers.id`;
+    - a client sending any other value, except its own `customers.id`, gets **42501**;
+    - server values are left to the FK.
+  - `provision_tap_on_payment()` (D-U4): the first-payment Tap is created as a **draft** (`status 'draft'`, `published false`), with the notification "Your SHYGON Tap draft is ready" / "Your Tap page has been created. Review and publish it from your SHYGON dashboard."
+    - The body differs from live by exactly those literals. Signature, grants and trigger are unchanged.
+  - Rollback SQL is in the header and tested. VERIFY ON LIVE queries are included. The migration is idempotent.
+- `supabase/tests/identity-contract.mjs` (`npm run test:identity`): **69 checks.**
+  - Run twice (migrations applied once, then twice): I-1 claim, D-U4 draft and notification, anonymous visibility, returning buyer, failed payment, duplicate claim, missing customer, rollback on failure, retry plus safety net (I-3), Settings / Checkout saves (I-2), client refusals (B2), server rules, helper privileges, the deterministic collision sequence (11 digits, 12 digits, full id `-3`, and the 23505 cap after 1022 candidates), and O-13 at sign-up (characterised, open).
+  - The 021 rollback proof runs once.
+- `supabase/tests/golden-public-tap.mjs` + `golden/public-tap.json` (`npm run test:golden`):
+  - 30 slugs, including the F3 card-state characterisations;
+  - output byte-identical on the baseline, +020 and +020+021.
+- `supabase/tests/admin-contract.mjs` + `golden/admin-contract.json` (`npm run test:admin-contract`):
+  - 61 frozen functions: signatures, grants, `search_path` and bodies (only the approved D-U4 body change allowed);
+  - every other function, every policy, every table grant and every existing trigger unchanged.
+- `package.json` (scripts only: the three suites, added to `test:db`) and `.github/workflows/ci.yml` (three steps).
+
+**Evidence**
+- `db:verify` is **21/21** (6/21 before).
+- rls-adversarial 64/64; history 2/2.
+- **Negative controls (scratch):**
+  - without 021, identity-contract fails 51/69 and admin-contract fails the D-U4 check;
+  - a fallback that skips code lengths fails the 4 collision checks in both passes;
+  - with the client branch disabled, the 12 client refusals fail;
+  - mutant migrations (a grant, a `search_path`, a policy, a resolver body) are caught by admin-contract and golden.
+
+**Not done:** not applied to any real database; no production contact, deployment or push. Committed locally after its gates passed (owner authorization of 2026-10-05; the full-history secret scan's only failure is the known 9c8caa7 exception). It waits for the DEC-2026-018 24-hour cool-off and checklist approval. `handle_new_user` (O-13 at sign-up) and O-14 (a customer can create their own active Tap directly) are recorded, not fixed.
+
 ### M0.3 U3 complete locally: F1 suspension guard (2026-10-03), branch `feat/m0.3-security-identity`
 **Added** (DEC-2026-022 Position A; L3)
 - `supabase/migrations/020_guard_suspension_columns.sql`. A BEFORE UPDATE trigger (`guard_suspension_columns()`) on `tap_profiles` and `profiles` refuses, with **42501**, any change made by a client role (`anon` / `authenticated`) to:

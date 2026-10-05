@@ -80,6 +80,22 @@ jobs:
       - name: rls-adversarial (live baseline)
         run: node supabase/tests/rls-adversarial.mjs
 
+      # M0.3 U4 (DEC-2026-024 A, DEC-2026-029 A): the identity contract and the
+      # paid-order claim, run twice (migrations applied once, then twice), plus
+      # the 021 rollback proof.
+      - name: identity contract (live baseline)
+        run: npm run test:identity
+
+      # Doc 12 §0 rule 4: /t/<slug> output byte-identical to the live baseline
+      # after every migration from 020 on, and to the committed golden file.
+      - name: golden public Tap (live baseline)
+        run: npm run test:golden
+
+      # Doc 12 §2: frozen function signatures, grants and bodies; no policy,
+      # table grant or existing trigger changed by 020 onward.
+      - name: admin contract (live baseline)
+        run: npm run test:admin-contract
+
       # Catalogue seed data inserted by 001–019 (owner decision D-U1-a):
       # isolated PGlite, history chain only, never live.
       - name: migration-history seed checks
