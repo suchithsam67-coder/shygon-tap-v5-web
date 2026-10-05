@@ -14,7 +14,7 @@
 | Priority | **P0 triage (provisional)** until the exposure history is established. The pack's classification was I3 U3 Irr1 R2 = 9 → P1 · matrix P0 · Final P1 (doc 13 §1.1). See the priority change below. |
 | Deadline | Immediate |
 | Credential rotation | **NOT DONE.** Assume this until a human explicitly confirms otherwise. |
-| doc 12 §2A gate ("any work at all") | **WAIVED FOR M0.3 ONLY** by the repository owner, 2026-10-02, in session. See "Waiver" below. Rotation remains required. |
+| doc 12 §2A gate ("any work at all") | **WAIVED FOR M0.3** (2026-10-02) **and for SHYGON V6 development / release-candidate work** (2026-10-05) by the repository owner, in session. See "Waiver" and "Extension" below. Rotation remains required, and is a V6 release requirement. |
 | Production data | **UNKNOWN — HUMAN CONFIRMATION REQUIRED.** It has not been inspected, and must not be inspected just to answer this question. |
 
 ## Priority change (G§76)
@@ -95,6 +95,16 @@ Any one of these confirms a P0:
 | Conditions | 1. Live payments stay OFF (Razorpay test mode only; no `rzp_live_`). 2. No credential from `.env`, `.env.*` or any ZIP is read, loaded or used. All work runs on local PGlite and on clean clones without `.env`. 3. No production access, migration apply or deployment by Claude Code. 4. Nothing produced in M0.3 is applied to production until the owner has rotated, or explicitly extends this waiver in writing. |
 | Expires | When M0.3 is reported complete, or earlier if the owner withdraws it |
 | Risk accepted | Development continues while the exposure history of `.claude (2).zip` and the other project ZIPs is unestablished. M0.3 adds no new use of any credential. |
+
+## Extension of the waiver to SHYGON V6 (2026-10-05)
+| Field | Value |
+|---|---|
+| What is waived | The same doc 12 §2A first row, now also for the **SHYGON V6 development and release-candidate work** (stages 2–6, `docs/v6/`), in addition to M0.3 |
+| Waived by | Repository owner, in session, 2026-10-05 (decision D-1 of the V6 Stage 1 audit; recorded in DEC-2026-035) |
+| What is NOT waived | **Rotation itself:** still required and NOT DONE. It is a **release requirement** for V6: no production deployment, production migration apply or live payment before it is done and evidenced here. Everything listed as not waived in the M0.3 waiver above also still applies |
+| Conditions | 1. **No credential is rotated during V6 implementation unless the owner explicitly authorizes it in session.** 2. No secret is printed, logged, committed or pasted anywhere (chat, docs, commit messages, CI logs). 3. No credential from `.env`, `.env.*` or any ZIP is read, loaded or used; work runs on local PGlite and clean worktrees without `.env`. 4. **No security control is weakened because of this waiver.** 5. The exact rotation procedure is prepared: `docs/runbooks/RUNBOOK-secrets.md` |
+| Expires | When the V6 release candidate reaches the production gate (Stage 6), or earlier if the owner withdraws it. **It is temporary: credentials may not stay unrotated indefinitely.** |
+| Risk accepted | V6 development continues while the exposure history of the project ZIPs is unestablished. V6 adds no new use of any credential |
 
 ## Decision
 - **Decision:** ________ (HUMAN ACTION REQUIRED)
