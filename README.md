@@ -38,10 +38,11 @@ npm run db:verify    # behaviour checks on that database
 npm run db:push      # 020+ only, and only to a project on supabase/non-production-projects.json
 ```
 
-> **Do not paste `supabase/APPLY_ALL.sql` into any Supabase SQL editor.** It bundles
-> the 001–019 history; replaying it onto the live project changes dozens of objects and
-> breaks sign-up (`docs/governance/SCHEMA_DRIFT_REPORT.md`). `npm run db:bundle` still
-> regenerates it from the same history; that is unchanged until M0.4.
+> **`supabase/APPLY_ALL.sql` contains only the migrations from 020 onward** (SHYGON V6,
+> V6-040). The 001–019 history is no longer bundled and must never be replayed on live
+> (`docs/governance/SCHEMA_DRIFT_REPORT.md`). Even so, apply nothing from it except at the
+> human production gate: each migration needs its VERIFY ON LIVE queries and its
+> DEC-2026-018 approval first. `npm run db:bundle` regenerates it, and CI fails if it is stale.
 
 Run `db:apply` and `db:verify` after changing anything under
 `supabase/migrations/`.

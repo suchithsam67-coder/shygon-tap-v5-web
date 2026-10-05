@@ -1,0 +1,50 @@
+-- 023: a customer can no longer create a Tap row directly. A Tap exists only
+-- after payment (O-14).
+--
+-- Decision:  DEC-2026-035 D-6 (owner, 2026-10-05: "Taps only after payment");
+--            backlog V6-012; migration numbering N-1.
+-- Level:     L3 (an RLS policy). Under DEC-2026-018 it needs a 24-hour cool-off
+--            plus the checklist review before it is approved or applied. Never
+--            applied by tooling to production.
+-- Origin:    the live schema baseline (DEC-2026-023 Option A), after 020-022.
+-- Data:      none. Existing Taps, whoever created them, are untouched.
+--
+-- THE PROBLEM (live baseline; observation O-14, confirmed 2026-10-03)
+--   The policy tap_profiles_insert_own lets any signed-in account insert its own
+--   tap_profiles row. With status 'active' the row is published at once, so an
+--   account that never paid gets a public Tap. The customers.id the row needs is
+--   readable from the account's own profile row, and since 021 the account's
+--   own user id is accepted as well.
+--
+-- THE FIX
+--   Drop tap_profiles_insert_own. With row level security on and no INSERT
+--   policy, every INSERT from anon or authenticated is refused (42501).
+--   Taps keep being created by:
+--     - provision_tap_on_payment(): SECURITY DEFINER, runs as the owner (021 draft);
+--     - the fulfilment safety net and other server code: service_role
+--       (BYPASSRLS on Supabase);
+--     - an administrator, through SECURITY DEFINER functions.
+--   The browser never inserts Tap rows (src/services/tap.ts only selects,
+--   updates and calls RPCs), so no V5 screen changes. Owners still edit,
+--   publish and pause their own Tap through tap_profiles_update_own (unchanged).
+--   Grants are not changed: the policy, not the grant, is the control here, as
+--   on every other table.
+--
+-- VERIFY ON LIVE before applying (read-only, human):
+--   SELECT policyname, cmd, roles::text, with_check FROM pg_policies
+--    WHERE tablename = 'tap_profiles' AND cmd = 'INSERT';
+--                                         -- exactly tap_profiles_insert_own
+--   SELECT count(*) FROM public.tap_profiles t
+--    WHERE NOT EXISTS (SELECT 1 FROM public.orders o
+--                       WHERE o.user_id = t.user_id AND o.payment_status = 'paid');
+--                                         -- Taps without a paid order (O-14 exposure so far)
+--
+-- ROLLBACK (begin)
+-- DROP POLICY IF EXISTS tap_profiles_insert_own ON public.tap_profiles;
+-- CREATE POLICY tap_profiles_insert_own ON public.tap_profiles FOR INSERT
+--   WITH CHECK ((( SELECT auth.uid() AS uid) = user_id));
+-- ROLLBACK (end)
+--
+-- Idempotent: safe to run more than once.
+
+DROP POLICY IF EXISTS tap_profiles_insert_own ON public.tap_profiles;

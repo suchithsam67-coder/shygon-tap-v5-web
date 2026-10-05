@@ -1,86 +1,79 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { PGlite } from '@electric-sql/pglite';
+import { createLiveDb, newMigrations, ROOT } from './lib/live-db.mjs';
 
 /**
- * Concatenates every migration, in order, into `supabase/APPLY_ALL.sql`, then
- * proves the bundle by executing it as a single statement batch against a real
- * Postgres.
+ * Writes `supabase/APPLY_ALL.sql`: the migrations from 020 onward, in order,
+ * and proves the bundle by executing it, twice, on the live schema baseline.
  *
- * WARNING (DEC-2026-023, 2026-10-02): the bundle contains the 001–019 history,
- * which was applied on live before the live schema baseline was captured and
- * must never be re-applied. APPLY_ALL.sql is NOT to be pasted into any Supabase
- * SQL editor. Only this text changed in M0.3 U2. What the script bundles is
- * unchanged, and regenerating or deleting it is an M0.4 decision.
+ * Since SHYGON V6 (DEC-2026-035, backlog V6-040) the bundle contains ONLY the
+ * migrations written for the live baseline (DEC-2026-023 Option A). The
+ * 001–019 history, which must never be replayed on live, is no longer bundled.
+ *
+ * The bundle is a convenience for the human production gate, not a shortcut
+ * around it: each migration still needs its VERIFY ON LIVE queries and its
+ * DEC-2026-018 approval before it is applied.
+ *
+ *   npm run db:bundle                          regenerate and prove
+ *   node supabase/tests/bundle.mjs --check     fail if the committed bundle is stale
  */
 
-const HERE = fileURLToPath(new URL('.', import.meta.url));
-const MIGRATIONS = path.join(HERE, '..', 'migrations');
-const OUT = path.join(HERE, '..', 'APPLY_ALL.sql');
-
-const files = fs
-  .readdirSync(MIGRATIONS)
-  .filter((f) => f.endsWith('.sql'))
-  .sort();
+const OUT = path.join(ROOT, 'supabase', 'APPLY_ALL.sql');
+const CHECK = process.argv.includes('--check');
+const migrations = newMigrations();
 
 const header = `-- ============================================================================
--- SHYGON TAP — ALL MIGRATIONS, IN ORDER
+-- SHYGON — MIGRATIONS 020 ONWARD, IN ORDER (live-baseline migrations only)
 -- ============================================================================
 -- GENERATED FILE. Do not edit: change the numbered files in
 -- supabase/migrations/ and re-run \`npm run db:bundle\`.
 --
--- DO NOT PASTE THIS FILE INTO ANY SUPABASE SQL EDITOR (DEC-2026-023).
---   It contains the 001–019 history. Those migrations were applied on live
---   before the live schema baseline was captured, and replaying them onto live
---   changes dozens of objects and breaks sign-up
---   (docs/governance/SCHEMA_DRIFT_REPORT.md). New work starts at 020 and is
---   applied only through the approved path (supabase/migrations/README.md).
+-- Contains ONLY the migrations written for the live schema baseline
+-- (DEC-2026-023 Option A). The 001–019 history is NOT in this file and must
+-- never be re-applied to live.
+--
+-- Production gate (human only): apply each migration only after its own
+-- VERIFY ON LIVE queries (see its header) and its DEC-2026-018 approval
+-- (24-hour cool-off + checklist). Every migration here is idempotent and
+-- carries tested rollback SQL in its header (supabase/tests/migration-rollbacks.mjs).
 --
 -- Source files, in the order they appear below:
-${files.map((f, i) => `--   ${i + 1}. ${f}`).join('\n')}
---
--- Generated ${new Date().toISOString().slice(0, 10)}
+${migrations.map((m, i) => `--   ${i + 1}. ${m.name}`).join('\n')}
 -- ============================================================================
-
 `;
 
-const body = files
-  .map((f) => {
-    const sql = fs.readFileSync(path.join(MIGRATIONS, f), 'utf8');
-    return `\n-- ###########################################################################\n-- ## ${f}\n-- ###########################################################################\n\n${sql}\n`;
-  })
-  .join('\n');
+const bundle = header + migrations
+  .map(({ name, sql }) => `\n-- ###########################################################################\n-- ## ${name}\n-- ###########################################################################\n\n${sql.replace(/\r\n/g, '\n')}\n`)
+  .join('');
 
-const bundle = header + body;
-fs.writeFileSync(OUT, bundle);
-console.log(`wrote ${path.relative(process.cwd(), OUT)} — ${files.length} migrations, ${(bundle.length / 1024).toFixed(0)} kB`);
-
-// ---- prove the bundle, the way the SQL editor will run it -------------------
-const db = await PGlite.create();
-await db.exec(fs.readFileSync(path.join(HERE, 'baseline.sql'), 'utf8'));
-
-try {
-  await db.exec(bundle);
-  console.log('PASS  bundle applies as one batch');
-} catch (error) {
-  console.error('FAIL  bundle did not apply');
-  console.error('      ' + error.message);
-  process.exit(1);
+if (CHECK) {
+  const current = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n') : '';
+  if (current !== bundle) {
+    console.error('FAIL  supabase/APPLY_ALL.sql is stale: run `npm run db:bundle` and commit it.');
+    process.exit(1);
+  }
+  console.log(`PASS  supabase/APPLY_ALL.sql is current (${migrations.length} migrations, 020 onward)`);
+} else {
+  fs.writeFileSync(OUT, bundle);
+  console.log(`wrote supabase/APPLY_ALL.sql — ${migrations.length} migrations (020 onward), ${(bundle.length / 1024).toFixed(0)} kB`);
 }
 
-try {
-  await db.exec(bundle);
-  console.log('PASS  bundle is idempotent (applied twice)');
-} catch (error) {
-  console.error('FAIL  bundle is not idempotent');
-  console.error('      ' + error.message);
+// ---- prove the bundle on the live baseline, the way an editor would run it ----
+const history = bundle.match(/^-- ## (0(0\d|1\d)_[^\n]+)$/gm) ?? [];
+if (history.length) {
+  console.error(`FAIL  bundle contains history migrations: ${history.join(', ')}`);
   process.exit(1);
 }
+console.log('PASS  bundle contains no 001–019 history migration');
 
-const { rows } = await db.query(`
-  SELECT sku FROM public.products
-  WHERE product_type IN ('digital_plan','lifetime_plan') AND active
-  ORDER BY sort_order
-`);
-console.log('PASS  catalog after bundle: ' + rows.map((r) => r.sku).join(', '));
+const db = await createLiveDb();
+for (const step of ['applies as one batch on the live baseline', 'is idempotent (applied twice)']) {
+  try {
+    await db.exec(bundle);
+    console.log(`PASS  bundle ${step}`);
+  } catch (error) {
+    console.error(`FAIL  bundle ${step}: ${String(error.message).split('\n')[0]}`);
+    process.exit(1);
+  }
+}
+await db.close();

@@ -20,3 +20,12 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Supabase grants the API roles USAGE on the auth schema, so SECURITY INVOKER
+-- code they run can call auth.uid(). Live depends on it: the trigger
+-- notifications_only_read_state() calls auth.uid() as the caller, and customers
+-- mark notifications read in production. Without this grant the stand-in
+-- refused every such update with "permission denied for schema auth" (found by
+-- supabase/tests/rls-matrix.mjs, V6 Stage 2).
+-- VERIFY ON LIVE: SELECT has_schema_privilege('authenticated', 'auth', 'USAGE'); -- true
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;

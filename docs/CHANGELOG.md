@@ -5,6 +5,28 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### SHYGON V6 Stage 2: identity, database, RLS (2026-10-05), branch `v6/stage-2-identity-rls`
+**Governance** (DEC-2026-035, approved 2026-10-05)
+- DEC-2026-001: the §2A waiver is extended to V6 development / release-candidate work. Rotation stays a release requirement. `docs/runbooks/RUNBOOK-secrets.md` holds the exact procedure (nothing rotated).
+- DEC-2026-035 records D-1, D-2 (V6 = software platform; physical cards out), N-1 (V6 migrations 022+), D-6 (Taps only after payment), the card deferral (no physical card sales in the RC) and privacy hardening. Open: D-3, D-4, D-7, D-8, and new D-9 (customer-facing SHYGON ID).
+- `docs/v6/backlog.md`: the living backlog. `docs/DECISIONS.md`: F2, O-1 and O-14 marked implemented locally; new observation **O-15**: any active admin reads every support ticket, message and notification through `is_admin()`.
+
+**Added** (all L3; local PGlite only; each idempotent, with VERIFY ON LIVE queries and tested rollback SQL)
+- `022_admin_notes_off_customer_rows.sql` (F2, V6-010): the internal order note moves to the admin-only `order_admin_notes` (RLS on, no client grant). `admin_get_order` still returns `order.admin_note`, and `admin_update_order_status` writes the note to the new table. Both are generated from the live bodies with exact replacements. Existing notes are copied, then cleared from `orders`.
+- `023_taps_only_after_payment.sql` (O-14, D-6): drops `tap_profiles_insert_own`. No client can create a Tap row; provisioning, the server and admins still can.
+- `024_owner_or_admin_policies_to_authenticated.sql` (F6 + O-1, V6-030): the eight `*_select_owner_or_admin` policies apply to `authenticated` only, so anon reads 0 rows with no error. `require_admin` is revoked from anon, and `admin_has` from anon **and PUBLIC**.
+- `supabase/tests/rls-matrix.mjs` (`test:rls-matrix`, V6-077): every table × every caller against an explicit expected-access model; extra access fails as a P0. Includes strict anon checks.
+- `supabase/tests/admin-notes.mjs` (`test:admin-notes`): F2 behaviour, the admin contract shape, no side effects, the rollback with notes restored.
+- `supabase/tests/migration-rollbacks.mjs` (`test:rollbacks`, V6-079): each migration's header rollback restores the schema before it; the full chain rolls back to the baseline and re-applies identically.
+
+**Changed**
+- `supabase/tests/admin-contract.mjs`: approvals for exact grant revokes, policy removals and re-targets, and new closed relations, alongside body replacements. Anything unlisted still fails.
+- `supabase/tests/bundle.mjs` / `supabase/APPLY_ALL.sql` (V6-040): the bundle holds **only 020 onward** (it held the 001–019 history), proven twice on the live baseline. `db:bundle:check` fails CI when it is stale. Warnings updated in `README.md`, `PRODUCTION.md` §5 and `supabase/migrations/README.md`.
+- `supabase/tests/live-auth-shim.sql`: grants the API roles USAGE on schema `auth`, as Supabase does (VERIFY ON LIVE). Without it the stand-in refused every customer "mark notification read". The RLS matrix found the gap.
+- `package.json` (scripts only) and `.github/workflows/ci.yml` (four steps): the new suites run in `test:db` and CI.
+
+**Not done:** nothing applied to any real database; no production contact, deployment, push or rotation. 022–024 wait for the DEC-2026-018 cool-off and checklist.
+
 ### verify-011 replays the history chain only (2026-10-05), branch `feat/m0.3-security-identity`
 **Fixed** (DEC-2026-023 Option A; owner decision 2026-10-05, a separate commit from U4)
 - `supabase/tests/verify-011-admin-notes.mjs` replays only migrations 001–019 on the repository shim, not every file in `supabase/migrations/`.

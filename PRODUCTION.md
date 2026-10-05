@@ -461,10 +461,11 @@ else before any network call, with no override. Production is never on that list
 token is read from the environment and never written to disk. It is a full-account
 credential, so do not put it in `.env`.
 
-**2. One paste: DO NOT USE.** `supabase/APPLY_ALL.sql` bundles the 001–019 history.
-Pasting it into a SQL editor replays that history onto the project. Do not paste it into
-any Supabase project. `npm run db:bundle` still regenerates it, which stays unchanged
-until M0.4.
+**2. One paste: only at the production gate.** Since SHYGON V6 (V6-040),
+`supabase/APPLY_ALL.sql` contains only the migrations from 020 onward, never the 001–019
+history. Do not paste it before every migration in it has passed its VERIFY ON LIVE
+queries and its DEC-2026-018 approval; applying them one file at a time is preferred.
+`npm run db:bundle` regenerates it, and CI fails if the committed file is stale.
 
 **3. By hand: DO NOT USE for 001–019.** The files below are the historical record.
 

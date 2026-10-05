@@ -13,10 +13,15 @@ import { createLiveDb, newMigrations, MIGRATIONS_DIR, ROOT } from './lib/live-db
  *   1. the snapshot taken from the live schema baseline equals the committed
  *      golden file (supabase/tests/golden/admin-contract.json);
  *   2. after migrations 020 onward, every frozen function still matches it,
- *      body included, except the bodies listed in APPROVED_BODY_CHANGES;
- *   3. each approved body change is exactly the approved one;
+ *      body and grants included, except what an approved decision lists
+ *      (APPROVED_BODY_CHANGES, APPROVED_ACL_CHANGES);
+ *   3. each approved change is exactly the approved one: body replacements
+ *      applied to the live text, grants revoked from exactly the listed roles;
  *   4. nothing else in the schema moved: every other existing function, every
- *      policy, every table grant and every pre-existing trigger is identical.
+ *      policy (except APPROVED_POLICY_CHANGES), every existing relation's
+ *      grants and every pre-existing trigger is identical, and every new
+ *      relation (APPROVED_NEW_RELATIONS) is closed to anon/authenticated/PUBLIC
+ *      with row level security on.
  *
  *   node supabase/tests/admin-contract.mjs [migrations-dir]   check
  *   node supabase/tests/admin-contract.mjs --write            regenerate the golden file
@@ -45,9 +50,58 @@ const D_U4 = [
     "'Your Tap page has been created. Review and publish it from your SHYGON dashboard.'",
   ],
 ];
+// F2 (migration 022, DEC-2026-035 / V6-010): the admin note moves off the
+// customer's order row into order_admin_notes. Same JSON shape for the admin app.
+const F2_GET = [[
+  "    'order', to_jsonb(o) - 'customer_id',\n",
+  "    'order', (to_jsonb(o) - 'customer_id') || jsonb_build_object('admin_note',\n        (SELECT n.note FROM public.order_admin_notes n WHERE n.order_id = o.id)),\n",
+]];
+const F2_UPD = [
+  ["    admin_note       = COALESCE(NULLIF(btrim(COALESCE(p_note, '')), ''), admin_note),\n", ''],
+  [
+    "  WHERE id = p_order_id;\n\n  -- Cards leave the building with the order they belong to.\n",
+    "  WHERE id = p_order_id;\n\n  -- The note is internal: it lives in order_admin_notes, which no customer can\n  -- read, not on the customer's own order row. A blank note keeps the existing one.\n  IF NULLIF(btrim(COALESCE(p_note, '')), '') IS NOT NULL THEN\n    INSERT INTO public.order_admin_notes (order_id, note, updated_by, updated_at)\n    VALUES (p_order_id, btrim(p_note), v_admin, NOW())\n    ON CONFLICT (order_id) DO UPDATE\n      SET note = EXCLUDED.note, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at;\n  END IF;\n\n  -- Cards leave the building with the order they belong to.\n",
+  ],
+];
 const APPROVED_BODY_CHANGES = {
-  'provision_tap_on_payment()': { decision: 'DEC-2026-024 D-U4 (migration 021)', replacements: D_U4 },
+  'provision_tap_on_payment()': {
+    decision: 'DEC-2026-024 D-U4 (migration 021)', replacements: D_U4,
+    summary: 'published/status, notification title and body; nothing else',
+  },
+  'admin_get_order(uuid)': {
+    decision: 'DEC-2026-035 V6-010 F2 (migration 022)', replacements: F2_GET,
+    summary: 'order.admin_note read from order_admin_notes; nothing else',
+  },
+  'admin_update_order_status(uuid,text,text,text,text)': {
+    decision: 'DEC-2026-035 V6-010 F2 (migration 022)', replacements: F2_UPD,
+    summary: 'note written to order_admin_notes instead of the order row; nothing else',
+  },
 };
+
+// EXECUTE grants an approved decision removes. Grantee '' is PUBLIC. Every
+// other grant on every frozen function must stay exactly as on live.
+const APPROVED_ACL_CHANGES = {
+  'require_admin(text)': { decision: 'DEC-2026-035 V6-030 O-1 (migration 024)', remove: ['anon'] },
+  'admin_has(text)': { decision: 'DEC-2026-035 V6-030 O-1 (migration 024)', remove: ['', 'anon'] },
+};
+
+// Policies an approved decision removes or re-targets. Their USING / WITH CHECK
+// expressions must stay identical; any other policy change fails.
+const OWNER_OR_ADMIN = ['cards', 'notifications', 'orders', 'profiles', 'support_messages',
+  'support_tickets', 'tap_events', 'tap_profiles'].map((t) => `${t}.${t}_select_owner_or_admin`);
+const APPROVED_POLICY_CHANGES = {
+  removed: { 'tap_profiles.tap_profiles_insert_own': 'DEC-2026-035 D-6, O-14 (migration 023)' },
+  roles: Object.fromEntries(OWNER_OR_ADMIN.map((p) => [p, { to: '{authenticated}', decision: 'DEC-2026-035 V6-030 F6 (migration 024)' }])),
+};
+
+// Relations an approved decision adds. None may be reachable by anon,
+// authenticated or PUBLIC, and each must have row level security on.
+const APPROVED_NEW_RELATIONS = {
+  order_admin_notes: 'DEC-2026-035 V6-010 F2 (migration 022)',
+};
+
+const aclItems = (acl) => (acl ? acl.replace(/^\{|\}$/g, '').split(',').filter(Boolean) : []);
+const grantee = (item) => item.slice(0, item.indexOf('='));
 
 const FUNCTIONS_SQL = `
   SELECT p.oid::regprocedure::text AS signature,
@@ -165,12 +219,29 @@ await check('the golden file is the live baseline snapshot', () => {
 
 await check('every frozen function keeps its signature, return type, security, search_path and grants', () => {
   const frozenMig = mig.all.filter((f) => isFrozen(f.name));
-  const problems = diffRows(frozenBase, frozenMig, (f) => f.signature, SIGNATURE_FIELDS);
+  const fixedAcl = frozenBase.filter((f) => !APPROVED_ACL_CHANGES[f.signature]);
+  const problems = [
+    ...diffRows(fixedAcl, frozenMig, (f) => f.signature, SIGNATURE_FIELDS),
+    ...diffRows(frozenBase.filter((f) => APPROVED_ACL_CHANGES[f.signature]), frozenMig, (f) => f.signature,
+      SIGNATURE_FIELDS.filter((x) => x !== 'acl')),
+  ];
   const added = frozenMig.filter((f) => !frozenBase.some((b) => b.signature === f.signature)).map((f) => f.signature);
   assert(problems.length === 0, problems.join('; '));
   assert(added.length === 0, `new overloads of frozen names: ${added.join(', ')}`);
-  return `${frozenBase.length} unchanged`;
+  return `${frozenBase.length} unchanged (grants of ${Object.keys(APPROVED_ACL_CHANGES).join(', ')} checked below)`;
 });
+
+for (const [signature, { decision, remove }] of Object.entries(APPROVED_ACL_CHANGES)) {
+  await check(`${signature}: EXECUTE grants differ from live by exactly the approved revoke (${decision})`, () => {
+    const before = aclItems(base.all.find((f) => f.signature === signature).acl);
+    const after = aclItems(mig.all.find((f) => f.signature === signature).acl);
+    for (const g of remove) assert(before.some((i) => grantee(i) === g), `live has no grant to ${g || 'PUBLIC'} to revoke`);
+    const expected = before.filter((i) => !remove.includes(grantee(i)));
+    assert(JSON.stringify([...after].sort()) === JSON.stringify([...expected].sort()),
+      `grants ${JSON.stringify(after)}, expected ${JSON.stringify(expected)}`);
+    return `revoked from ${remove.map((g) => g || 'PUBLIC').join(', ')}; ${after.length} grants kept`;
+  });
+}
 
 await check('every frozen body is byte-identical, except the approved changes', () => {
   const m = byKey(mig.all, (f) => f.signature);
@@ -190,7 +261,7 @@ for (const [signature, { decision, replacements }] of Object.entries(APPROVED_BO
       expected = expected.replace(from, to);
     }
     assert(after === expected, 'the migrated body is not the baseline body with only the approved replacements');
-    return 'published/status, notification title and body; nothing else';
+    return APPROVED_BODY_CHANGES[signature].summary;
   });
 }
 
@@ -202,14 +273,45 @@ await check('no other existing function changed (signature, body, grants)', () =
   return `${others.length} unchanged; new: ${added.join(', ') || 'none'}`;
 });
 
-await check('no policy changed, and none was added or removed', () => {
-  assert(JSON.stringify(mig.policies) === JSON.stringify(base.policies), 'pg_policies differs');
-  return `${base.policies.length} policies identical`;
+await check('no policy changed, added or removed, except the approved ones', () => {
+  const key = (p) => `${p.tablename}.${p.policyname}`;
+  const m = byKey(mig.policies, key);
+  const problems = [];
+  for (const p of base.policies) {
+    const k = key(p);
+    const got = m.get(k);
+    if (APPROVED_POLICY_CHANGES.removed[k]) {
+      if (got) problems.push(`${k}: should have been removed`);
+      continue;
+    }
+    if (!got) { problems.push(`${k}: removed without a decision`); continue; }
+    const roles = APPROVED_POLICY_CHANGES.roles[k]?.to ?? p.roles;
+    for (const f of ['schemaname', 'permissive', 'cmd', 'qual', 'with_check']) {
+      if (got[f] !== p[f]) problems.push(`${k}.${f} changed`);
+    }
+    if (got.roles !== roles) problems.push(`${k}.roles: ${p.roles} -> ${got.roles} (expected ${roles})`);
+  }
+  const added = mig.policies.filter((p) => !base.policies.some((b) => key(b) === key(p))).map(key);
+  if (added.length) problems.push(`added without a decision: ${added.join(', ')}`);
+  assert(problems.length === 0, problems.join('; '));
+  const removed = Object.keys(APPROVED_POLICY_CHANGES.removed).length;
+  const retargeted = Object.keys(APPROVED_POLICY_CHANGES.roles).length;
+  return `${base.policies.length - removed - retargeted} identical; ${retargeted} re-targeted to authenticated; ${removed} removed`;
 });
 
-await check('no table grant or RLS switch changed', () => {
-  assert(JSON.stringify(mig.tableGrants) === JSON.stringify(base.tableGrants), 'table ACLs / RLS flags differ');
-  return `${base.tableGrants.length} relations identical`;
+await check('no table grant or RLS switch changed on existing relations; new ones are closed', () => {
+  const m = byKey(mig.tableGrants, (r) => r.relname);
+  const problems = diffRows(base.tableGrants, mig.tableGrants, (r) => r.relname, ['acl', 'relrowsecurity', 'relforcerowsecurity']);
+  const added = mig.tableGrants.filter((r) => !base.tableGrants.some((b) => b.relname === r.relname));
+  for (const r of added) {
+    if (!APPROVED_NEW_RELATIONS[r.relname]) { problems.push(`${r.relname}: new relation without a decision`); continue; }
+    const open = aclItems(r.acl).filter((i) => ['', 'anon', 'authenticated'].includes(grantee(i)));
+    if (open.length) problems.push(`${r.relname}: reachable by ${open.join(', ')}`);
+    if (!r.relrowsecurity) problems.push(`${r.relname}: row level security is off`);
+  }
+  assert(problems.length === 0, problems.join('; '));
+  assert(m.size === base.tableGrants.length + added.length, 'a relation disappeared');
+  return `${base.tableGrants.length} existing identical; new: ${added.map((r) => r.relname).join(', ') || 'none'} (closed, RLS on)`;
 });
 
 await check('every pre-existing trigger is unchanged (new ones listed)', () => {

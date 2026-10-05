@@ -212,7 +212,11 @@ if (withPrivileges === repoShim || !defaultPrivileges) {
 }
 await repo.exec(withPrivileges);
 steps.push({ step: '000 tests/baseline.sql', inv: await introspect(repo) });
-for (const file of fs.readdirSync(MIG).filter((f) => f.endsWith('.sql')).sort()) {
+// The repository chain is the 001–019 history only. Migrations from 020 on are
+// written for the live baseline (DEC-2026-023 Option A); on this old chain they
+// would fail (024 re-targets policies that exist only on live) and say nothing
+// about drift. Same rule as verify-011 (SHYGON V6 Stage 2).
+for (const file of fs.readdirSync(MIG).filter((f) => /^\d{3}_.*\.sql$/.test(f) && Number(f.slice(0, 3)) < 20).sort()) {
   try {
     await repo.exec(fs.readFileSync(path.join(MIG, file), 'utf8'));
   } catch (error) {

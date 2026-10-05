@@ -92,9 +92,29 @@ jobs:
         run: npm run test:golden
 
       # Doc 12 §2: frozen function signatures, grants and bodies; no policy,
-      # table grant or existing trigger changed by 020 onward.
+      # table grant or existing trigger changed by 020 onward, except the
+      # changes an approved decision lists (each checked exactly).
       - name: admin contract (live baseline)
         run: npm run test:admin-contract
+
+      # SHYGON V6 Stage 2 (DEC-2026-035): every table x every caller against the
+      # expected access model; any access beyond it fails as a P0.
+      - name: RLS matrix (live baseline)
+        run: npm run test:rls-matrix
+
+      # V6-010 / F2 (migration 022): the internal order note is not readable by
+      # the customer; notes moved intact; admin contract held; rollback proven.
+      - name: admin notes off customer rows (live baseline)
+        run: npm run test:admin-notes
+
+      # Every migration's header rollback restores the schema before it, and the
+      # whole chain rolls back to the live baseline and re-applies identically.
+      - name: migration rollbacks (live baseline)
+        run: npm run test:rollbacks
+
+      # V6-040: APPLY_ALL.sql holds only 020 onward and matches the migrations.
+      - name: APPLY_ALL.sql is current
+        run: npm run db:bundle:check
 
       # Catalogue seed data inserted by 001–019 (owner decision D-U1-a):
       # isolated PGlite, history chain only, never live.
