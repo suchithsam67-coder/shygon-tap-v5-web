@@ -17,7 +17,9 @@ const PROPOSED = path.join(ROOT, 'supabase', 'proposed', '011_admin_notes_off_cu
 
 const db = await PGlite.create();
 await db.exec(fs.readFileSync(path.join(ROOT, 'supabase/tests/baseline.sql'), 'utf8'));
-for (const f of fs.readdirSync(MIG).filter((f) => f.endsWith('.sql')).sort()) {
+// Only the history chain, 001–019. Migrations from 020 on are written for the
+// live schema baseline (DEC-2026-023 Option A), not for this repository shim.
+for (const f of fs.readdirSync(MIG).filter((f) => /^\d{3}_.*\.sql$/.test(f) && Number(f.slice(0, 3)) < 20).sort()) {
   await db.exec(fs.readFileSync(path.join(MIG, f), 'utf8'));
 }
 await db.exec(`

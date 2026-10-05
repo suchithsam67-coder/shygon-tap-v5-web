@@ -5,6 +5,12 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### verify-011 replays the history chain only (2026-10-05), branch `feat/m0.3-security-identity`
+**Fixed** (DEC-2026-023 Option A; owner decision 2026-10-05, a separate commit from U4)
+- `supabase/tests/verify-011-admin-notes.mjs` replays only migrations 001–019 on the repository shim, not every file in `supabase/migrations/`.
+  - Migrations from 020 on are written for the live schema baseline. 021 references `public.customers`, which the shim does not have, so the stand-alone script had failed since 021 was added.
+  - It is back to 16/16. It is not a CI gate, and its assertions are unchanged.
+
 ### M0.3 U4 complete locally: customer_id resolution and the draft first-payment Tap (2026-10-05), branch `feat/m0.3-security-identity`
 **Added** (DEC-2026-024 Option A + D-U4, DEC-2026-029 Option A; L3; owner decisions of 2026-10-05, superseding 2026-10-03)
 - `supabase/migrations/021_resolve_customer_id.sql`:
