@@ -34,6 +34,7 @@ import { EXPERIENCE_LABELS, TAP_STATUS_HINTS, TAP_STATUS_LABELS, tapUrl } from '
 import { cardArt, digitalPlans, products, materialLabels, tierLabels, CUSTOMIZATION_PASS_PRICE, type MaterialId, type TierId } from '../data/shygonTapData';
 import { rupees } from '../services/catalog';
 import { toExperience } from '../lib/database.types';
+import { CARD_SALES_OPEN, CARDS_COMING_SOON, TIERS_PATH, clearPendingCardOrder } from '../lib/commerce';
 
 const PENDING_KEY = 'shygon_pending_order';
 
@@ -67,7 +68,12 @@ export default function Account() {
       return null;
     }
   });
-  const hasPending = Boolean(pendingOrder);
+  // A card selection saved before card sales closed (D-10) cannot be checked
+  // out; it gets its own notice instead of "continue to checkout".
+  const pendingIsCard = Boolean(pendingOrder) && (pendingOrder?.orderType ?? 'physical') === 'physical';
+  const [cardSelectionCleared, setCardSelectionCleared] = useState(false);
+  const staleCardSelection = pendingIsCard && !CARD_SALES_OPEN && !cardSelectionCleared;
+  const hasPending = Boolean(pendingOrder) && !(pendingIsCard && !CARD_SALES_OPEN);
   const [showQr, setShowQr] = useState(false);
   const pendingProduct = pendingOrder?.productId ? products.find((item) => item.id === pendingOrder.productId) : null;
   const pendingPlan = pendingOrder?.planId ? digitalPlans.find((item) => item.id === pendingOrder.planId) : null;
@@ -151,6 +157,32 @@ export default function Account() {
       title={`Hello, ${firstName}`}
       description="Your Tap, your experience and everything behind it."
     >
+      {staleCardSelection && (
+        <section className="panel" style={{ marginBottom: 18 }}>
+          <div className="panel-body" style={{ display: 'grid', gap: 10 }}>
+            <strong style={{ fontSize: 15 }}>{CARDS_COMING_SOON.title}</strong>
+            <p style={{ margin: 0, color: 'var(--muted)', fontSize: 13, lineHeight: 1.6 }}>
+              You saved a card selection earlier. Nothing was charged, and it can't be ordered yet.
+              {' '}{CARDS_COMING_SOON.body}
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-blue" onClick={() => navigate(TIERS_PATH)}>
+                {CARDS_COMING_SOON.action} <ArrowRight size={15} />
+              </button>
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  clearPendingCardOrder();
+                  setCardSelectionCleared(true);
+                }}
+              >
+                Remove the saved card selection
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       {hasPending && (
         <section className="panel panel-warning" style={{ marginBottom: 18 }}>
           <div
@@ -222,6 +254,23 @@ export default function Account() {
       ) : (
         <>
           {/* ------------------------------------------------ YOUR TAP, first */}
+          {!tap ? (
+            // No Tap yet (D-10): the first purchase is an experience, and the
+            // Tap page is created as a draft once the payment is confirmed.
+            <section className="panel" style={{ marginBottom: 18 }}>
+              <div className="panel-body">
+                <p className="mini-label">Your Tap</p>
+                <h2 style={{ margin: '6px 0 8px', fontSize: 22, letterSpacing: '-.02em' }}>You don't have a Tap yet</h2>
+                <p style={{ margin: '0 0 14px', color: 'var(--muted)', fontSize: 13, lineHeight: 1.6, maxWidth: 560 }}>
+                  Choose the experience your Tap opens in. Your Tap page is created as a draft as soon as
+                  your payment is confirmed, and you publish it when you're ready.
+                </p>
+                <button className="btn btn-blue" onClick={() => navigate(TIERS_PATH)}>
+                  Choose your Tap experience <ArrowRight size={15} />
+                </button>
+              </div>
+            </section>
+          ) : (
           <section className="panel" style={{ marginBottom: 18 }}>
             <div className="panel-body">
               <div
@@ -256,7 +305,7 @@ export default function Account() {
                     </span>
                   </div>
                   <p style={{ margin: 0, color: 'var(--muted)', fontSize: 13, lineHeight: 1.6 }}>
-                    {tap ? TAP_STATUS_HINTS[status] : 'Your Tap profile is created the moment your first purchase is paid for.'}
+                    {TAP_STATUS_HINTS[status]}
                   </p>
                   {tap?.slug && (
                     <div
@@ -326,6 +375,7 @@ export default function Account() {
               )}
             </div>
           </section>
+          )}
 
           {/* ------------------------------------------- first-run activation */}
           {tap && !onboardingDone && (

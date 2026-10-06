@@ -25,6 +25,12 @@ dist-ssr
 .vite-source-tags.js
 .vercel
 
+# Local stack and end-to-end runs (V6, D-4): the stack's own build, its
+# throwaway per-machine keys, and Playwright's output.
+.e2e/
+test-results/
+playwright-report/
+
 # Environment secrets
 .env
 .env.*

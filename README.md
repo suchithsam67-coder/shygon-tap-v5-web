@@ -46,3 +46,23 @@ npm run db:push      # 020+ only, and only to a project on supabase/non-producti
 
 Run `db:apply` and `db:verify` after changing anything under
 `supabase/migrations/`.
+
+## The local stack and the test suites (SHYGON V6)
+
+`supabase/local/` runs the whole product on this machine with no Docker and no
+production value (decision D-4): the live schema on a local Postgres (PGlite), a
+Supabase-compatible gateway (the REST and Auth calls the app makes), the real
+server functions, and a Razorpay stand-in. Every key is generated locally, no
+`.env` is read, and nothing leaves the machine.
+
+```bash
+npm run stack               # build the site against the stack and serve it on http://127.0.0.1:4173
+npm run test:payment-chain  # checkout → payment → webhook → fulfilment → entitlement, every failure path
+npm run test:public-tap     # Tap lifecycle, the six public states, field privacy, analytics
+npm run test:components     # the public Tap page in every state (Vitest + Testing Library)
+npm run test:e2e            # the three journeys in a real browser (Playwright; starts the stack itself)
+npm run ci                  # every gate except the browser journeys
+```
+
+`test:e2e` drives the browser already installed (Edge by default; set
+`E2E_BROWSER_CHANNEL=chrome` for Chrome), so nothing is downloaded.

@@ -124,6 +124,24 @@ jobs:
       - name: test:payments (outbound network denied)
         run: npm run test:payments:ci
 
+      # SHYGON V6 Stage 3: the real payment handlers against the real schema on
+      # the local stack (supabase/local/, decision D-4): success, failure,
+      # cancel, retry, duplicate and replayed webhooks, bad signatures, amount
+      # mismatch, first-time vs returning customers. Razorpay is the stand-in;
+      # outbound network denied.
+      - name: payment chain on the local stack (outbound network denied)
+        run: npm run test:payment-chain
+
+      # V6-071 / V6-073 / V6-032 (migration 025): the Tap lifecycle, the six
+      # public states, field privacy and analytics, with live-baseline negative
+      # controls. Outbound network denied.
+      - name: public Tap lifecycle, privacy and analytics (local stack)
+        run: npm run test:public-tap
+
+      # V6-083: the public Tap page in every state a visitor can meet.
+      - name: component tests
+        run: npm run test:components
+
       - name: Install gitleaks (pinned version, SHA-256 verified)
         env:
           GITLEAKS_VERSION: 8.30.1
@@ -144,3 +162,31 @@ jobs:
 
       - name: npm audit (high and above)
         run: npm audit --audit-level=high
+
+  # SHYGON V6 Stage 5 (decision D-4): the three end-to-end journeys in a real
+  # browser against the local stack, which Playwright starts itself. The
+  # runner's preinstalled Chrome is used, so no browser is downloaded; every
+  # request that would leave the runner is aborted by the tests.
+  e2e:
+    name: end-to-end journeys
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Playwright journeys (local stack, preinstalled Chrome)
+        env:
+          E2E_BROWSER_CHANNEL: chrome
+        run: npm run test:e2e

@@ -549,12 +549,21 @@ await check("anon can still resolve a published Tap through the RPC (control)", 
 
 await db.exec(`UPDATE public.tap_profiles SET published = false, status = 'draft' WHERE slug = 'bob-slug'`);
 
+// Since migration 025 (V6-071) anon may not execute the legacy reader at all:
+// a refusal is the strongest "withheld". If it ever answers again, it must
+// still not leak, and the check fails either way because the revoke regressed.
 await check("anon cannot resolve an unpublished Tap's private data", () =>
   asRole('anon', null, async () => {
-    const r = await db.query(`SELECT public.get_public_tap('bob-slug') AS v`);
+    let r;
+    try {
+      r = await db.query(`SELECT public.get_public_tap('bob-slug') AS v`);
+    } catch (e) {
+      if (/permission denied for function get_public_tap/.test(e.message)) return 'refused: EXECUTE revoked (V6-071)';
+      throw e;
+    }
     const txt = JSON.stringify(r.rows[0]?.v ?? null);
     assert(!/Bob/.test(txt), `LEAK — draft Tap content exposed: ${txt.slice(0, 160)}`);
-    return 'withheld';
+    throw new Error('anon can execute get_public_tap again (migration 025 revokes it)');
   }));
 
 console.log(`\n${pass} passed, ${fail} failed`);

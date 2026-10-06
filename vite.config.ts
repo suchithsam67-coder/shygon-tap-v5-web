@@ -31,7 +31,7 @@ function securityHeaders(root: string): { key: string; value: string }[] {
  * Also writes sitemap.xml, robots.txt and llms.txt from the same data, so
  * none of them can drift from what the pages say.
  */
-function seoPages(site: string): Plugin {
+function seoPages(site: string, sales: { cardSales: boolean }): Plugin {
   let root = ''
   let outDir = ''
   return {
@@ -43,10 +43,10 @@ function seoPages(site: string): Plugin {
     },
     // The shell served for customer Taps and signed-in pages.
     transformIndexHtml(html) {
-      return injectHead(html, renderHead(site, shellMeta(site), { canonical: false }))
+      return injectHead(html, renderHead(site, shellMeta(site, sales), { canonical: false }))
     },
     closeBundle() {
-      const pages = prerenderedPages(site)
+      const pages = prerenderedPages(site, sales)
 
       // Netlify and Vercel reach each file through an explicit rewrite; a page
       // without one would be answered by the 404 rule. Fail here, not in
@@ -85,7 +85,7 @@ function seoPages(site: string): Plugin {
       const today = new Date().toISOString().slice(0, 10)
       fs.writeFileSync(path.join(outDir, 'sitemap.xml'), sitemapXml(site, today))
       fs.writeFileSync(path.join(outDir, 'robots.txt'), robotsTxt(site))
-      fs.writeFileSync(path.join(outDir, 'llms.txt'), llmsTxt(site))
+      fs.writeFileSync(path.join(outDir, 'llms.txt'), llmsTxt(site, sales))
     },
   }
 }
@@ -218,7 +218,10 @@ export default defineConfig(async ({ command, mode }) => {
 
   // Same rule as src/lib/site.ts: https origin, no trailing slash.
   const rawSite = (env.VITE_SITE_URL || 'https://shygontech.com').trim().replace(/\/+$/, '');
-  plugins.push(seoPages(/^https?:\/\//i.test(rawSite) ? rawSite : `https://${rawSite}`));
+  // Card sales (D-10): closed unless the card release turns them on; the
+  // server enforces the same switch with CARD_SALES_ENABLED.
+  const sales = { cardSales: env.VITE_CARD_SALES_ENABLED === 'true' };
+  plugins.push(seoPages(/^https?:\/\//i.test(rawSite) ? rawSite : `https://${rawSite}`, sales));
   if (command === 'serve') {
     // Every .env key, but only for the dev-time function runner above.
     const all = loadEnv(mode, process.cwd(), '');

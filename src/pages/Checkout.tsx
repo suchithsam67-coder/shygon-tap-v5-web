@@ -30,6 +30,8 @@ import PaymentProgress, { type PaymentStage } from '../components/app/PaymentPro
 import EBill from '../components/app/EBill';
 import { useAsync } from '../hooks/useAsync';
 import { toExperience } from '../lib/database.types';
+import { CARD_SALES_OPEN, clearPendingCardOrder } from '../lib/commerce';
+import CardsComingSoon from '../components/CardsComingSoon';
 
 /**
  * Checkout.
@@ -433,6 +435,36 @@ export default function Checkout() {
   }
 
   if (!pending) return null;
+
+  // Card sales are closed in the V6 release candidate (D-10). A card selection
+  // saved before then cannot be checked out (the server refuses it too).
+  if (isPhysical && !CARD_SALES_OPEN) {
+    return (
+      <div className="app">
+        <main
+          className="app-body page-enter"
+          style={{ gridTemplateColumns: '1fr', placeItems: 'center', minHeight: '100svh' }}
+        >
+          <div className="panel" style={{ width: 'min(560px, 100%)' }}>
+            <div className="panel-body">
+              <CardsComingSoon />
+              <button
+                type="button"
+                className="btn btn-ghost btn-block"
+                style={{ marginTop: 10 }}
+                onClick={() => {
+                  clearPendingCardOrder();
+                  navigate('/shygontap/account');
+                }}
+              >
+                Remove the saved card selection
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (verificationPending) {
     return (

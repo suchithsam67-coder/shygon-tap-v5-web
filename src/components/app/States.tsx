@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
-import { AlertTriangle, RotateCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, ArrowRight, RotateCw, Sparkles } from 'lucide-react';
+import { TIERS_PATH } from '../../lib/commerce';
 
 /**
  * Loading, empty and error states.
@@ -69,6 +71,26 @@ export function EmptyState({
       {description && <p>{description}</p>}
       {action}
     </div>
+  );
+}
+
+/**
+ * A signed-in customer who has no Tap yet. Not an error: the first purchase
+ * (an experience, D-10) creates the Tap page as a draft.
+ */
+export function NoTapState({ purpose }: { purpose: string }) {
+  const navigate = useNavigate();
+  return (
+    <EmptyState
+      icon={<Sparkles size={24} />}
+      title="You don't have a Tap yet"
+      description={`${purpose} Choose the experience your Tap opens in, and your Tap page is created as a draft once your payment is confirmed.`}
+      action={
+        <button type="button" className="btn btn-blue" onClick={() => navigate(TIERS_PATH)}>
+          Choose your Tap experience <ArrowRight size={15} />
+        </button>
+      }
+    />
   );
 }
 

@@ -5,6 +5,50 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### SHYGON V6 Stage 3: payments and the Tap lifecycle (2026-10-06), branch `v6/stage-3-payments-tap`
+**Governance:** DEC-2026-035 amendment A-1 (owner, 2026-10-06):
+- run Stages 3–6 back-to-back;
+- D-4 = the no-Docker local stack;
+- D-10 = digital-first;
+- test-only dev dependencies.
+
+New open decision **D-11** (login email pre-filled into the public Tap). New observation **O-16**. O-2 implemented locally. Report: `docs/v6/stage-3-report.md`.
+
+**Added**
+- `supabase/local/`: the local stack (D-4).
+  - PGlite with the live schema and 020 onward, behind a Supabase-compatible gateway (REST, Auth, Realtime handshake).
+  - The real server functions behind the `netlify.toml` routing and CSP.
+  - A Razorpay stand-in.
+  - `npm run stack` serves it.
+- `025_public_tap_privacy_and_analytics.sql` (L3; generated from the live bodies with exact replacements; tested rollback):
+  - V6-071 / O-2: `get_public_tap` revoked from the API roles; it leaked a hidden address to anon on live;
+  - V6-073: salted daily visitor hash;
+  - V6-032: dedupe and hourly cap;
+  - V6-071: owners can hide phone and email.
+- Suites:
+  - `test:payment-chain` (27): the real payment handlers on the stack;
+  - `test:public-tap` (25): lifecycle, six states, privacy, analytics, with live-baseline negative controls;
+  - `test:components` (14, Vitest);
+  - `test:e2e` (6, Playwright on the installed browser): the three V6 journeys.
+- `src/lib/commerce.ts`, `CardsComingSoon`, `NoTapState`: the digital-first storefront (D-10).
+
+**Fixed**
+- **V6-086:** `create-order` crashed (500) for every customer who already owned an experience, because of an unimported helper. Present since the V5 import.
+- **V6-087:** a new customer could not buy anything, because Tiers required an existing Tap and cards are not sold.
+
+**Changed**
+- **V6-070:** card orders are refused server-side (`CARD_SALES_ENABLED`); card pages say "coming soon"; no card offers in the structured data.
+- **V6-031:** the order-number suffix comes from `crypto.randomInt`.
+- **Tap editor:** "Show on Tap" switches for phone and email, saveable while the edit window is closed.
+- **Tests:**
+  - `admin-contract`: 025's exact approvals, applied literally;
+  - `rls-matrix`: models the new table;
+  - `rls-adversarial`: the get_public_tap check is stricter.
+- **CI:** three new gate steps and an `e2e` job.
+- **Lockfile:** the new test dependencies, plus `source-map-js` 1.2.1 → 1.2.2 (a new high advisory; owner to confirm).
+
+**Not done:** nothing applied to any real database; no production contact, deployment, push, rotation or live payment.
+
 ### SHYGON V6 Stage 2: identity, database, RLS (2026-10-05), branch `v6/stage-2-identity-rls`
 **Governance** (DEC-2026-035, approved 2026-10-05)
 - DEC-2026-001: the §2A waiver is extended to V6 development / release-candidate work. Rotation stays a release requirement. `docs/runbooks/RUNBOOK-secrets.md` holds the exact procedure (nothing rotated).

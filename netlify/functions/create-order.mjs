@@ -1,5 +1,9 @@
+import crypto from 'node:crypto';
 import { adminClient, getRequestUser, json, MissingSecretError, requireEnv } from '../lib/supabase.mjs';
 import { assertLiveKeysAllowed, PaymentNotConfirmedError } from '../lib/razorpay.mjs';
+// The same legacy-key mapping fulfilment grants by (V6-086: this file used it
+// without importing it, so a returning customer's upgrade failed with a 500).
+import { normaliseExperienceKey } from '../lib/fulfilment.mjs';
 
 /**
  * POST /api/create-order
@@ -107,7 +111,9 @@ export default async (request) => {
       }
     }
 
-    const shygonOrderId = `ST-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    // The suffix only separates orders placed in the same millisecond, but it
+    // is printed on receipts, so it comes from a CSPRNG (V6-031).
+    const shygonOrderId = `ST-${Date.now().toString(36).toUpperCase()}-${crypto.randomInt(1000, 10000)}`;
     const productName = lineItems
       .map((item) => (item.quantity > 1 ? `${item.name} x${item.quantity}` : item.name))
       .join(' + ');
@@ -357,6 +363,13 @@ async function resolveLineItems(admin, { body, orderType, quantity, str, user })
   }
 
   // --- Physical card ------------------------------------------------------
+  // The V6 release candidate sells no physical cards (DEC-2026-035, D-10): a
+  // paid card order cannot yet become an activatable card (I-4, deferred to
+  // the card release). The card release opens sales with CARD_SALES_ENABLED.
+  if (process.env.CARD_SALES_ENABLED !== 'true') {
+    throw new IntentError('SHYGON cards are coming soon and cannot be ordered yet.', 409);
+  }
+
   const productId = str(body?.productId);
   const material = str(body?.material);
   const tier = str(body?.tier);

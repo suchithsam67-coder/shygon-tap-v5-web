@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link2, MousePointerClick, Nfc, QrCode, TrendingUp, Users } from 'lucide-react';
 import { AppShell } from '../components/app/AppShell';
 import { useAccount } from '../lib/account-context';
-import { ErrorState, Skeleton } from '../components/app/States';
+import { ErrorState, NoTapState, Skeleton } from '../components/app/States';
 import { describeError, isMissingSchema } from '../lib/supabase';
 import { densify, fetchAnalytics, type AnalyticsSummary } from '../services/analytics';
 import { useAsync } from '../hooks/useAsync';
@@ -86,10 +86,7 @@ export default function Analytics() {
         </div>
       ) : !tap ? (
         <div className="panel">
-          <ErrorState
-            title="No Tap profile yet"
-            message="Analytics appear once you have a Tap profile — purchase a SHYGON Tap card to get one."
-          />
+          <NoTapState purpose="Visits, taps and link clicks on your Tap show up here." />
         </div>
       ) : error || !summary ? (
         <div className="panel">

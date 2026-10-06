@@ -17,8 +17,10 @@ import { storeMeta } from '../../seo/meta';
 import { usePageMeta } from '../../seo/usePageMeta';
 import { editionAvailability, useEditions } from '../../lib/editions';
 import StoreFooter from '../../components/StoreFooter';
+import { CARD_SALES_OPEN } from '../../lib/commerce';
+import CardsComingSoon from '../../components/CardsComingSoon';
 
-const META = storeMeta(SITE_URL);
+const META = storeMeta(SITE_URL, { cardSales: CARD_SALES_OPEN });
 
 /**
  * Amazon-style catalog grid.
@@ -162,12 +164,14 @@ export default function Store() {
           </form>
 
           <ThemeToggle />
-          <button
-            onClick={() => navigate('/shygontap/checkout')}
-            className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold shrink-0 hover:text-[var(--ds-accent)]"
-          >
-            <ShoppingCart size={18} /> Cart
-          </button>
+          {CARD_SALES_OPEN && (
+            <button
+              onClick={() => navigate('/shygontap/checkout')}
+              className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold shrink-0 hover:text-[var(--ds-accent)]"
+            >
+              <ShoppingCart size={18} /> Cart
+            </button>
+          )}
         </div>
       </header>
 
@@ -213,6 +217,8 @@ export default function Store() {
             </label>
           </div>
         </div>
+
+        {!CARD_SALES_OPEN && <CardsComingSoon className="mb-5" />}
 
         <div className="store-layout">
           {/* ------------------------------------------------------- filters */}

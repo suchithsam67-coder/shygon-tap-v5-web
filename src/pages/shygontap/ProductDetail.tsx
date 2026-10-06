@@ -20,6 +20,8 @@ import { productMeta, productPath } from '../../seo/meta';
 import { usePageMeta } from '../../seo/usePageMeta';
 import StoreFooter from '../../components/StoreFooter';
 import { editionAvailability, useEditions } from '../../lib/editions';
+import { CARD_SALES_OPEN } from '../../lib/commerce';
+import CardsComingSoon from '../../components/CardsComingSoon';
 import NotFound from '../NotFound';
 
 /**
@@ -45,7 +47,7 @@ function ProductDetailView({ productId }: { productId?: string }) {
   const navigate = useNavigate();
 
   const product = useMemo(() => products.find((p) => p.id === productId), [productId]);
-  usePageMeta(useMemo(() => (product ? productMeta(SITE_URL, product) : null), [product]));
+  usePageMeta(useMemo(() => (product ? productMeta(SITE_URL, product, { cardSales: CARD_SALES_OPEN }) : null), [product]));
 
   const [material, setMaterial] = useState<MaterialId>('pvc');
   const [tier, setTier] = useState<TierId>('standard');
@@ -290,6 +292,9 @@ function ProductDetailView({ productId }: { productId?: string }) {
                 ))}
               </Field>
 
+              {!CARD_SALES_OPEN ? (
+                <CardsComingSoon />
+              ) : (
               <div className="product-actions">
                 <button
                   onClick={addToCart}
@@ -304,6 +309,7 @@ function ProductDetailView({ productId }: { productId?: string }) {
                   <Zap size={16} /> Buy Now
                 </button>
               </div>
+              )}
 
               {added && (
                 <p role="status" className="product-saved text-sm px-3 py-2.5 mt-3">
@@ -317,10 +323,12 @@ function ProductDetailView({ productId }: { productId?: string }) {
             </div>
 
             <div className="product-trust mt-5 text-sm">
-              <p className="flex gap-2.5">
-                <Truck size={17} className="text-[var(--ds-accent)] shrink-0 mt-0.5" aria-hidden="true" />
-                Delivered across India. Shipping details are collected at checkout.
-              </p>
+              {CARD_SALES_OPEN && (
+                <p className="flex gap-2.5">
+                  <Truck size={17} className="text-[var(--ds-accent)] shrink-0 mt-0.5" aria-hidden="true" />
+                  Delivered across India. Shipping details are collected at checkout.
+                </p>
+              )}
               <p className="flex gap-2.5">
                 <ShieldCheck size={17} className="text-[var(--ds-accent)] shrink-0 mt-0.5" aria-hidden="true" />
                 Payments are processed by Razorpay and verified on our server before your order is

@@ -13,6 +13,7 @@ import {
   productPath,
   storeMeta,
   type PageMeta,
+  type SalesOptions,
 } from './meta';
 
 /**
@@ -27,11 +28,11 @@ export interface PrerenderedPage {
   meta: PageMeta;
 }
 
-export function prerenderedPages(site: string): PrerenderedPage[] {
+export function prerenderedPages(site: string, sales: SalesOptions = {}): PrerenderedPage[] {
   return [
-    { file: 'shygontap.html', meta: homeMeta(site) },
-    { file: 'shygontap/store.html', meta: storeMeta(site) },
-    ...products.map((product) => ({ file: `shygontap/store/${product.id}.html`, meta: productMeta(site, product) })),
+    { file: 'shygontap.html', meta: homeMeta(site, sales) },
+    { file: 'shygontap/store.html', meta: storeMeta(site, sales) },
+    ...products.map((product) => ({ file: `shygontap/store/${product.id}.html`, meta: productMeta(site, product, sales) })),
     ...(Object.keys(LEGAL_PAGES) as LegalPageId[]).map((id) => ({
       file: `${LEGAL_PAGES[id].path.slice(1)}.html`,
       meta: legalMeta(site, id),
@@ -50,8 +51,8 @@ const abs = (site: string, path: string) => (/^https?:/.test(path) ? path : `${s
  * customer Taps and the signed-in pages. It claims no canonical URL: the page
  * sets its own once it renders.
  */
-export function shellMeta(site: string): PageMeta {
-  return { ...homeMeta(site), jsonLd: undefined };
+export function shellMeta(site: string, sales: SalesOptions = {}): PageMeta {
+  return { ...homeMeta(site, sales), jsonLd: undefined };
 }
 
 /** The tags `usePageMeta` manages, as static HTML. */
@@ -141,12 +142,14 @@ export function robotsTxt(site: string): string {
 }
 
 /** https://llmstxt.org — a plain-language map of the site for language models. */
-export function llmsTxt(site: string): string {
+export function llmsTxt(site: string, { cardSales = false }: SalesOptions = {}): string {
   const rupees = (n: number) => `₹${n.toLocaleString('en-IN')}`;
   return [
     `# ${BRAND}`,
     '',
-    `> ${BRAND} is a premium NFC business card from ${COMPANY}, Bengaluru, India. Tapping the card on a phone opens the owner's digital profile in the browser — no app required. Cards come in PVC, metal and transparent finishes and are delivered across India.`,
+    cardSales
+      ? `> ${BRAND} is a premium NFC business card from ${COMPANY}, Bengaluru, India. Tapping the card on a phone opens the owner's digital profile in the browser — no app required. Cards come in PVC, metal and transparent finishes and are delivered across India.`
+      : `> ${BRAND}, from ${COMPANY}, Bengaluru, India, is a digital profile that opens in the browser in one tap, with no app required. It is sold today as a digital Tap; the NFC cards in PVC, metal and transparent finishes are coming soon.`,
     '',
     '## Pages',
     '',
@@ -155,7 +158,7 @@ export function llmsTxt(site: string): string {
     '',
     '## Cards',
     '',
-    ...products.map((p) => `- [${p.name}](${site}${productPath(p)}): ${p.description} From ${rupees(lowestPrice(p))}.`),
+    ...products.map((p) => `- [${p.name}](${site}${productPath(p)}): ${p.description} ${cardSales ? `From ${rupees(lowestPrice(p))}.` : 'Coming soon.'}`),
     '',
     '## Digital experiences',
     '',

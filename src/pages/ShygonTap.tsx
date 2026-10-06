@@ -60,8 +60,10 @@ import { cardPriceIndex, fetchCatalog } from "../services/catalog";
 import { homeMeta, LEGAL_PAGES, productPath } from "../seo/meta";
 import { usePageMeta } from "../seo/usePageMeta";
 import { editionAvailability, useEditions } from "../lib/editions";
+import { CARD_SALES_OPEN } from '../lib/commerce'
+import CardsComingSoon from '../components/CardsComingSoon'
 
-const HOME_META = homeMeta(SITE_URL)
+const HOME_META = homeMeta(SITE_URL, { cardSales: CARD_SALES_OPEN })
 
 const currency = (value: number) => value === 0 ? 'Free' : `₹${value.toLocaleString('en-IN')}`
 
@@ -465,6 +467,13 @@ function ChoiceButton({ selected, onClick, children, detail }: { selected: boole
 }
 
 function OrderButton({ product, material, tier, plan, physicalPrice, total }: { product: Product; material: MaterialId; tier: TierId; plan: DigitalPlan; physicalPrice: number; total: number }) {
+  // Card sales are closed in the V6 release candidate (D-10): no cart, no
+  // checkout, and the digital Tap offered instead.
+  if (!CARD_SALES_OPEN) return <CardsComingSoon className="commerce-coming-soon" />
+  return <CardOrderButtons product={product} material={material} tier={tier} plan={plan} physicalPrice={physicalPrice} total={total} />
+}
+
+function CardOrderButtons({ product, material, tier, plan, physicalPrice, total }: { product: Product; material: MaterialId; tier: TierId; plan: DigitalPlan; physicalPrice: number; total: number }) {
   const navigate = useNavigate()
   const save = () => {
     // A SELECTION, not a price. Checkout re-reads every amount from the catalog
@@ -1369,7 +1378,7 @@ function CartDrawer({ onClose, passPrice }: { onClose: () => void; passPrice: nu
   const plan = item ? digitalPlans.find(p => p.id === item.planId) : null
   if (isLifetime) return <div className="cart-overlay" onClick={onClose}><aside className="cart-drawer" onClick={e=>e.stopPropagation()}><div className="cart-drawer-head"><div><small>SHYGON TAP</small><h2>Your Cart</h2></div><button className="cart-close" onClick={onClose}><X/></button></div><div className="cart-item lifetime-cart-item"><div className="cart-item-image lifetime-cart-icon"><Sparkles size={34}/></div><div className="cart-item-copy"><p>ONE-TIME UPGRADE</p><h3>Customization Pass</h3><span>Change your Tap whenever you like · all colour palettes</span><strong>₹{passPrice.toLocaleString('en-IN')}</strong><button onClick={()=>{onClose();scrollToId('builder')}}>Edit / view details</button></div></div><div className="cart-trust"><div><BadgeCheck size={17}/><span>Secure checkout</span></div><div><Sparkles size={17}/><span>Unlimited changes</span></div><div><ShoppingBag size={17}/><span>No new card needed</span></div></div><div className="cart-subtotal"><span>Subtotal</span><strong>₹{passPrice.toLocaleString('en-IN')}</strong></div><button className="cart-checkout" onClick={()=>{onClose();void continueToCheckout(navigate)}}>Proceed to Checkout <ArrowRight size={18}/></button><button className="cart-continue" onClick={onClose}>Continue Shopping</button></aside></div>
   if (!item || !product || !plan) return <div className="cart-overlay" onClick={onClose}><aside className="cart-drawer" onClick={e=>e.stopPropagation()}><button className="cart-close" onClick={onClose}><X/></button><h2>Your Cart</h2><div className="empty-cart"><ShoppingCart size={38}/><strong>Your cart is empty</strong><p>Choose a Shygon Tap and build your digital experience.</p><button className="button" onClick={()=>{onClose();scrollToId('cards')}}>Continue shopping</button></div></aside></div>
-  return <div className="cart-overlay" onClick={onClose}><aside className="cart-drawer" onClick={e=>e.stopPropagation()}><div className="cart-drawer-head"><div><small>SHYGON TAP</small><h2>Your Cart</h2></div><button className="cart-close" onClick={onClose}><X/></button></div><div className="cart-item"><div className="cart-item-image"><img src={cardArt(product, item.material as MaterialId, item.tier as TierId)} alt={product.name}/></div><div className="cart-item-copy"><p>{product.eyebrow}</p><h3>{product.name}</h3><span>{materialLabels[item.material as MaterialId]} · {tierLabels[item.tier as TierId]} · {plan.name}</span><strong>{currency(item.total ?? 0)}{plan.priceSuffix}</strong><button onClick={()=>{onClose();scrollToId('builder')}}>Edit item</button></div></div><div className="cart-trust"><div><BadgeCheck size={17}/><span>Secure checkout</span></div><div><ShoppingBag size={17}/><span>Track your order</span></div><div><Sparkles size={17}/><span>Upgrade your UI later</span></div></div><div className="cart-subtotal"><span>Subtotal</span><strong>{currency(item.total ?? 0)}{plan.priceSuffix}</strong></div><button className="cart-checkout" onClick={()=>{onClose();navigate('/shygontap/auth')}}>Proceed to Checkout <ArrowRight size={18}/></button><button className="cart-continue" onClick={onClose}>Continue Shopping</button></aside></div>
+  return <div className="cart-overlay" onClick={onClose}><aside className="cart-drawer" onClick={e=>e.stopPropagation()}><div className="cart-drawer-head"><div><small>SHYGON TAP</small><h2>Your Cart</h2></div><button className="cart-close" onClick={onClose}><X/></button></div><div className="cart-item"><div className="cart-item-image"><img src={cardArt(product, item.material as MaterialId, item.tier as TierId)} alt={product.name}/></div><div className="cart-item-copy"><p>{product.eyebrow}</p><h3>{product.name}</h3><span>{materialLabels[item.material as MaterialId]} · {tierLabels[item.tier as TierId]} · {plan.name}</span><strong>{currency(item.total ?? 0)}{plan.priceSuffix}</strong><button onClick={()=>{onClose();scrollToId('builder')}}>Edit item</button></div></div><div className="cart-trust"><div><BadgeCheck size={17}/><span>Secure checkout</span></div><div><ShoppingBag size={17}/><span>Track your order</span></div><div><Sparkles size={17}/><span>Upgrade your UI later</span></div></div><div className="cart-subtotal"><span>Subtotal</span><strong>{currency(item.total ?? 0)}{plan.priceSuffix}</strong></div>{CARD_SALES_OPEN ? <button className="cart-checkout" onClick={()=>{onClose();navigate('/shygontap/auth')}}>Proceed to Checkout <ArrowRight size={18}/></button> : <CardsComingSoon />}<button className="cart-continue" onClick={onClose}>Continue Shopping</button></aside></div>
 }
 
 export default function ShygonApp() {
@@ -1418,7 +1427,7 @@ export default function ShygonApp() {
     // re-prices everything server-side.
     let pending: PendingSelection | null = null
     try { pending = JSON.parse(localStorage.getItem('shygon_pending_order') || 'null') } catch { pending = null }
-    if (!pending || pending.orderType !== 'physical') return
+    if (!pending || pending.orderType !== 'physical' || !CARD_SALES_OPEN) return
     if (pending.productId === productId && pending.material === material && pending.tier === tier && pending.planId === planId && pending.total === total) return
     localStorage.setItem('shygon_pending_order', JSON.stringify({ orderType: 'physical', productId, material, tier, planId, physicalPrice, digitalPrice: plan.price, total }))
     window.dispatchEvent(new Event('shygon-cart-updated'))

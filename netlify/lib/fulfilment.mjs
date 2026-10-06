@@ -30,7 +30,7 @@ const LEGACY_EXPERIENCE_KEYS = {
   custom: 'goat',
 };
 
-function normaliseExperienceKey(key) {
+export function normaliseExperienceKey(key) {
   const value = String(key ?? '').trim().toLowerCase();
   return LEGACY_EXPERIENCE_KEYS[value] ?? value;
 }

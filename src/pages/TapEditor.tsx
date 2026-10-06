@@ -28,7 +28,7 @@ import { useAuth } from '../lib/auth-context';
 import { useAccount } from '../lib/account-context';
 import { useToast } from '../components/app/toast-context';
 import { ConfirmDialog } from '../components/app/ConfirmDialog';
-import { ErrorState, SetupRequiredState, Skeleton } from '../components/app/States';
+import { ErrorState, NoTapState, SetupRequiredState, Skeleton } from '../components/app/States';
 import { describeError, supabase } from '../lib/supabase';
 import {
   EXPERIENCE_LABELS,
@@ -138,9 +138,9 @@ export default function TapEditor() {
     }
   }
 
-  const dirty = useMemo(() => {
-    if (!tap || !draft) return false;
-    return (Object.keys(draft) as (keyof TapDraft)[]).some((key) => {
+  const changed = useMemo(() => {
+    if (!tap || !draft) return [] as (keyof TapDraft)[];
+    return (Object.keys(draft) as (keyof TapDraft)[]).filter((key) => {
       if (key === 'enabled_customizations') {
         const a = [...(draft.enabled_customizations ?? [])].sort();
         const b = [...(tap.enabled_customizations ?? [])].sort();
@@ -152,6 +152,11 @@ export default function TapEditor() {
       return (draft[key] ?? '') !== ((tap as unknown as Record<string, unknown>)[key] ?? '');
     });
   }, [tap, draft]);
+  const dirty = changed.length > 0;
+  // Showing or hiding a field is not a content edit (enforce_tap_edit_rules),
+  // so it can be saved even while the editing window is closed: a customer can
+  // always take their number off the public page (V6-071).
+  const visibilityOnly = dirty && changed.every((key) => key === 'enabled_customizations');
 
   // The edit-state RPC is authoritative. Never turn an unknown state into an
   // unlocked editor; a real database error must fail closed.
@@ -162,6 +167,16 @@ export default function TapEditor() {
 
   function update<K extends keyof TapDraft>(key: K, value: TapDraft[K]) {
     setDraft((current) => (current ? { ...current, [key]: value } : current));
+  }
+
+  /** Phone and email need no add-on; their switch only shows or hides them. */
+  function toggleContact(key: 'phone' | 'email') {
+    if (!draft) return;
+    const current = draft.enabled_customizations ?? [];
+    update(
+      'enabled_customizations',
+      current.includes(key) ? current.filter((k) => k !== key) : [...current, key],
+    );
   }
 
   function toggleAddon(key: string) {
@@ -234,7 +249,8 @@ export default function TapEditor() {
     if (!user || !draft) return;
     setSaving(true);
     try {
-      const saved = await saveTap(user.id, draft);
+      // While the window is closed only the visibility switches are sent.
+      const saved = await saveTap(user.id, canEdit ? draft : { enabled_customizations: draft.enabled_customizations });
       setTap(saved);
       await refresh();
       toast.success('Saved', 'Your Tap profile has been updated.');
@@ -391,10 +407,7 @@ export default function TapEditor() {
         </div>
       ) : !tap ? (
         <div className="panel">
-          <ErrorState
-            title="No Tap profile yet"
-            message="Your Tap profile is created automatically the moment your first SHYGON Tap purchase is paid for."
-          />
+          <NoTapState purpose="This is where you write your Tap page and publish it." />
         </div>
       ) : (
         <>
@@ -639,34 +652,61 @@ export default function TapEditor() {
                   <Phone size={19} />
                   <div>
                     <h2>Contact</h2>
-                    <p>Phone and email are always available. Other links need an add-on.</p>
+                    <p>Phone and email need no add-on. Switch any of them off to keep it off your public Tap.</p>
                   </div>
                 </div>
                 <div className="panel-body">
-                  <label className="field">
-                    <span>Phone</span>
-                    <div className="input-prefixed">
-                      <Phone size={15} />
-                      <input
-                        value={draft?.phone ?? ''}
-                        disabled={!canEdit}
-                        onChange={(e) => update('phone', e.target.value)}
-                        placeholder="+91 98765 43210"
-                      />
+                  {([
+                    { key: 'phone', label: 'Phone', icon: Phone, placeholder: '+91 98765 43210', type: 'tel' },
+                    { key: 'email', label: 'Email', icon: Mail, placeholder: 'you@example.com', type: 'email' },
+                  ] as const).map(({ key, label, icon: Icon, placeholder, type }) => (
+                    <div key={key} style={{ marginBottom: 16 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: 7,
+                          gap: 10,
+                        }}
+                      >
+                        <label
+                          htmlFor={`tap-contact-${key}`}
+                          style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--ds-text-secondary)' }}
+                        >
+                          {label}
+                        </label>
+                        <label
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 7,
+                            fontSize: 12,
+                            fontWeight: 650,
+                            color: 'var(--muted)',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={(draft?.enabled_customizations ?? []).includes(key)}
+                            onChange={() => toggleContact(key)}
+                          />
+                          Show on Tap
+                        </label>
+                      </div>
+                      <div className="input-prefixed">
+                        <Icon size={15} />
+                        <input
+                          id={`tap-contact-${key}`}
+                          type={type}
+                          value={draft?.[key] ?? ''}
+                          disabled={!canEdit}
+                          onChange={(e) => update(key, e.target.value)}
+                          placeholder={placeholder}
+                        />
+                      </div>
                     </div>
-                  </label>
-                  <label className="field">
-                    <span>Email</span>
-                    <div className="input-prefixed">
-                      <Mail size={15} />
-                      <input
-                        value={draft?.email ?? ''}
-                        disabled={!canEdit}
-                        onChange={(e) => update('email', e.target.value)}
-                        placeholder="you@example.com"
-                      />
-                    </div>
-                  </label>
+                  ))}
 
                   {CONTACT_ADDONS.map(({ key, icon: Icon, label }) => {
                     const owned = entitlements.customizations.includes(key);
@@ -751,7 +791,7 @@ export default function TapEditor() {
                   <button
                     className="btn btn-blue"
                     onClick={() => void save()}
-                    disabled={saving || !dirty || !canEdit}
+                    disabled={saving || !dirty || !(canEdit || visibilityOnly)}
                   >
                     {saving ? <Loader2 size={15} className="spin" /> : <CheckCircle2 size={15} />}
                     {saving ? 'Saving…' : 'Save changes'}

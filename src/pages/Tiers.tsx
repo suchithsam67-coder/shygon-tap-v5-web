@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Infinity as InfinityIcon, Loader2, Lock, Palette, Sparkles } from 'lucide-react';
+import { Check, Infinity as InfinityIcon, Loader2, Palette, Sparkles } from 'lucide-react';
 import { AppShell } from '../components/app/AppShell';
 import { useAuth } from '../lib/auth-context';
 import { useAccount } from '../lib/account-context';
@@ -79,6 +79,9 @@ export default function Tiers() {
   }
 
   async function purchase(experience: Experience) {
+    // A customer without a Tap is buying their first one (D-10): payment
+    // creates the Tap page as a draft, already set to this experience.
+    const firstTap = !tap;
     const product = experiencePrice(catalog, experience);
     if (!product) {
       toast.error(
@@ -95,6 +98,11 @@ export default function Tiers() {
       // experience id are the same string.
       await startCheckout({ orderType: 'digitalUpgrade', planId: experience });
       await refresh();
+      if (firstTap) {
+        toast.success('Your SHYGON Tap draft is ready', 'Review your Tap page and publish it when you are ready.');
+        navigate('/shygontap/tap');
+        return;
+      }
       if (user) setTap(await saveTap(user.id, { selected_ui_tier: experience }));
       toast.success('Upgrade complete', `Your Tap now opens in ${EXPERIENCE_LABELS[experience]}.`);
     } catch (err) {
@@ -143,7 +151,11 @@ export default function Tiers() {
     <AppShell
       eyebrow="Digital experience"
       title="Choose how your Tap opens"
-      description="Four experiences, one physical card. Upgrading changes the presentation of your Tap — you never buy another card. What your public Tap renders is decided by the server, not by this page."
+      description={
+        tap
+          ? 'Four experiences for one Tap. Upgrading changes how your Tap opens; you never buy a second Tap. What your public Tap shows is decided by the server, not by this page.'
+          : "Pick the experience your Tap opens in. Your Tap page is created as a draft as soon as your payment is confirmed, and you publish it when you're ready."
+      }
     >
       {loading || accountLoading ? (
         <div className="tier-grid">
@@ -185,14 +197,14 @@ export default function Tiers() {
                   aria-pressed={state === 'active'}
                   disabled={busy !== null}
                   onClick={() => {
-                    if (!tap) {
-                      toast.error(
-                        'No Tap profile yet',
-                        'Purchase a SHYGON Tap to get your profile, then choose an experience.',
+                    if (!tap && experience === 'essential') {
+                      toast.info(
+                        'Essential is included',
+                        'Every Tap includes Essential. Choose Business, Premium or GOAT to create your Tap.',
                       );
                       return;
                     }
-                    if (owns) void applyOwned(experience);
+                    if (owns && tap) void applyOwned(experience);
                     else void purchase(experience);
                   }}
                 >
@@ -221,17 +233,18 @@ export default function Tiers() {
                   </ul>
 
                   <div className="tier-price">
-                    {owns ? (
+                    {!tap && experience === 'essential' ? (
+                      <span className="pill pill-green">
+                        <Check size={12} /> Included with every Tap
+                      </span>
+                    ) : owns ? (
                       <span className={state === 'active' ? 'pill pill-blue' : 'pill pill-green'}>
                         <Check size={12} /> {ENTITLEMENT_STATE_LABELS[state]}
                       </span>
                     ) : product ? (
                       <>
                         <strong>{priceLabel(product.priceInPaise)}</strong>
-                        <span className={state === 'available' ? 'pill pill-amber' : 'pill'}>
-                          {state === 'available' ? null : <Lock size={11} />}
-                          {ENTITLEMENT_STATE_LABELS[state]}
-                        </span>
+                        <span className="pill pill-amber">{ENTITLEMENT_STATE_LABELS.available}</span>
                       </>
                     ) : (
                       <span className="pill">Not available</span>

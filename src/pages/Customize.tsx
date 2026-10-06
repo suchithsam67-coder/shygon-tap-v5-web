@@ -5,7 +5,7 @@ import { AppShell } from '../components/app/AppShell';
 import { useAuth } from '../lib/auth-context';
 import { useAccount } from '../lib/account-context';
 import { useToast } from '../components/app/toast-context';
-import { ErrorState, Skeleton } from '../components/app/States';
+import { ErrorState, NoTapState, Skeleton } from '../components/app/States';
 import { describeError, isMissingSchema } from '../lib/supabase';
 import { EXPERIENCE_LABELS, fetchEventTheme, fetchThemeOptions, saveTap, themeOf } from '../services/tap';
 import { PALETTES } from '../components/tap/palettes';
@@ -235,10 +235,7 @@ export default function Customize() {
         </div>
       ) : !tap ? (
         <div className="panel">
-          <ErrorState
-            title="No Tap profile yet"
-            message="Your Tap profile is created automatically once your first SHYGON Tap purchase is paid for."
-          />
+          <NoTapState purpose="Colours, layout and fonts for your Tap are set here." />
         </div>
       ) : (
         <div className="tap-editor-layout">

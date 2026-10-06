@@ -958,6 +958,27 @@ body:has(.storefront) .select option { background: #141618; color: var(--ds-text
   color: var(--ds-text-secondary);
 }
 
+/* Card sales are closed in the V6 release candidate (D-10): wherever a card
+   would be bought, this says so and offers the digital Tap instead. */
+.cards-coming-soon {
+  display: block;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--ds-border);
+  border-radius: 14px;
+  background: var(--ds-surface-raised);
+  color: var(--ds-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.cards-coming-soon strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ds-text);
+  font-size: 15px;
+}
+.cards-coming-soon .btn { margin-top: 12px; }
+
 /* Account status panels. The shared .panel edge is scoped in
    customer-experience.css, so these carry the same scope to win. */
 body:has(.storefront) .panel.panel-warning { border-color: rgba(251, 191, 36, 0.45); }

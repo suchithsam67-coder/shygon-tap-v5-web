@@ -145,7 +145,18 @@ export function breadcrumbList(site: string, trail: Array<[name: string, path: s
   };
 }
 
-function productLd(site: string, product: Product): JsonLd {
+/**
+ * Whether physical cards are on sale (D-10). Pages and the build pass it in
+ * explicitly: this module also runs in the Node build, where import.meta.env
+ * does not exist. Closed unless a caller says otherwise, as in the V6 RC.
+ */
+export interface SalesOptions {
+  cardSales?: boolean;
+}
+
+function productLd(site: string, product: Product, cardSales: boolean): JsonLd {
+  // No offer is claimed for a card that cannot be bought: structured data that
+  // advertises an unavailable offer misleads search engines.
   return {
     '@type': 'Product',
     '@id': `${site}${productPath(product)}#product`,
@@ -155,15 +166,19 @@ function productLd(site: string, product: Product): JsonLd {
     brand: { '@type': 'Brand', name: BRAND },
     image: [abs(site, productShareImage(product)), ...MATERIALS.map((m) => abs(site, product.images[m]))],
     material: MATERIALS.map((m) => materialLabels[m]).join(', '),
-    offers: {
-      '@type': 'AggregateOffer',
-      priceCurrency: 'INR',
-      lowPrice: lowestPrice(product),
-      highPrice: highestPrice(product),
-      offerCount: Object.values(product.pricing).length * MATERIALS.length,
-      url: abs(site, productPath(product)),
-      seller: { '@id': `${site}/#organization` },
-    },
+    ...(cardSales
+      ? {
+          offers: {
+            '@type': 'AggregateOffer',
+            priceCurrency: 'INR',
+            lowPrice: lowestPrice(product),
+            highPrice: highestPrice(product),
+            offerCount: Object.values(product.pricing).length * MATERIALS.length,
+            url: abs(site, productPath(product)),
+            seller: { '@id': `${site}/#organization` },
+          },
+        }
+      : {}),
   };
 }
 
@@ -182,11 +197,12 @@ function itemList(site: string): JsonLd {
 
 // ----------------------------------------------------------------- pages ---
 
-export function homeMeta(site: string): PageMeta {
+export function homeMeta(site: string, { cardSales = false }: SalesOptions = {}): PageMeta {
   return {
     title: `${BRAND} — Premium NFC Business Cards & Digital Profiles`,
-    description:
-      'Premium NFC business cards in PVC, metal and transparent finishes, with a digital profile that opens in one tap — no app needed. Delivered across India.',
+    description: cardSales
+      ? 'Premium NFC business cards in PVC, metal and transparent finishes, with a digital profile that opens in one tap — no app needed. Delivered across India.'
+      : 'A digital profile that opens in one tap, no app needed. Premium NFC cards in PVC, metal and transparent finishes are coming soon.',
     path: '/shygontap',
     image: DEFAULT_SHARE_IMAGE,
     imageAlt: 'A SHYGON Tap NFC card beside the words One tap. One identity.',
@@ -194,11 +210,13 @@ export function homeMeta(site: string): PageMeta {
   };
 }
 
-export function storeMeta(site: string): PageMeta {
+export function storeMeta(site: string, { cardSales = false }: SalesOptions = {}): PageMeta {
   const from = Math.min(...products.map(lowestPrice));
   return {
     title: `Shop NFC Cards | ${BRAND}`,
-    description: `Compare ${BRAND} NFC cards for business, restaurants, events and Google reviews. Available in PVC, metal and transparent, from ${rupees(from)}.`,
+    description: cardSales
+      ? `Compare ${BRAND} NFC cards for business, restaurants, events and Google reviews. Available in PVC, metal and transparent, from ${rupees(from)}.`
+      : `${BRAND} NFC cards for business, restaurants, events and Google reviews, in PVC, metal and transparent. Coming soon; your digital Tap is available today.`,
     path: '/shygontap/store',
     image: DEFAULT_SHARE_IMAGE,
     imageAlt: `${BRAND} NFC cards`,
@@ -209,17 +227,19 @@ export function storeMeta(site: string): PageMeta {
   };
 }
 
-export function productMeta(site: string, product: Product): PageMeta {
+export function productMeta(site: string, product: Product, { cardSales = false }: SalesOptions = {}): PageMeta {
   return {
     title: `${shortName(product)} NFC Card | ${BRAND}`,
-    description: `${product.description} In PVC, metal or transparent, from ${rupees(lowestPrice(product))}. Delivered across India.`,
+    description: cardSales
+      ? `${product.description} In PVC, metal or transparent, from ${rupees(lowestPrice(product))}. Delivered across India.`
+      : `${product.description} Coming soon in PVC, metal or transparent.`,
     path: productPath(product),
     image: productShareImage(product),
     imageAlt: `${BRAND} ${shortName(product)} NFC card`,
     type: 'product',
     jsonLd: [
       breadcrumbList(site, [[BRAND, '/shygontap'], ['Store', '/shygontap/store'], [product.name, productPath(product)]]),
-      productLd(site, product),
+      productLd(site, product, cardSales),
     ],
   };
 }

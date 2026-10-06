@@ -18,6 +18,11 @@
     "brand": "node scripts/brand/generate.mjs",
     "test:payments": "node netlify/tests/payments-and-sms.mjs && node netlify/tests/functions-security.mjs",
     "test:payments:ci": "node --import ./scripts/ci/deny-network.mjs netlify/tests/payments-and-sms.mjs && node --import ./scripts/ci/deny-network.mjs netlify/tests/functions-security.mjs",
+    "test:payment-chain": "node --import ./scripts/ci/deny-network.mjs netlify/tests/payment-chain.mjs",
+    "test:public-tap": "node --import ./scripts/ci/deny-network.mjs supabase/tests/public-tap.mjs",
+    "test:components": "vitest run",
+    "stack": "node supabase/local/serve.mjs",
+    "test:e2e": "playwright test",
     "test:db": "npm run db:apply && npm run db:verify && node supabase/tests/rls-adversarial.mjs && npm run test:rls-matrix && npm run test:identity && npm run test:admin-notes && npm run test:golden && npm run test:admin-contract && npm run test:rollbacks && npm run db:bundle:check && npm run test:db:history",
     "test:identity": "node supabase/tests/identity-contract.mjs",
     "test:golden": "node supabase/tests/golden-public-tap.mjs",
@@ -30,7 +35,7 @@
     "test:push-guard": "node supabase/tests/db-push-guard.mjs",
     "test:bundle": "node scripts/check-bundle-size.mjs",
     "test:secrets": "node scripts/ci/secret-scan.mjs",
-    "ci": "npm run lint && npm run build && npm run test:bundle && npm run test:push-guard && npm run test:db && npm run test:payments:ci && npm run test:secrets && npm audit --audit-level=high"
+    "ci": "npm run lint && npm run build && npm run test:bundle && npm run test:push-guard && npm run test:db && npm run test:payments:ci && npm run test:payment-chain && npm run test:public-tap && npm run test:components && npm run test:secrets && npm audit --audit-level=high"
   },
   "dependencies": {
     "@fontsource/geist": "^5.3.0",
@@ -46,9 +51,13 @@
     "tailwindcss": "^4.2.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^9.39.1",
     "@fontsource/playfair-display": "^5.3.0",
+    "@playwright/test": "^1.63.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -57,9 +66,11 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "jsdom": "^26.1.0",
     "opentype.js": "^1.3.4",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.1.11"
   }
 }

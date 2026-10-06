@@ -63,6 +63,21 @@ const F2_UPD = [
     "  WHERE id = p_order_id;\n\n  -- The note is internal: it lives in order_admin_notes, which no customer can\n  -- read, not on the customer's own order row. A blank note keeps the existing one.\n  IF NULLIF(btrim(COALESCE(p_note, '')), '') IS NOT NULL THEN\n    INSERT INTO public.order_admin_notes (order_id, note, updated_by, updated_at)\n    VALUES (p_order_id, btrim(p_note), v_admin, NOW())\n    ON CONFLICT (order_id) DO UPDATE\n      SET note = EXCLUDED.note, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at;\n  END IF;\n\n  -- Cards leave the building with the order they belong to.\n",
   ],
 ];
+// V6-073 + V6-032 (migration 025, DEC-2026-035): salted daily visitor hash,
+// 10-second dedupe and a per-visitor hourly cap. Same signature and grants.
+const V6_073 = [
+  ["  v_ref     TEXT;\nBEGIN\n",
+   "  v_ref     TEXT;\n  v_day     DATE;\n  v_salt    TEXT;\n  v_hash    TEXT;\n  v_link    TEXT;\nBEGIN\n"],
+  ["  INSERT INTO public.tap_events\n    (tap_profile_id, event_type, link_key, visitor_hash, referrer_host)\n  VALUES (\n    v_tap_id,\n    p_event,\n    left(NULLIF(btrim(COALESCE(p_link_key, '')), ''), 48),\n    md5(COALESCE(v_ua, '') || '|' || COALESCE(v_ip, '') || '|' ||\n        to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD')),\n",
+   "  -- V6-073: the visitor hash is salted with a random value per UTC day. The\n  -- salt never leaves the database and is deleted after two days, so a hash\n  -- cannot be reversed to an IP address and user agent by brute force, nor\n  -- linked across days. Unique visitors per day still count correctly.\n  v_day := (NOW() AT TIME ZONE 'UTC')::date;\n  INSERT INTO public.tap_visitor_salts (day, salt)\n  VALUES (v_day, md5(gen_random_uuid()::text) || md5(gen_random_uuid()::text))\n  ON CONFLICT (day) DO NOTHING;\n  SELECT s.salt INTO v_salt FROM public.tap_visitor_salts s WHERE s.day = v_day;\n  DELETE FROM public.tap_visitor_salts WHERE day < v_day - 1;\n  v_hash := encode(sha256(convert_to(\n    v_salt || '|' || COALESCE(v_ua, '') || '|' || COALESCE(v_ip, ''), 'UTF8')), 'hex');\n  v_link := left(NULLIF(btrim(COALESCE(p_link_key, '')), ''), 48);\n\n  -- V6-032: the same visitor sending the same event within 10 seconds counts\n  -- once (double taps, reloads), and no visitor records more than 60 events\n  -- on one Tap in an hour. Both read idx_tap_events_profile_visitor_time.\n  IF EXISTS (\n       SELECT 1 FROM public.tap_events e\n       WHERE e.tap_profile_id = v_tap_id AND e.visitor_hash = v_hash\n         AND e.event_type = p_event AND e.link_key IS NOT DISTINCT FROM v_link\n         AND e.occurred_at > NOW() - INTERVAL '10 seconds')\n     OR (SELECT count(*) FROM public.tap_events e\n         WHERE e.tap_profile_id = v_tap_id AND e.visitor_hash = v_hash\n           AND e.occurred_at > NOW() - INTERVAL '1 hour') >= 60 THEN\n    RETURN;\n  END IF;\n\n  INSERT INTO public.tap_events\n    (tap_profile_id, event_type, link_key, visitor_hash, referrer_host)\n  VALUES (\n    v_tap_id,\n    p_event,\n    v_link,\n    v_hash,\n"],
+];
+// V6-071 (migration 025, DEC-2026-035): the owner's visibility list is kept as
+// given; phone and email are no longer forced back on. Not a frozen function,
+// so "no other existing function changed" defers to this entry.
+const V6_071 = [
+  ["NEW.enabled_customizations:=ARRAY(SELECT DISTINCT value FROM unnest(COALESCE(NEW.enabled_customizations,'{}'::text[]) || ARRAY['phone','email']) AS u(value) WHERE value<>'' ORDER BY value);",
+   "NEW.enabled_customizations:=ARRAY(SELECT DISTINCT value FROM unnest(COALESCE(NEW.enabled_customizations,'{}'::text[])) AS u(value) WHERE value<>'' ORDER BY value);"],
+];
 const APPROVED_BODY_CHANGES = {
   'provision_tap_on_payment()': {
     decision: 'DEC-2026-024 D-U4 (migration 021)', replacements: D_U4,
@@ -76,6 +91,14 @@ const APPROVED_BODY_CHANGES = {
     decision: 'DEC-2026-035 V6-010 F2 (migration 022)', replacements: F2_UPD,
     summary: 'note written to order_admin_notes instead of the order row; nothing else',
   },
+  'record_tap_event(text,text,text)': {
+    decision: 'DEC-2026-035 V6-073 + V6-032 (migration 025)', replacements: V6_073,
+    summary: 'salted daily visitor hash, dedupe and hourly cap; nothing else',
+  },
+  'enforce_tap_edit_rules()': {
+    decision: 'DEC-2026-035 V6-071 (migration 025)', replacements: V6_071,
+    summary: 'phone and email no longer forced visible; nothing else',
+  },
 };
 
 // EXECUTE grants an approved decision removes. Grantee '' is PUBLIC. Every
@@ -83,6 +106,7 @@ const APPROVED_BODY_CHANGES = {
 const APPROVED_ACL_CHANGES = {
   'require_admin(text)': { decision: 'DEC-2026-035 V6-030 O-1 (migration 024)', remove: ['anon'] },
   'admin_has(text)': { decision: 'DEC-2026-035 V6-030 O-1 (migration 024)', remove: ['', 'anon'] },
+  'get_public_tap(text)': { decision: 'DEC-2026-035 V6-071 (migration 025)', remove: ['anon', 'authenticated'] },
 };
 
 // Policies an approved decision removes or re-targets. Their USING / WITH CHECK
@@ -98,6 +122,7 @@ const APPROVED_POLICY_CHANGES = {
 // authenticated or PUBLIC, and each must have row level security on.
 const APPROVED_NEW_RELATIONS = {
   order_admin_notes: 'DEC-2026-035 V6-010 F2 (migration 022)',
+  tap_visitor_salts: 'DEC-2026-035 V6-073 (migration 025)',
 };
 
 const aclItems = (acl) => (acl ? acl.replace(/^\{|\}$/g, '').split(',').filter(Boolean) : []);
@@ -258,7 +283,7 @@ for (const [signature, { decision, replacements }] of Object.entries(APPROVED_BO
     let expected = before;
     for (const [from, to] of replacements) {
       assert(expected.split(from).length === 2, `the baseline body does not contain ${JSON.stringify(from)} exactly once`);
-      expected = expected.replace(from, to);
+      expected = expected.replace(from, () => to);
     }
     assert(after === expected, 'the migrated body is not the baseline body with only the approved replacements');
     return APPROVED_BODY_CHANGES[signature].summary;
@@ -267,10 +292,15 @@ for (const [signature, { decision, replacements }] of Object.entries(APPROVED_BO
 
 await check('no other existing function changed (signature, body, grants)', () => {
   const others = base.all.filter((f) => !isFrozen(f.name));
-  const problems = diffRows(others, mig.all, (f) => f.signature, [...SIGNATURE_FIELDS, 'body_md5']);
+  const approved = others.filter((f) => APPROVED_BODY_CHANGES[f.signature]);
+  const problems = [
+    ...diffRows(others.filter((f) => !APPROVED_BODY_CHANGES[f.signature]), mig.all, (f) => f.signature, [...SIGNATURE_FIELDS, 'body_md5']),
+    // An approved body change (checked above) keeps everything else.
+    ...diffRows(approved, mig.all, (f) => f.signature, SIGNATURE_FIELDS),
+  ];
   assert(problems.length === 0, problems.join('; '));
   const added = mig.all.filter((f) => !base.all.some((b) => b.signature === f.signature)).map((f) => f.signature);
-  return `${others.length} unchanged; new: ${added.join(', ') || 'none'}`;
+  return `${others.length - approved.length} unchanged; body approved: ${approved.map((f) => f.signature).join(', ') || 'none'}; new: ${added.join(', ') || 'none'}`;
 });
 
 await check('no policy changed, added or removed, except the approved ones', () => {

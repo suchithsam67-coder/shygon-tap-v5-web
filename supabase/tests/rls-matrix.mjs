@@ -68,6 +68,7 @@ await db.exec(`
   INSERT INTO public.admin_notification_reads (notification_id, admin_id) VALUES
     ('aa000000-0000-4000-8000-000000000001', '${V}'), ('aa000000-0000-4000-8000-000000000001', '${AD}');
   INSERT INTO public.admin_push_tokens (admin_id, expo_token) VALUES ('${V}', 'tok-viewer'), ('${AD}', 'tok-admin');
+  INSERT INTO public.tap_visitor_salts (day, salt) VALUES (current_date, 'matrix-salt');
 `);
 for (const [u, n] of [[A, 1], [B, 2]]) {
   const o = `0${n}000000-0000-4000-8000-0000000000a${n}`;
@@ -148,6 +149,7 @@ const MODEL = {
   tap_events: { owner: VIA_TAP, select: sel(NONE, VIA_TAP, ALL) },
   // D-6 / O-14 (023): no insert, not even of the caller's own Tap.
   tap_profiles: { owner: OWN('user_id'), select: sel(NONE, OWN('user_id'), ALL), update: OWN('user_id') },
+  tap_visitor_salts: { owner: NONE, select: sel(NONE, NONE) }, // V6-073 (025): record_tap_event only
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };
