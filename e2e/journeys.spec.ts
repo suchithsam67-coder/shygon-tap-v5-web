@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { apiCustomer, buyExperience, dismissCookieNotice, eventually, razorpay, server, stayLocal } from './stack';
+import { apiCustomer, buyExperience, dismissCookieNotice, eventually, razorpay, server, stayLocal, cspViolations } from './stack';
 
 /**
  * The three V6 end-to-end journeys (Stage 5), on the local stack:
@@ -39,6 +39,11 @@ async function signInInBrowser(page: Page, email: string, password: string) {
 }
 
 const tierCard = (page: Page, name: string) => page.locator('.tier-card', { has: page.getByRole('heading', { name, exact: true }) });
+
+// The production CSP blocked nothing on any page of the journey.
+test.afterEach(async ({ context }) => {
+  expect(cspViolations(context)).toEqual([]);
+});
 
 test('(a) a new customer signs up, buys their Tap, publishes it, and a visitor sees it', async ({ page, browser }) => {
   await razorpay(page, { outcome: 'success', webhook: 'after' });

@@ -61,6 +61,12 @@ jobs:
       - name: bundle check (public Tap entry JS <= 90 kB gz; DEC-2026-019)
         run: npm run test:bundle
 
+      # V6 Stage 5: what the browser downloads carries no secret: no JWT but
+      # the public anon key, no server-only setting name, no private key, no
+      # live Razorpay key before G-PAY, no source map.
+      - name: no secrets in the bundle
+        run: npm run test:bundle-secrets
+
       # DEC-2026-023 S1 (amendment A-1): db:push refuses every project not on
       # the committed allowlist, sends only 020+, and checks before any network
       # call. Runs with outbound network denied; no credential is involved.
@@ -155,6 +161,12 @@ jobs:
       # security events; /api/health. Outbound network denied.
       - name: observability (local stack)
         run: npm run test:observability
+
+      # V6 Stage 5: forged, expired and unsigned tokens are refused by every
+      # customer function; the security headers meet the policy and are served
+      # on every page; no foreign origin is allowed by CORS. Needs the build.
+      - name: security, tokens, headers and CORS (local stack)
+        run: npm run test:security
 
       # V6-083: the public Tap page in every state a visitor can meet.
       - name: component tests

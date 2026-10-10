@@ -50,8 +50,12 @@ Priority: P0 release blocker · P1 must complete · P2 should complete · P3 def
 | V6-092 | Testing | The add-on and Customization Pass checkouts (live in the RC) had no chain test | P2 | 4 | **done:** 3 tests in `payment-chain` (30/30) |
 | V6-093 | Privacy | O-17: a deleted Tap's address can be claimed again; shared links and QR codes would then open someone else's Tap | P2 | 4 (decision) | new: owner decision (D-12 item 3) |
 | V6-094 | Observability | Admin edge functions log free text and do not log a refused caller as a security event | P3 | 5/6 | new |
+| V6-095 | Tenant isolation | Storage bucket `profile-images` (profile photos): its policies exist only on live, so cross-account writes are untested | P1 until verified | 5 → owner | **VERIFY ON LIVE:** read-only queries and expected results in PRODUCTION.md §7. A gap becomes a reviewed storage-policy change |
+| V6-096 | Privacy | `avatar_url` accepts any URL: an owner can point their photo at any host, so visitors' browsers contact it, sidestepping the salted visitor hash (V6-073). Not script injection (an image URL runs no code) | P2 | 5 → owner | new: recommended, accept only the project's storage URL (a database check). A product and policy call |
+| V6-097 | Testing | **Defect in the local stack, found by `test:security`:** the app host never served the security headers (`[headers.values]` is indented in netlify.toml), so the E2E journeys ran without the CSP | P1 | 5 | **fixed:** headers on every response (files, redirects, 404). The 7 journeys now run under the production CSP and fail on any violation (watcher proven by a probe) |
+| V6-098 | Debt | `src/pages/Home.tsx` and `ProjectConsultation.tsx` are routed nowhere (dead). The form also posts to Web3Forms, which the CSP would block | P3 | 6 | new: delete in Stage 6 cleanup (with V6-052) |
 | V6-014 | Release | Secret-scan gate on `9c8caa7` (D-7) | P1 | 5 | open (D-7) |
-| V6-044 | Admin | Edge-function CORS `*` | P3 | 5 | open |
+| V6-044 | Admin | Edge-function CORS `*` | P3 | 5 | **reviewed:** the admin edge functions take a bearer token and no cookies, so `*` lets no other site act as an administrator without the token itself. Tightening it to the admin app's origins is safe hygiene but part of the admin app contract (D-8). The Netlify functions send no CORS headers at all (`test:security`) |
 | V6-036 | Auth | Password policy and email confirmation are Supabase project settings: production configuration doc; align the client minimum to it | P2 | 6 (ask) | open |
 | V6-039 | Accessibility | Automated a11y checks, skip link | P2 | 6 | open |
 | V6-074 | Privacy | Privacy docs updated to the V6 behaviour | P2 | 6 | new |

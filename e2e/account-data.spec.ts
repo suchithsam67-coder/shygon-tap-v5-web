@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { apiCustomer, buyExperience, dismissCookieNotice, server, stayLocal } from './stack';
+import { apiCustomer, buyExperience, dismissCookieNotice, server, stayLocal, cspViolations } from './stack';
 
 /**
  * A customer's own data (V6-072), on the local stack: they download a copy of
@@ -28,6 +28,11 @@ async function askForDeletion(page: Page) {
   await page.getByRole('button', { name: 'Send the request' }).click();
   await page.waitForURL('**/shygontap/support');
 }
+
+// The production CSP blocked nothing on any page of the journey.
+test.afterEach(async ({ context }) => {
+  expect(cspViolations(context)).toEqual([]);
+});
 
 test('a customer downloads their own data, then asks for deletion; nothing is deleted yet', async ({ page }) => {
   const someoneElse = await apiCustomer('Someone Else');

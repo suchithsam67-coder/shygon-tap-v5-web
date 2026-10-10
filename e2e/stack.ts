@@ -67,9 +67,32 @@ export async function buyExperience(customer: { token: string }, planId: string)
   return order.order_id;
 }
 
-/** Nothing leaves the machine: every request to a non-local host is aborted. */
+const violations = new WeakMap<BrowserContext, string[]>();
+
+/**
+ * Nothing leaves the machine: every request to a non-local host is aborted.
+ * And every Content-Security-Policy violation on any page of the context is
+ * recorded, so a journey proves the production policy (served by the local
+ * host from netlify.toml) blocks nothing the app needs.
+ */
 export async function stayLocal(context: BrowserContext) {
   await context.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, (route) => route.abort());
+  const seen: string[] = [];
+  violations.set(context, seen);
+  await context.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (event) => {
+      console.error(`[csp] ${event.violatedDirective} blocked ${event.blockedURI || '(inline)'}`);
+    });
+  });
+  context.on('console', (message) => {
+    const text = message.text();
+    if (text.startsWith('[csp] ')) seen.push(`${message.page()?.url() ?? '?'}: ${text.slice(6)}`);
+  });
+}
+
+/** The CSP violations recorded in `context` so far. */
+export function cspViolations(context: BrowserContext): string[] {
+  return violations.get(context) ?? [];
 }
 
 /**

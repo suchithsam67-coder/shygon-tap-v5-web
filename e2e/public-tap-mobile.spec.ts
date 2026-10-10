@@ -1,10 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { apiCustomer, buyExperience, eventually, server, stayLocal } from './stack';
+import { apiCustomer, buyExperience, eventually, server, stayLocal, cspViolations } from './stack';
 
 /**
  * The public Tap on a phone (Stage 3 "mobile layout"): it renders, nothing
  * overflows sideways, and the contact the owner chose to hide is not there.
  */
+// The production CSP blocked nothing on any page of the journey.
+test.afterEach(async ({ context }) => {
+  expect(cspViolations(context)).toEqual([]);
+});
+
 test('a published Tap on a phone: renders, no sideways scroll, hidden contact absent', async ({ page, context }) => {
   await stayLocal(context);
   const db = server();

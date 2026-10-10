@@ -22,6 +22,8 @@
     "test:public-tap": "node --import ./scripts/ci/deny-network.mjs supabase/tests/public-tap.mjs",
     "test:admin-edge": "node --import ./scripts/ci/deny-network.mjs supabase/tests/admin-edge.mjs",
     "test:observability": "node --import ./scripts/ci/deny-network.mjs netlify/tests/observability.mjs",
+    "test:security": "node --import ./scripts/ci/deny-network.mjs netlify/tests/security.mjs",
+    "test:bundle-secrets": "node scripts/ci/check-bundle-secrets.mjs dist",
     "test:account-deletion": "node supabase/tests/account-deletion.mjs",
     "test:components": "vitest run",
     "stack": "node supabase/local/serve.mjs",
@@ -38,7 +40,7 @@
     "test:push-guard": "node supabase/tests/db-push-guard.mjs",
     "test:bundle": "node scripts/check-bundle-size.mjs",
     "test:secrets": "node scripts/ci/secret-scan.mjs",
-    "ci": "npm run lint && npm run build && npm run test:bundle && npm run test:push-guard && npm run test:db && npm run test:payments:ci && npm run test:payment-chain && npm run test:public-tap && npm run test:admin-edge && npm run test:observability && npm run test:components && npm run test:secrets && npm audit --audit-level=high"
+    "ci": "npm run lint && npm run build && npm run test:bundle && npm run test:bundle-secrets && npm run test:push-guard && npm run test:db && npm run test:payments:ci && npm run test:payment-chain && npm run test:public-tap && npm run test:admin-edge && npm run test:observability && npm run test:security && npm run test:components && npm run test:secrets && npm audit --audit-level=high"
   },
   "dependencies": {
     "@fontsource/geist": "^5.3.0",

@@ -5,6 +5,16 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### SHYGON V6 Stage 5: security verification and E2E (2026-10-10), branch `v6/stage-5-security-e2e`
+- **Verification:** every Stage 5 requirement is mapped to its evidence in `docs/v6/stage-5-report.md`. No new P0.
+- **New gates:**
+  - `test:security` (11): forged, expired, unsigned and impersonating tokens refused by every customer function; the security header policy, served on every page; no CORS for foreign origins;
+  - `test:bundle-secrets`: no secret, source map or live Razorpay key in the built site.
+- **Fixed (V6-097):** the local stack never served the security headers, so the E2E journeys had run without the CSP. They now run under the production CSP and fail on any violation: 7/7, none.
+- **Open:**
+  - V6-095, storage policies are only on live: VERIFY ON LIVE queries in PRODUCTION.md §7;
+  - V6-096, `avatar_url` accepts any host (owner decision).
+
 ### SHYGON V6 Stage 4: customer, admin and observability (2026-10-10), branch `v6/stage-4-customer-admin`
 - **Your data (V6-072):** Settings → Your data downloads a JSON copy of the account's own data. "Ask us to delete your account" opens one `privacy` support ticket. Deletion is the manual, tested runbook `docs/runbooks/RUNBOOK-account-deletion.md` (needs D-12).
 - **Migration 026 (V6-090):** an account delete can no longer cascade into the customer's orders and payment records (`orders_user_id_fkey` → `RESTRICT`). Proven against the live baseline's cascade by `test:account-deletion`.

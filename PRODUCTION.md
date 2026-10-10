@@ -601,6 +601,24 @@ ticket. It is handled by hand with `docs/runbooks/RUNBOOK-account-deletion.md`.
 before migration 026 is applied: on the live baseline it deletes their orders
 and payment records too.
 
+**Storage: profile photos** (V6 Stage 5, VERIFY ON LIVE) — the `profile-images`
+bucket and its policies exist only on the live project (they are not in the
+public-schema baseline), so no local test covers them. Read-only, in the SQL
+editor:
+```sql
+SELECT id, public, file_size_limit, allowed_mime_types FROM storage.buckets WHERE id = 'profile-images';
+-- expect: public = true; a file_size_limit (e.g. 5 MB); allowed_mime_types limited to
+-- image/jpeg, image/png, image/webp (no image/svg+xml, no text/html)
+SELECT policyname, cmd, roles::text, qual, with_check FROM pg_policies
+ WHERE schemaname = 'storage' AND tablename = 'objects' ORDER BY 1;
+-- expect, for profile-images: INSERT, UPDATE and DELETE only TO authenticated and only
+-- where (storage.foldername(name))[1] = auth.uid()::text (the app writes <user id>/avatar-…);
+-- no policy that lets anon write, or one account write another account's folder
+```
+If either differs, it is a **P1**: the app uploads with `upsert`, so one
+customer could replace another's photo on their public Tap. The fix is a
+reviewed storage-policy change (owner approval). V6-095.
+
 **Animations, on a real phone** — Essential opens with no animation at all;
 Business, Premium and GOAT each play their own; GOAT's tint differs morning vs
 evening.

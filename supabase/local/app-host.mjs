@@ -51,8 +51,12 @@ export function parseNetlifyToml(text) {
         force: field('force') === 'true',
       });
     } else if (block.startsWith('[[headers]]') && /for\s*=\s*"\/\*"/.test(block)) {
-      const values = blocks[i + 1]?.startsWith('[headers.values]') ? blocks[i + 1] : '';
+      // [headers.values] is indented under its [[headers]] in netlify.toml, so it
+      // is part of this block; a flush-left one would start the next block.
+      const at = block.indexOf('[headers.values]');
+      const values = at >= 0 ? block.slice(at) : blocks[i + 1]?.startsWith('[headers.values]') ? blocks[i + 1] : '';
       for (const [, key, value] of values.matchAll(/^\s*([A-Za-z-]+)\s*=\s*(".*")\s*$/gm)) headers[key] = JSON.parse(value);
+      if (Object.keys(headers).length === 0) throw new Error('netlify.toml: the "/*" [[headers]] block has no values');
     }
   }
   return { redirects, headers };
@@ -174,7 +178,7 @@ export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, log = ()
         if (file && !rule.force) continue;
         const target = rule.to.replace(':splat', hit.splat);
         if (rule.status === 301 || rule.status === 302) {
-          response.writeHead(rule.status, { location: target + url.search });
+          response.writeHead(rule.status, { location: target + url.search, ...securityHeaders });
           return response.end();
         }
         if (target.startsWith('/.netlify/functions/')) {
@@ -185,7 +189,8 @@ export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, log = ()
         break;
       }
       if (file) return serveFile(response, file, 200, request.method);
-      response.writeHead(404, { 'content-type': 'text/plain' });
+      // Like the hosts, the "/*" headers apply to every response, not only to files.
+      response.writeHead(404, { 'content-type': 'text/plain', ...securityHeaders });
       response.end('Not found');
     } catch (error) {
       log(`app-host: ${error?.stack ?? error}`);
