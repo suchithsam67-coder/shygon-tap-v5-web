@@ -67,6 +67,11 @@ jobs:
       - name: no secrets in the bundle
         run: npm run test:bundle-secrets
 
+      # V6 Stage 6: robots, sitemap, canonicals, Open Graph, JSON-LD (no card
+      # offers while card sales are closed), 404 and llms.txt are consistent.
+      - name: SEO of the built site
+        run: npm run test:seo
+
       # DEC-2026-023 S1 (amendment A-1): db:push refuses every project not on
       # the committed allowlist, sends only 020+, and checks before any network
       # call. Runs with outbound network denied; no credential is involved.

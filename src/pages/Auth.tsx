@@ -242,10 +242,11 @@ export default function Auth() {
                     autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                     required
                   />
+                  {/* A 36 px target (WCAG 2.5.8) around the 18 px icon, centred where the icon was. */}
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-4 top-3.5 text-[var(--ds-text-tertiary)]"
+                    className="absolute right-[7px] top-[5px] grid h-9 w-9 place-items-center rounded-lg text-[var(--ds-text-tertiary)]"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

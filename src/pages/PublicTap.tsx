@@ -140,7 +140,7 @@ export default function PublicTap() {
 
   if (outcome.kind === 'loading') {
     return (
-      <div className="tap-state-page">
+      <main className="tap-state-page">
         <div>
           <div className="tap-state-icon">
             <Loader2 size={24} className="spin" />
@@ -149,7 +149,7 @@ export default function PublicTap() {
             Loading Tap…
           </p>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -234,7 +234,7 @@ function TapStatePage({
   onRetry?: () => void;
 }) {
   return (
-    <div className="tap-state-page">
+    <main className="tap-state-page">
       <div>
         <div className="tap-state-icon">{icon}</div>
         <h1>{title}</h1>
@@ -247,6 +247,6 @@ function TapStatePage({
           <a href="/shygontap">What is SHYGON Tap?</a>
         )}
       </div>
-    </div>
+    </main>
   );
 }

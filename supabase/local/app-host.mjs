@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { pathToFileURL } from 'node:url';
 
 const TYPES = {
@@ -34,6 +35,9 @@ const TYPES = {
   '.xml': 'application/xml; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
 };
+
+/** What the hosts compress: text. Images and fonts are already compressed. */
+const COMPRESSIBLE = /\.(html|m?js|css|json|webmanifest|svg|txt|xml)$/i;
 
 /** The [[redirects]] and the "/*" [[headers]] of netlify.toml. */
 export function parseNetlifyToml(text) {
@@ -128,10 +132,27 @@ export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, log = ()
     log(`${request.method} ${url.pathname} ${fnResponse.status}`);
   }
 
-  function serveFile(response, file, status = 200, method = 'GET') {
+  // Text is sent brotli-compressed when the browser accepts it, as Netlify and
+  // Vercel do, so what a journey or a performance check downloads matches
+  // production. Compressed once per file version.
+  const compressed = new Map();
+  function brotli(file) {
+    const { mtimeMs } = fs.statSync(file);
+    const cached = compressed.get(file);
+    if (cached?.mtimeMs === mtimeMs) return cached.body;
+    const body = zlib.brotliCompressSync(fs.readFileSync(file), { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } });
+    compressed.set(file, { mtimeMs, body });
+    return body;
+  }
+
+  function serveFile(request, response, file, status = 200) {
     const type = TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
-    response.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', ...securityHeaders });
-    response.end(method === 'HEAD' ? undefined : fs.readFileSync(file));
+    const headers = { 'content-type': type, 'cache-control': 'no-store', vary: 'accept-encoding', ...securityHeaders };
+    const compress = /\bbr\b/.test(request.headers['accept-encoding'] ?? '') && COMPRESSIBLE.test(file);
+    if (compress) headers['content-encoding'] = 'br';
+    response.writeHead(status, headers);
+    if (request.method === 'HEAD') return response.end();
+    response.end(compress ? brotli(file) : fs.readFileSync(file));
   }
 
   function staticFile(pathname) {
@@ -185,10 +206,10 @@ export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, log = ()
           return await runFunction(target.slice('/.netlify/functions/'.length), request, response, body, url);
         }
         const rewritten = staticFile(target);
-        if (rewritten) return serveFile(response, rewritten, rule.status, request.method);
+        if (rewritten) return serveFile(request, response, rewritten, rule.status);
         break;
       }
-      if (file) return serveFile(response, file, 200, request.method);
+      if (file) return serveFile(request, response, file, 200);
       // Like the hosts, the "/*" headers apply to every response, not only to files.
       response.writeHead(404, { 'content-type': 'text/plain', ...securityHeaders });
       response.end('Not found');

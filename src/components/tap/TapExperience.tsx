@@ -188,7 +188,7 @@ export function TapExperience({
       />
 
       <div className="tap-stage">
-        <div className="tap-column">
+        <main className="tap-column">
           <div className="tap-topbar">
             {experience !== 'essential' && (
               <span className="tap-chip">
@@ -300,7 +300,7 @@ export function TapExperience({
           </section>
 
           <p className="tap-footnote"><BrandMark className="tap-footnote-mark" /> Powered by SHYGON Tap · <a href="/shygontap/privacy-policy">Privacy</a></p>
-        </div>
+        </main>
       </div>
     </div>
   );
