@@ -37,8 +37,11 @@ globalThis.WebSocket ??= class {
   }
 };
 
-// Under node_modules (gitignored) so the compiled code resolves the installed packages.
-const outDir = fs.mkdtempSync(path.join(ROOT, 'node_modules', '.cache', 'shygon-edge-'));
+// Under node_modules (gitignored) so the compiled code resolves the installed
+// packages. A fresh install has no node_modules/.cache yet.
+const cacheDir = path.join(ROOT, 'node_modules', '.cache');
+fs.mkdirSync(cacheDir, { recursive: true });
+const outDir = fs.mkdtempSync(path.join(cacheDir, 'shygon-edge-'));
 const esmShToNpm = {
   name: 'esm-sh-to-npm',
   setup(b) {
