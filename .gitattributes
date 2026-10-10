@@ -1,0 +1,18 @@
+# Line endings (SHYGON V6 Stage 6; found by the clean-install test).
+#
+# The repository stores LF, and these files are checked out as LF on every
+# platform, so a Windows checkout (core.autocrlf=true) behaves exactly like
+# CI: the database suites compare the migrations' function bodies byte for
+# byte, and APPLY_ALL.sql is applied as it was tested.
+*.sql   text eol=lf
+*.mjs   text eol=lf
+*.js    text eol=lf
+*.ts    text eol=lf
+*.json  text eol=lf
+*.toml  text eol=lf
+*.yml   text eol=lf
+*.md    text eol=lf
+
+# The live schema dump is the schema of record, kept byte for byte as the
+# owner provided it (its line endings are mixed); the loaders normalize it.
+supabase/baseline/000_live_baseline.sql -text
