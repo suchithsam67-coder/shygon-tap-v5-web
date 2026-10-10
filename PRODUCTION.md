@@ -641,7 +641,8 @@ Every item needs credentials or SQL access this environment does not have.
    the SQL editor. `npm run db:apply` already proves they will run.
 2. **Two secrets unset.** `SUPABASE_SERVICE_ROLE_KEY` (every Netlify function
    returns 503 without it) and `RAZORPAY_WEBHOOK_SECRET` (set after creating the
-   webhook for `payment.captured`, `order.paid`, `payment.failed`).
+   webhook for `payment.authorized`, `payment.captured`, `order.paid`,
+   `payment.failed`).
 3. **Rotate the Razorpay key secret.** An earlier version of this file contained
    it in plaintext, and it is currently present in `.env`, which is gitignored
    but was distributed inside the project ZIPs.

@@ -5,6 +5,21 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### SHYGON V6 Stage 6: hardening and the release candidate (2026-10-10), branch `v6/stage-6-rc`
+- **Feature freeze:** only fixes, documents and verification. The release candidate code is `287268f`. **Production deployment is not authorized**; the readiness report says **NOT READY** (`docs/v6/readiness-report.md`).
+- **New gates:**
+  - `test:seo`: sitemap, robots, titles, descriptions, canonicals, Open Graph, JSON-LD, 404 and `llms.txt`;
+  - accessibility: axe WCAG 2.2 AA on 20 pages (0 violations), keyboard and focus, reduced motion, landmarks;
+  - performance on a slow phone: public Tap LCP 1,288 ms, CLS 0.
+- **Fixed:**
+  - the public Tap's missing `main` landmark, and an 18 px password toggle (now 36 px);
+  - V6-099, CRLF migrations in a Windows clone (`.gitattributes`);
+  - V6-100, `test:admin-edge` on a fresh install;
+  - V6-101, the local host now compresses like the production hosts;
+  - V6-052, the dead compiled V5 bundle removed.
+- **Clean install:** a fresh clone of `287268f` passes every suite and E2E 14/14. An earlier run failed once because the PC went into standby mid-test; this is documented in the Stage 6 report §2.
+- **Release documents:** `docs/release/` (production configuration, deployment, rollback, recovery, known limitations). Report: `docs/v6/stage-6-report.md`.
+
 ### SHYGON V6 Stage 5: security verification and E2E (2026-10-10), branch `v6/stage-5-security-e2e`
 - **Verification:** every Stage 5 requirement is mapped to its evidence in `docs/v6/stage-5-report.md`. No new P0.
 - **New gates:**
