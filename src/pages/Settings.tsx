@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   CheckCircle2,
+  Download,
   Eye,
   KeyRound,
   Loader2,
@@ -15,6 +16,7 @@ import {
   LifeBuoy,
   Receipt,
   Sparkles,
+  Trash2,
   UserRound,
 } from 'lucide-react';
 import { AppShell } from '../components/app/AppShell';
@@ -26,6 +28,8 @@ import { supabase, describeError } from '../lib/supabase';
 import { TAP_STATUS_HINTS, TAP_STATUS_LABELS, setTapStatus, tapUrl } from '../services/tap';
 import { APP_NAME, APP_VERSION, BUILD_DATE, COMPANY } from '../lib/version';
 import { EXPERIENCE_LABELS } from '../services/tap';
+import { downloadJson, exportMyData, requestAccountDeletion } from '../services/privacy';
+import { TIERS_PATH } from '../lib/commerce';
 
 /**
  * Account settings.
@@ -55,6 +59,9 @@ export default function Settings() {
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [confirmDeletion, setConfirmDeletion] = useState(false);
+  const [requestingDeletion, setRequestingDeletion] = useState(false);
 
   // Both of these adjust state from a value that arrives asynchronously, which
   // React handles during render rather than in an effect — an effect would
@@ -190,6 +197,37 @@ export default function Settings() {
       toast.error('Could not change visibility', describeError(err));
     } finally {
       setStatusBusy(false);
+    }
+  }
+
+  /** V6-072: a copy of everything the account can read about itself. */
+  async function downloadMyData() {
+    if (!user) return;
+    setExporting(true);
+    try {
+      const data = await exportMyData({ id: user.id, email: user.email });
+      downloadJson(`shygon-account-${new Date().toISOString().slice(0, 10)}.json`, data);
+      toast.success('Your data is downloading', 'A JSON file with your account, Tap, orders and messages.');
+    } catch (err) {
+      toast.error('Could not prepare your data', describeError(err));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  /** V6-072: deletion is a request a person handles, never an instant delete. */
+  async function askForDeletion() {
+    if (!user) return;
+    setRequestingDeletion(true);
+    try {
+      const reference = await requestAccountDeletion(user.id);
+      setConfirmDeletion(false);
+      toast.success('Deletion request sent', `Reference ${reference}. We will reply to you in Support.`);
+      navigate('/shygontap/support');
+    } catch (err) {
+      toast.error('Could not send your request', describeError(err));
+    } finally {
+      setRequestingDeletion(false);
     }
   }
 
@@ -550,10 +588,31 @@ export default function Settings() {
               </>
             ) : (
               <p className="field-hint" style={{ margin: 0 }}>
-                You do not have a Tap profile yet. It is created automatically after your first
-                SHYGON Tap purchase.
+                You do not have a Tap yet. It is created when you{' '}
+                <a href={TIERS_PATH} onClick={(e) => { e.preventDefault(); navigate(TIERS_PATH); }}>
+                  choose your Tap experience
+                </a>
+                .
               </p>
             )}
+
+            <div style={{ borderTop: '1px solid var(--line)', marginTop: 16, paddingTop: 16, display: 'grid', gap: 10 }}>
+              <strong style={{ fontSize: 13.5 }}>Your data</strong>
+              <p style={{ margin: 0, color: 'var(--muted)', fontSize: 12.5, lineHeight: 1.6 }}>
+                Download a copy of what your account holds, or ask us to delete your account. A
+                deletion is handled by a person: we confirm what we delete, and anything the law
+                requires us to keep, such as payment records.
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => void downloadMyData()} disabled={exporting}>
+                  {exporting ? <Loader2 size={14} className="spin" /> : <Download size={14} />}
+                  Download your data
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDeletion(true)}>
+                  <Trash2 size={14} /> Ask us to delete your account
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -563,7 +622,7 @@ export default function Settings() {
             <LifeBuoy size={19} />
             <div>
               <h2>Help and support</h2>
-              <p>Questions about your card, an order or an upgrade.</p>
+              <p>Questions about your Tap, an order or a payment.</p>
             </div>
           </div>
           <div className="panel-body" style={{ display: 'grid', gap: 10 }}>
@@ -617,6 +676,16 @@ export default function Settings() {
           <LogOut size={16} /> Sign out
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeletion}
+        title="Ask us to delete your account?"
+        description="We open a privacy request in Support. Nothing is deleted until we have confirmed it with you there. You can keep using your account meanwhile."
+        confirmLabel="Send the request"
+        busy={requestingDeletion}
+        onConfirm={() => void askForDeletion()}
+        onCancel={() => setConfirmDeletion(false)}
+      />
 
       <ConfirmDialog
         open={confirmSignOut}

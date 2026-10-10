@@ -9,8 +9,10 @@ import { createLiveDb, newMigrations, MIGRATIONS_DIR } from './lib/live-db.mjs';
  *
  * compared on the schema objects a migration can change: every function in
  * `public` (signature, body, security, search_path, grants), every policy,
- * every relation (grants, row level security) and every trigger. Grants are
- * compared as sets, because a re-grant may land in a different order.
+ * every relation (grants, row level security), every trigger and every
+ * constraint (definition, including a foreign key's ON DELETE, and whether it
+ * is validated). Grants are compared as sets, because a re-grant may land in a
+ * different order.
  *
  * Rollback text: the block between "-- ROLLBACK (begin)" and "-- ROLLBACK (end)"
  * (021 onward), or, for 020, the indented lines under "-- ROLLBACK". Data
@@ -70,7 +72,11 @@ async function snapshot(db) {
   const triggers = await q(`SELECT c.relname, t.tgname, pg_get_triggerdef(t.oid) AS def, t.tgenabled::text AS enabled
     FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND NOT t.tgisinternal ORDER BY 1, 2`);
-  return { functions, policies, relations, triggers };
+  const constraints = await q(`SELECT c.conrelid::regclass::text AS rel, c.conname, pg_get_constraintdef(c.oid) AS def,
+           c.convalidated AS validated
+    FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace
+    WHERE n.nspname = 'public' ORDER BY 1, 2`);
+  return { functions, policies, relations, triggers, constraints };
 }
 
 function diff(a, b) {
@@ -104,7 +110,7 @@ for (let k = 0; k < migrations.length; k++) {
     await before.close();
     await after.close();
     assert(problems.length === 0, problems.slice(0, 8).join('; ') + (problems.length > 8 ? ` (+${problems.length - 8} more)` : ''));
-    return 'functions, policies, grants, relations and triggers identical';
+    return 'functions, policies, grants, relations, triggers and constraints identical';
   });
 }
 

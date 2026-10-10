@@ -10,6 +10,7 @@ import { useAsync } from '../hooks/useAsync';
 import { describeError } from '../lib/supabase';
 import type { CardRow } from '../lib/database.types';
 import { formatEdition } from '../lib/editions';
+import { CARD_SALES_OPEN, CARDS_COMING_SOON } from '../lib/commerce';
 import { cardArt, cardDesignNames, materialLabels, products, type MaterialId, type TierId } from '../data/shygonTapData';
 import {
   CardOtpError,
@@ -60,6 +61,9 @@ export default function Cards() {
     { enabled: Boolean(user), deps: [user?.id], onError: (err) => describeError(err) },
   );
   const cards = data ?? [];
+  // While card sales are closed (D-10) a customer without a card has nothing
+  // to activate here, so the OTP set-up advice would be a dead end.
+  const cardsExpected = CARD_SALES_OPEN || cards.length > 0;
   const [pending, setPending] = useState<{ card: CardRow; action: CardAction } | null>(null);
 
   const done = useCallback(
@@ -77,7 +81,7 @@ export default function Cards() {
       title="Your cards"
       description="Activate or deactivate your NFC card. Every change is confirmed with a one-time code sent to your registered mobile number."
     >
-      {!profile?.phone && (
+      {!profile?.phone && cardsExpected && (
         <section className="panel card-otp-phone-note" role="note">
           <PhoneCall size={18} aria-hidden="true" />
           <p>
@@ -92,6 +96,17 @@ export default function Cards() {
           <SkeletonRows rows={2} />
         ) : error ? (
           <ErrorState message={error} onRetry={reload} />
+        ) : cards.length === 0 && !CARD_SALES_OPEN ? (
+          <EmptyState
+            icon={<Nfc size={22} />}
+            title={CARDS_COMING_SOON.title}
+            description="You can't order a physical card yet. Your digital Tap works without one: share its link or its QR code."
+            action={
+              <Link to="/shygontap/qr" className="btn btn-ghost btn-sm">
+                Get your QR code
+              </Link>
+            }
+          />
         ) : cards.length === 0 ? (
           <EmptyState
             icon={<Nfc size={22} />}
@@ -164,10 +179,12 @@ export default function Cards() {
         )}
       </section>
 
-      <p className="card-otp-footnote">
-        Lost your card? Deactivate it here straight away — tapping it will stop opening your Tap. An activation
-        lasts 14 days; renew it any time.
-      </p>
+      {cardsExpected && (
+        <p className="card-otp-footnote">
+          Lost your card? Deactivate it here straight away — tapping it will stop opening your Tap. An activation
+          lasts 14 days; renew it any time.
+        </p>
+      )}
 
       {pending && (
         <OtpDialog

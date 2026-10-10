@@ -1,3 +1,4 @@
+import { requestLog } from './log.mjs';
 import { env, sendText, SmsError, toE164 } from './sms.mjs';
 
 /**
@@ -20,7 +21,7 @@ import { env, sendText, SmsError, toE164 } from './sms.mjs';
 
 const site = () => (env('SITE_URL') ?? env('VITE_SITE_URL') ?? 'https://shygontech.com').replace(/\/+$/, '');
 
-export async function sendOrderConfirmation(admin, orderId) {
+export async function sendOrderConfirmation(admin, orderId, log = requestLog('order-sms', null)) {
   try {
     const { data: claimed, error: claimError } = await admin
       .from('orders')
@@ -31,7 +32,7 @@ export async function sendOrderConfirmation(admin, orderId) {
 
     if (claimError) {
       // Before migration 019 the columns do not exist: skip quietly.
-      console.warn('[order-sms] not sent:', claimError.code ?? claimError.message);
+      log.warn('order-sms.unavailable', { orderId, code: claimError.code ?? claimError.message });
       return { sent: false, reason: 'unavailable' };
     }
     const order = claimed?.[0];
@@ -71,12 +72,12 @@ export async function sendOrderConfirmation(admin, orderId) {
       return { sent: true };
     } catch (error) {
       const status = error instanceof SmsError && error.status === 503 ? 'not_configured' : 'failed';
-      console.warn('[order-sms]', status, order.order_id);
+      log.warn('order-sms.not-sent', { orderId: order.order_id, status });
       await record(status);
       return { sent: false, reason: status };
     }
   } catch (error) {
-    console.error('[order-sms] unexpected error', error instanceof Error ? error.message : error);
+    log.error('order-sms.error', { orderId, error });
     return { sent: false, reason: 'error' };
   }
 }

@@ -9,6 +9,7 @@ import type { MaterialId, TierId } from '../data/shygonTapData';
 import { LEGAL_PAGES, privateMeta } from '../seo/meta';
 import { LEGAL } from '../data/legal';
 import { usePageMeta } from '../seo/usePageMeta';
+import { CARD_SALES_OPEN } from '../lib/commerce';
 
 const PENDING_KEY = 'shygon_pending_order';
 
@@ -119,7 +120,10 @@ export default function Auth() {
       return null;
     }
   })();
-  const pendingProduct = pendingOrder ? products.find((item) => item.id === pendingOrder.productId) : null;
+  // A card saved before card sales closed (D-10) cannot be bought, so it is not
+  // shown as a selection waiting for the customer.
+  const pendingProduct =
+    CARD_SALES_OPEN && pendingOrder ? products.find((item) => item.id === pendingOrder.productId) : null;
   const pendingPlan = pendingOrder ? digitalPlans.find((item) => item.id === pendingOrder.planId) : null;
 
   return (
@@ -134,7 +138,9 @@ export default function Auth() {
             One tap away.
           </p>
           <p className="text-[var(--ds-text-tertiary)] text-lg mt-6">
-            Buy a card once. Build your profile. Keep improving the digital experience.
+            {CARD_SALES_OPEN
+              ? 'Buy a card once. Build your profile. Keep improving the digital experience.'
+              : 'Choose your experience. Build your profile. Share it with one link.'}
           </p>
           {pendingOrder && pendingProduct && pendingPlan && (
             <div className="mt-10 rounded-3xl border border-[var(--ds-border)] bg-white/[0.04] p-5">
@@ -181,7 +187,11 @@ export default function Auth() {
               {mode === 'login' ? 'Welcome back.' : mode === 'signup' ? 'Create your account.' : 'Reset your password.'}
             </h1>
             <p className="text-[var(--ds-text-tertiary)] mt-2">
-              {mode === 'forgot' ? 'We will send a secure reset link.' : 'Your account keeps your card, profile and orders connected.'}
+              {mode === 'forgot'
+                ? 'We will send a secure reset link.'
+                : CARD_SALES_OPEN
+                  ? 'Your account keeps your card, profile and orders connected.'
+                  : 'Your account keeps your Tap and your orders in one place.'}
             </p>
           </div>
 

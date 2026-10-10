@@ -1,5 +1,5 @@
 import {
-  faqs,
+  faqsFor,
   materialLabels,
   products,
   siteContent,
@@ -122,10 +122,11 @@ function localBusiness(site: string): JsonLd {
   };
 }
 
-function faqPage(): JsonLd {
+/** The same questions the home page shows for this sales state (D-10, V6-089). */
+function faqPage(cardSales: boolean): JsonLd {
   return {
     '@type': 'FAQPage',
-    mainEntity: faqs.map(([question, answer]) => ({
+    mainEntity: faqsFor(cardSales).map(([question, answer]) => ({
       '@type': 'Question',
       name: question,
       acceptedAnswer: { '@type': 'Answer', text: answer },
@@ -206,7 +207,7 @@ export function homeMeta(site: string, { cardSales = false }: SalesOptions = {})
     path: '/shygontap',
     image: DEFAULT_SHARE_IMAGE,
     imageAlt: 'A SHYGON Tap NFC card beside the words One tap. One identity.',
-    jsonLd: [organization(site), website(site), localBusiness(site), faqPage()],
+    jsonLd: [organization(site), website(site), localBusiness(site), faqPage(cardSales)],
   };
 }
 

@@ -1,3 +1,4 @@
+import { requestLog } from './log.mjs';
 import { requireEnv } from './supabase.mjs';
 
 /**
@@ -59,22 +60,23 @@ export function assertLiveKeysAllowed(request) {
  * Confirms with Razorpay that `paymentId` paid `amountInPaise` INR for
  * `razorpayOrderId`, capturing it first if it was only authorised.
  * Resolves to the payment entity; rejects with PaymentNotConfirmedError when
- * the money is not (or not all) there.
+ * the money is not (or not all) there. A mismatch is logged as a security
+ * event on the caller's log.
  */
-export async function confirmPayment({ paymentId, razorpayOrderId, amountInPaise }) {
+export async function confirmPayment({ paymentId, razorpayOrderId, amountInPaise }, log = requestLog('razorpay', null)) {
   const fetched = await call(`/payments/${encodeURIComponent(paymentId)}`);
   if (!fetched.ok || !fetched.data) {
-    console.error('[razorpay] payment lookup failed', fetched.status);
+    log.error('razorpay.payment-lookup-failed', { paymentId, status: fetched.status });
     throw new PaymentNotConfirmedError('We could not confirm your payment with Razorpay yet. Please try again in a minute.', 502);
   }
   let payment = fetched.data;
 
   if (payment.order_id !== razorpayOrderId) {
-    console.warn('[razorpay] payment belongs to another order', paymentId);
+    log.warn('payment.order-mismatch', { paymentId, razorpayOrderId, paidFor: payment.order_id });
     throw new PaymentNotConfirmedError('This payment does not belong to your order.');
   }
   if (payment.currency !== 'INR' || Number(payment.amount) !== Number(amountInPaise)) {
-    console.warn('[razorpay] amount or currency mismatch', paymentId, payment.amount, amountInPaise, payment.currency);
+    log.warn('payment.amount-mismatch', { paymentId, razorpayOrderId, paid: payment.amount, expected: amountInPaise, currency: payment.currency });
     throw new PaymentNotConfirmedError('The amount paid does not match your order. Please contact support.');
   }
 
@@ -91,7 +93,7 @@ export async function confirmPayment({ paymentId, razorpayOrderId, amountInPaise
       const again = await call(`/payments/${encodeURIComponent(paymentId)}`);
       if (again.ok && again.data?.status === 'captured') payment = again.data;
       else {
-        console.error('[razorpay] capture failed', captured.status, captured.data?.error?.code);
+        log.error('razorpay.capture-failed', { paymentId, status: captured.status, code: captured.data?.error?.code });
         throw new PaymentNotConfirmedError('Your payment is authorised but could not be completed yet. We will retry automatically.', 502);
       }
     }

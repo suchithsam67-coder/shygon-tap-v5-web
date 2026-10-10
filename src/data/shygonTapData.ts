@@ -403,6 +403,11 @@ export const premiumFeatures = [
   ['WhatsApp Ordering', 'Simple and direct ordering.'],
 ] as const
 
+const CUSTOMIZATION_PASS_FAQ = [
+  'What is the Customization Pass?',
+  'A one-time ₹999 purchase that lets you change your Tap as often as you like and unlocks every colour palette. It is not a subscription, and it is separate from the paid experiences.',
+] as const
+
 export const faqs = [
   ['What is Shygon Tap?', 'A physical NFC card connected to a digital experience you can share with one tap.'],
   ['How does NFC work?', 'A phone with NFC switched on reads the card when held a few centimetres away, while unlocked, and opens your linked experience.'],
@@ -413,7 +418,7 @@ export const faqs = [
     'Yes. Your physical Tap stays the same. You can change your profile once every 14 days, and the Customization Pass (₹999, one-time) removes that limit and unlocks every colour palette.',
   ],
   ['Can I choose my digital experience?', 'Yes. Essential is included with every Tap, and you can add Business, Premium or GOAT from your account at any time — no new physical card needed.'],
-  ['What is the Customization Pass?', 'A one-time ₹999 purchase that lets you change your Tap as often as you like and unlocks every colour palette. It is not a subscription, and it is separate from the paid experiences.'],
+  CUSTOMIZATION_PASS_FAQ,
   [
     'What does limited edition mean?',
     'Every card design is released in numbered chapters of 100. When your order is paid your card takes the next number in its design — for example Obsidian Feather, Chapter I · Nº 042 of 100. The number is printed on your card and shown in your account and on your e-bill. When a chapter’s 100 cards are gone, the next chapter begins.',
@@ -422,3 +427,52 @@ export const faqs = [
   ['How do I order?', 'Build your configuration, create or log into your account, add delivery details and continue to secure online checkout.'],
   ['Can I change my selection before paying?', 'Yes. Your saved configuration stays available in your account so you can edit the card, material, finish or Digital UI before checkout.'],
 ] as const
+
+/*
+ * The same sections while card sales are closed (DEC-2026-035 D-10, V6-089).
+ * The digital Tap is what is on sale, so none of this offers a card, a
+ * material or a delivery. The card-release copy above returns unchanged when
+ * card sales open (VITE_CARD_SALES_ENABLED).
+ */
+const digitalFirstHowItWorks = [
+  ['01', 'Choose your digital experience', 'Business, Premium or GOAT.'],
+  ['02', 'Create your account', 'Sign up with your email address, or log in.'],
+  ['03', 'Pay securely online', 'Protected Razorpay checkout.'],
+  ['04', 'Build your profile', 'Add your details and links, then publish.'],
+  ['05', 'Share & connect', 'Share your Tap link or its QR code.'],
+] as const
+
+const digitalFirstFeatures = [
+  ['Link & QR Code', 'Share your Tap anywhere, instantly.'],
+  ['Digital Profile', 'One tap opens your digital experience.'],
+  ['Three Experiences', 'Business, Premium or GOAT — move up any time.'],
+  ['Cards Coming Soon', 'SHYGON NFC cards in PVC, metal and transparent.'],
+  ['GOAT Experience', 'Give your customers something they remember.'],
+  ['Human Support', 'Talk to the SHYGON team on WhatsApp or by email.'],
+] as const
+
+const digitalFirstFaqs = [
+  ['What is Shygon Tap?', 'Your digital profile on one page, with your details, links and content, shared with a link or a QR code. SHYGON NFC cards are coming soon.'],
+  ['Do I need an app?', 'No. Your Tap opens in the browser on any phone or computer, from its link or its QR code.'],
+  ['What do people see when they open my Tap?', 'Your chosen digital profile opens instantly with your links, details and content.'],
+  [
+    'Can I change my digital profile later?',
+    'Yes. You can change your profile once every 14 days, and the Customization Pass (₹999, one-time) removes that limit and unlocks every colour palette.',
+  ],
+  ['Can I choose my digital experience?', 'Yes. Choose Business, Premium or GOAT when you get your Tap, and you can buy a higher experience from your account at any time.'],
+  CUSTOMIZATION_PASS_FAQ,
+  ['How do I get my Tap?', 'Choose your experience, create an account or log in, and pay securely online. Your Tap is ready to edit and publish once the payment is confirmed.'],
+  ['Can I order a SHYGON card?', 'Not yet. SHYGON NFC cards are coming soon. Your digital Tap is available today and works without a card.'],
+] as const
+
+type Pair = readonly [string, string]
+type Step = readonly [step: string, title: string, description: string]
+
+/** The FAQ for the sales state: the visible list, its JSON-LD and llms.txt all use this. */
+export const faqsFor = (cardSales: boolean): readonly Pair[] => (cardSales ? faqs : digitalFirstFaqs)
+
+/** How it works, step by step, for the sales state. */
+export const howItWorksFor = (cardSales: boolean): readonly Step[] => (cardSales ? howItWorks : digitalFirstHowItWorks)
+
+/** The feature tiles for the sales state. */
+export const featuresFor = (cardSales: boolean): readonly Pair[] => (cardSales ? premiumFeatures : digitalFirstFeatures)

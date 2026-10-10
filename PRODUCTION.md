@@ -588,6 +588,19 @@ the site, `https://www.shygontech.com` 301s to the apex, a magic link sent from
 the live site returns to it rather than erroring, and a QR generated in the
 editor scans to `shygontech.com/t/<slug>`.
 
+**Health and logs** (V6) — `GET /api/health` answers `200 {"status":"ok"}` and
+`GET /api/health?deep=1` also reaches the database; a `503 "degraded"` names
+the missing setting only in the function log (`health.config-missing`). Every
+payment function answers with an `x-request-id` and logs one JSON line per
+event under it. How to trace a failure from an order number, and what is never
+logged: `docs/v6/observability.md`.
+
+**Account deletion** (V6) — a customer's request arrives as a `privacy` support
+ticket. It is handled by hand with `docs/runbooks/RUNBOOK-account-deletion.md`.
+**Never** use the Supabase dashboard's "Delete user" on an account with orders
+before migration 026 is applied: on the live baseline it deletes their orders
+and payment records too.
+
 **Animations, on a real phone** — Essential opens with no animation at all;
 Business, Premium and GOAT each play their own; GOAT's tint differs morning vs
 evening.

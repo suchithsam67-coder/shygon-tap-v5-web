@@ -1,4 +1,5 @@
 import { sendOrderConfirmation } from './orderMessages.mjs';
+import { requestLog } from './log.mjs';
 
 /**
  * The single place an order becomes entitlements.
@@ -73,7 +74,7 @@ export async function markPaymentFailed(admin, { orderId, amountInPaise, provide
  * Marks the order paid and grants everything it bought.
  * @returns {{orderId: string, newlyFulfilled: boolean}}
  */
-export async function fulfilOrder(admin, orderId) {
+export async function fulfilOrder(admin, orderId, log = requestLog('fulfilment', null)) {
   const { data: order, error: orderError } = await admin
     .from('orders')
     .select('id, user_id, order_id, order_type, plan_id, product_id, product_name, material, tier, plan, amount, amount_in_paise, payment_status, order_status, fulfillment_status, created_at')
@@ -119,12 +120,12 @@ export async function fulfilOrder(admin, orderId) {
 
     const items = itemRows ?? [];
     if (items.length > 0) {
-      await grantFromLineItems(admin, order, items);
+      await grantFromLineItems(admin, order, items, log);
     } else {
       await grantFromLegacyColumns(admin, order);
     }
 
-    await ensureTapProfile(admin, order);
+    await ensureTapProfile(admin, order, log);
 
     const { error: completeError } = await admin
       .from('orders')
@@ -140,8 +141,9 @@ export async function fulfilOrder(admin, orderId) {
     if (completeError) throw new Error(`Failed to finalize fulfilment: ${completeError.message}`);
 
     // Text the customer their confirmation. Once per order, never fatal.
-    await sendOrderConfirmation(admin, order.id);
+    await sendOrderConfirmation(admin, order.id, log);
 
+    log.info('order.fulfilled', { orderId: order.order_id, orderType: order.order_type, items: items.map((item) => item.sku) });
     return { orderId: order.id, newlyFulfilled: true };
   } catch (error) {
     // Leave payment as paid — the customer already paid. Mark the fulfilment
@@ -155,18 +157,19 @@ export async function fulfilOrder(admin, orderId) {
       })
       .eq('id', order.id)
       .eq('fulfillment_status', 'processing');
-    if (releaseError) console.error('[fulfilment] failed to mark retryable', releaseError.message);
+    if (releaseError) log.error('fulfilment.release-failed', { orderId: order.order_id, message: releaseError.message });
+    else log.warn('fulfilment.retryable', { orderId: order.order_id, error });
     throw error;
   }
 }
 
 /** Line items are authoritative: they are what the customer was charged for. */
-async function grantFromLineItems(admin, order, items) {
+async function grantFromLineItems(admin, order, items, log) {
   for (const item of items) {
     switch (item.product_type) {
       case 'card': {
         await grantEntitlement(admin, order.user_id, 'card', item.sku, order.id);
-        await issueCards(admin, order, item);
+        await issueCards(admin, order, item, log);
         await decrementStock(admin, item.id, item.sku, item.quantity ?? 1);
         break;
       }
@@ -193,7 +196,7 @@ async function grantFromLineItems(admin, order, items) {
         break;
       }
       default:
-        console.warn('[fulfilment] unknown product_type', item.product_type, item.sku);
+        log.warn('fulfilment.unknown-product-type', { orderId: order.order_id, productType: item.product_type, sku: item.sku });
         break;
     }
   }
@@ -245,7 +248,7 @@ async function grantEntitlement(admin, userId, type, key, sourceOrderId) {
  * One card record per purchased card. The unique index on (order_id, sku) means
  * a replayed webhook cannot mint extra cards, so this is safe to re-run.
  */
-async function issueCards(admin, order, item) {
+async function issueCards(admin, order, item, log) {
   const { error } = await admin.from('cards').upsert(
     {
       user_id: order.user_id,
@@ -259,7 +262,7 @@ async function issueCards(admin, order, item) {
 
   // A missing card record is an operational problem, not a reason to fail the
   // customer's whole fulfilment — the entitlement is what unlocks their Tap.
-  if (error) console.error('[fulfilment] card issue failed', item.sku, error.message);
+  if (error) log.error('fulfilment.card-issue-failed', { orderId: order.order_id, sku: item.sku, message: error.message });
 }
 
 async function decrementStock(admin, orderItemId, sku, quantity) {
@@ -279,7 +282,7 @@ async function decrementStock(admin, orderItemId, sku, quantity) {
  * tap_profiles(user_id), so running both is harmless and losing either one
  * still leaves the customer provisioned.
  */
-async function ensureTapProfile(admin, order) {
+async function ensureTapProfile(admin, order, log) {
   const userId = order.user_id;
   const { data: existing } = await admin
     .from('tap_profiles')
@@ -297,7 +300,7 @@ async function ensureTapProfile(admin, order) {
         .from('tap_profiles')
         .update({ edit_window_started_at: order.created_at })
         .eq('id', existing.id);
-      if (error) console.error('[fulfilment] edit window stamp failed', error.message);
+      if (error) log.error('fulfilment.edit-window-failed', { orderId: order.order_id, message: error.message });
     }
   }
 
@@ -314,7 +317,7 @@ async function ensureTapProfile(admin, order) {
   });
 
   if (slugError) {
-    console.error('[fulfilment] slug generation failed', slugError.message);
+    log.error('fulfilment.slug-failed', { orderId: order.order_id, message: slugError.message });
     return;
   }
 
@@ -324,7 +327,7 @@ async function ensureTapProfile(admin, order) {
       .update({ slug, username: slug })
       .eq('id', existing.id)
       .is('slug', null);
-    if (error) console.error('[fulfilment] slug assignment failed', error.message);
+    if (error) log.error('fulfilment.slug-assignment-failed', { orderId: order.order_id, message: error.message });
     return;
   }
 
@@ -345,5 +348,6 @@ async function ensureTapProfile(admin, order) {
     { onConflict: 'user_id', ignoreDuplicates: true },
   );
 
-  if (error) console.error('[fulfilment] tap profile provisioning failed', error.message);
+  if (error) log.error('fulfilment.tap-provisioning-failed', { orderId: order.order_id, message: error.message });
+  else log.info('fulfilment.tap-provisioned', { orderId: order.order_id, slug });
 }

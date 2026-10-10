@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from '../App';
 import type { PublicProfile } from '../lib/database.types';
@@ -55,6 +55,20 @@ function visit(path: string) {
 
 const robots = () => document.head.querySelector('meta[name="robots"]')?.getAttribute('content') ?? '';
 
+/** Lets the effects that run after a paint finish. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 25));
+
+/**
+ * The Tap records analytics in an effect after it paints, so the calls are
+ * awaited, then checked again once everything pending has run: exactly these
+ * events, and nothing after them.
+ */
+async function expectEvents(expected: [string, string][]) {
+  await waitFor(() => expect(client.recordTapEvent.mock.calls).toEqual(expected));
+  await settle();
+  expect(client.recordTapEvent.mock.calls).toEqual(expected);
+}
+
 beforeEach(() => {
   client.fetchPublicProfile.mockReset();
   client.fetchPublicTapState.mockReset();
@@ -69,7 +83,7 @@ describe('an active Tap', () => {
     visit('/t/asha');
     expect(await screen.findByText('Asha Rao')).toBeTruthy();
     expect(client.fetchPublicProfile).toHaveBeenCalledWith('asha');
-    expect(client.recordTapEvent.mock.calls).toEqual([['asha', 'view']]);
+    await expectEvents([['asha', 'view']]);
     expect(robots()).toContain('index');
     expect(robots()).not.toContain('noindex');
   });
@@ -78,12 +92,12 @@ describe('an active Tap', () => {
     client.fetchPublicProfile.mockResolvedValue(profile());
     visit('/t/asha?src=nfc');
     await screen.findByText('Asha Rao');
-    expect(client.recordTapEvent.mock.calls).toEqual([['asha', 'view'], ['asha', 'nfc']]);
+    await expectEvents([['asha', 'view'], ['asha', 'nfc']]);
     cleanup();
     client.recordTapEvent.mockClear();
     visit('/t/asha?src=qr');
     await screen.findByText('Asha Rao');
-    expect(client.recordTapEvent.mock.calls).toEqual([['asha', 'view'], ['asha', 'qr']]);
+    await expectEvents([['asha', 'view'], ['asha', 'qr']]);
   });
 
   it('still answers at the legacy /tap/ address printed on early cards', async () => {
@@ -116,6 +130,7 @@ describe('a Tap the public cannot see', () => {
     visit('/t/asha');
     expect(await screen.findByText('Temporarily unavailable')).toBeTruthy();
     expect(robots()).toContain('noindex');
+    await settle();
     expect(client.recordTapEvent).not.toHaveBeenCalled();
   });
 
@@ -132,6 +147,7 @@ describe('a Tap the public cannot see', () => {
     expect(await screen.findByText('Tap not found')).toBeTruthy();
     expect(screen.queryByText(/draft|suspend|archiv/i)).toBeNull();
     expect(robots()).toContain('noindex');
+    await settle();
     expect(client.recordTapEvent).not.toHaveBeenCalled();
   });
 

@@ -240,21 +240,7 @@ function TapStatePage({
         <h1>{title}</h1>
         <p>{message}</p>
         {onRetry ? (
-          <button
-            type="button"
-            onClick={onRetry}
-            style={{
-              marginTop: 24,
-              padding: '12px 22px',
-              borderRadius: 999,
-              border: '1px solid rgba(255,255,255,.2)',
-              background: 'rgba(255,255,255,.1)',
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: 'pointer',
-            }}
-          >
+          <button type="button" className="tap-state-button" onClick={onRetry}>
             Try again
           </button>
         ) : (

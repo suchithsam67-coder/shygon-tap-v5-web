@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { adminClient, json, MissingSecretError, requireEnv } from '../lib/supabase.mjs';
 import { fulfilOrder, markPaymentFailed, recordPayment } from '../lib/fulfilment.mjs';
 import { captureIfAuthorised } from '../lib/razorpay.mjs';
+import { requestLog } from '../lib/log.mjs';
 
 /**
  * POST /api/razorpay-webhook
@@ -20,6 +21,11 @@ import { captureIfAuthorised } from '../lib/razorpay.mjs';
 const UNIQUE_VIOLATION = '23505';
 
 export default async (request) => {
+  const log = requestLog('razorpay-webhook', request);
+  return log.respond(await handleWebhook(request, log));
+};
+
+async function handleWebhook(request, log) {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   let admin = null;
@@ -33,7 +39,7 @@ export default async (request) => {
     const rawBody = await request.text();
 
     if (!signature) {
-      console.warn('razorpay-webhook: rejected unsigned request');
+      log.warn('webhook.rejected', { reason: 'unsigned' });
       return json({ error: 'Missing webhook signature.' }, 401);
     }
 
@@ -41,7 +47,7 @@ export default async (request) => {
     const a = Buffer.from(expected, 'utf8');
     const b = Buffer.from(signature, 'utf8');
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-      console.warn('razorpay-webhook: rejected invalid signature');
+      log.warn('webhook.rejected', { reason: 'bad-signature' });
       return json({ error: 'Invalid webhook signature.' }, 401);
     }
 
@@ -67,9 +73,10 @@ export default async (request) => {
 
     if (ledgerError) {
       if (ledgerError.code === UNIQUE_VIOLATION) {
+        log.info('webhook.duplicate', { eventId, eventType });
         return json({ message: 'Event already processed', eventId });
       }
-      console.error('Webhook ledger insert failed', ledgerError.message);
+      log.error('webhook.ledger-failed', { eventId, eventType, message: ledgerError.message });
       // 500 so Razorpay retries rather than dropping the event.
       return json({ error: 'Could not record webhook event.' }, 500);
     }
@@ -89,14 +96,14 @@ export default async (request) => {
 
     const { data: order, error: orderError } = await admin
       .from('orders')
-      .select('id, amount_in_paise')
+      .select('id, order_id, amount_in_paise')
       .eq('razorpay_order_id', razorpayOrderId)
       .maybeSingle();
 
     if (orderError) throw new Error(`Order lookup failed: ${orderError.message}`);
     if (!order) {
       // Acknowledge — retrying will not make an unknown order appear.
-      console.warn('razorpay-webhook: no local order for', razorpayOrderId);
+      log.warn('webhook.unknown-order', { eventId, eventType, razorpayOrderId });
       return json({ success: true, eventId, message: 'Unknown order' });
     }
 
@@ -105,6 +112,7 @@ export default async (request) => {
     if (eventType === 'payment.authorized' && razorpayPaymentId) {
       if (Number(paymentEntity?.amount) === Number(order.amount_in_paise) && paymentEntity?.currency === 'INR') {
         const captured = await captureIfAuthorised({ paymentId: razorpayPaymentId, amountInPaise: order.amount_in_paise });
+        log.info('webhook.capture', { eventId, orderId: order.order_id, razorpayPaymentId, captured });
         return json({ success: true, eventId, captured });
       }
     }
@@ -115,7 +123,7 @@ export default async (request) => {
       const paid = eventType === 'order.paid' ? orderEntity?.amount_paid : paymentEntity?.amount;
       const currency = paymentEntity?.currency ?? orderEntity?.currency;
       if (Number(paid) !== Number(order.amount_in_paise) || currency !== 'INR') {
-        console.warn('razorpay-webhook: amount mismatch on order', order.id, paid, order.amount_in_paise, currency);
+        log.warn('webhook.amount-mismatch', { eventId, orderId: order.order_id, razorpayPaymentId, paid, expected: order.amount_in_paise, currency });
         await admin.from('admin_notifications').insert({
           category: 'payment',
           severity: 'critical',
@@ -142,7 +150,8 @@ export default async (request) => {
         });
       }
 
-      const result = await fulfilOrder(admin, order.id);
+      const result = await fulfilOrder(admin, order.id, log);
+      log.info('webhook.processed', { eventId, eventType, orderId: order.order_id, razorpayPaymentId, newlyFulfilled: result.newlyFulfilled });
       return json({ success: true, eventId, newlyFulfilled: result.newlyFulfilled });
     }
 
@@ -162,13 +171,15 @@ export default async (request) => {
         .eq('id', order.id)
         .neq('payment_status', 'paid');
 
+      log.info('webhook.payment-failed', { eventId, orderId: order.order_id, razorpayPaymentId });
       return json({ success: true, eventId });
     }
 
+    log.info('webhook.ignored', { eventId, eventType });
     return json({ success: true, eventId, message: `Ignored event ${eventType}` });
   } catch (error) {
     if (error instanceof MissingSecretError) {
-      console.error(error.message);
+      log.error('config.missing', { setting: error.secretName });
       return json({ error: 'Payments are not configured on this server.' }, 503);
     }
 
@@ -178,16 +189,13 @@ export default async (request) => {
         .delete()
         .eq('event_id', claimedEventId);
       if (releaseError) {
-        console.error(
-          'razorpay-webhook: FAILED TO RELEASE event claim — manual reconciliation needed for',
-          claimedEventId,
-          releaseError.message,
-        );
+        // Manual reconciliation needed: the redelivery will be dismissed as a duplicate.
+        log.error('webhook.release-failed', { eventId: claimedEventId, message: releaseError.message });
       }
     }
 
-    console.error('Webhook processing error', error);
+    log.error('webhook.error', { eventId: claimedEventId, error });
     // 500 asks Razorpay to retry — safe because fulfilment is idempotent.
     return json({ error: 'Webhook processing error.' }, 500);
   }
-};
+}

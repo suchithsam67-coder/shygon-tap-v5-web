@@ -23,6 +23,7 @@ import {
   Palette,
   Phone,
   Play,
+  QrCode,
   Search,
   ShoppingBag,
   ShoppingCart,
@@ -39,10 +40,10 @@ import {
   cardArt,
   cardDesignNames,
   digitalPlans,
-  faqs,
-  howItWorks,
+  faqsFor,
+  featuresFor,
+  howItWorksFor,
   materialLabels,
-  premiumFeatures,
   products,
   siteContent,
   tierLabels,
@@ -60,7 +61,7 @@ import { cardPriceIndex, fetchCatalog } from "../services/catalog";
 import { homeMeta, LEGAL_PAGES, productPath } from "../seo/meta";
 import { usePageMeta } from "../seo/usePageMeta";
 import { editionAvailability, useEditions } from "../lib/editions";
-import { CARD_SALES_OPEN } from '../lib/commerce'
+import { CARD_SALES_OPEN, TIERS_PATH } from '../lib/commerce'
 import CardsComingSoon from '../components/CardsComingSoon'
 
 const HOME_META = homeMeta(SITE_URL, { cardSales: CARD_SALES_OPEN })
@@ -331,7 +332,9 @@ function Hero() {
 function StoreBenefits() {
   return <section className="store-benefits"><div className="container store-benefits-grid">
     <div><BadgeCheck size={25}/><div><strong>Secure payments</strong><span>Protected Razorpay checkout</span></div></div>
-    <div><ShoppingBag size={25}/><div><strong>Made for delivery</strong><span>Track your Tap order</span></div></div>
+    {CARD_SALES_OPEN
+      ? <div><ShoppingBag size={25}/><div><strong>Made for delivery</strong><span>Track your Tap order</span></div></div>
+      : <div><ShoppingBag size={25}/><div><strong>Ready once you pay</strong><span>Edit and publish your Tap</span></div></div>}
     <div><Sparkles size={25}/><div><strong>Upgrade anytime</strong><span>Change your digital UI later</span></div></div>
     <div><MessageCircle size={25}/><div><strong>Human support</strong><span>Talk to the Shygon team</span></div></div>
   </div></section>
@@ -1209,8 +1212,10 @@ function Manifesto() {
   )
 }
 
-/** What each step opens into, and where its button takes you. */
-const HOW_IT_WORKS_MORE: { detail: string; action: string; target: string }[] = [
+/** What a step opens into, and where its button takes you: a section of this page, or another page. */
+type StepMore = { detail: string; action: string } & ({ target: string } | { path: string })
+
+const HOW_IT_WORKS_MORE: StepMore[] = [
   {
     detail:
       'Four cards made for a job — Business (Obsidian Feather), Restaurant (Copper Lotus), Event (Emerald Arch) and Google Review (Ivory Bloom) — and six Design Collection cards: Obsidian Smoke, Rose Marble, Carbon Aurum, Sandstone Jaali, Sapphire Night and Aurora Glass. Open any card to see it in every material, front and back.',
@@ -1243,15 +1248,62 @@ const HOW_IT_WORKS_MORE: { detail: string; action: string; target: string }[] = 
   },
 ]
 
+/** The steps while card sales are closed (D-10, V6-089): buying a digital Tap. */
+const DIGITAL_FIRST_HOW_IT_WORKS_MORE: StepMore[] = [
+  {
+    detail:
+      'Business, Premium and GOAT add richer profiles and motion. Open a live demo of each before you choose, and buy a higher experience from your account later if you want more.',
+    action: 'Compare experiences',
+    target: 'digital-experience',
+  },
+  {
+    detail: 'Your account holds your Tap and your orders, and it is where you edit your profile.',
+    action: 'Sign up or log in',
+    path: '/shygontap/auth',
+  },
+  {
+    detail:
+      'Checkout is by Razorpay. Your Tap is ready to edit as soon as the payment is confirmed, and you can follow the order in your account.',
+    action: 'Choose your experience',
+    path: TIERS_PATH,
+  },
+  {
+    detail:
+      'Add your details and links in your account, choose which contact details visitors can see, then publish when you are ready.',
+    action: 'Try a live demo',
+    target: 'digital-experience',
+  },
+  {
+    detail:
+      'Your Tap has its own link and a QR code you can download from your account. Phones open it in the browser, with no app needed. SHYGON NFC cards are coming soon.',
+    action: 'See the cards',
+    target: 'cards',
+  },
+]
+
+const HOW_IT_WORKS = CARD_SALES_OPEN
+  ? {
+      intro: 'From physical card to digital connection in five clear steps.',
+      more: HOW_IT_WORKS_MORE,
+      icons: [ShoppingBag, Layers3, Smartphone, MessageCircle, Nfc],
+    }
+  : {
+      intro: 'From choosing your experience to sharing your Tap in five clear steps.',
+      more: DIGITAL_FIRST_HOW_IT_WORKS_MORE,
+      icons: [Smartphone, UserRound, ShoppingBag, Layers3, QrCode],
+    }
+
 function HowItWorks() {
   const [open, setOpen] = useState<number | null>(null)
+  const navigate = useNavigate()
   return (
     <section className="section how-section" id="how-it-works">
       <div className="container">
-        <div className="section-heading split-heading"><div><p className="eyebrow"><span className="story-index">05</span> SIMPLE BY DESIGN</p><h2>HOW IT WORKS</h2></div><p>From physical card to digital connection in five clear steps. Open a step for the details.</p></div>
+        <div className="section-heading split-heading"><div><p className="eyebrow"><span className="story-index">05</span> SIMPLE BY DESIGN</p><h2>HOW IT WORKS</h2></div><p>{HOW_IT_WORKS.intro} Open a step for the details.</p></div>
         <div className="steps-list">
-          {howItWorks.map(([number, title, description], index) => {
-            const more = HOW_IT_WORKS_MORE[index]!
+          {howItWorksFor(CARD_SALES_OPEN).map(([number, title, description], index) => {
+            const more = HOW_IT_WORKS.more[index]!
+            const StepIcon = HOW_IT_WORKS.icons[index]!
             const isOpen = open === index
             return (
               <article key={number} className={isOpen ? 'is-open' : ''}>
@@ -1263,14 +1315,14 @@ function HowItWorks() {
                   onClick={() => setOpen(isOpen ? null : index)}
                 >
                   <span>{number}</span>
-                  <div className="step-icon">{[<ShoppingBag />, <Layers3 />, <Smartphone />, <MessageCircle />, <Nfc />][index]}</div>
+                  <div className="step-icon"><StepIcon /></div>
                   <h3>{title}</h3>
                   <p>{description}</p>
                   <ArrowDownRight className="step-arrow" aria-hidden="true" />
                 </button>
                 <div className="step-more" id={`step-more-${number}`} role="region" aria-label={title} hidden={!isOpen}>
                   <p>{more.detail}</p>
-                  <button type="button" className="text-button" onClick={() => scrollToId(more.target)}>
+                  <button type="button" className="text-button" onClick={() => ('path' in more ? navigate(more.path) : scrollToId(more.target))}>
                     {more.action} <ArrowRight size={15} />
                   </button>
                 </div>
@@ -1284,13 +1336,15 @@ function HowItWorks() {
 }
 
 function Features() {
-  const icons = [Nfc, Smartphone, Palette, Layers3, Sparkles, MessageCircle]
+  const icons = CARD_SALES_OPEN
+    ? [Nfc, Smartphone, Palette, Layers3, Sparkles, MessageCircle]
+    : [QrCode, Smartphone, Palette, Nfc, Sparkles, MessageCircle]
   return (
     <section className="section features-section">
       <div className="container features-layout">
         <div className="features-intro"><p className="eyebrow"><span className="story-index">06</span> BUILT DIFFERENTLY</p><h2>More than a card in your wallet.</h2><p>Every detail is designed to move people from a physical moment into a considered digital experience.</p></div>
         <div className="feature-grid">
-          {premiumFeatures.map(([title, description], index) => {
+          {featuresFor(CARD_SALES_OPEN).map(([title, description], index) => {
             const Icon = icons[index] ?? Sparkles
             return <article key={title}><Icon /><span>0{index + 1}</span><h3>{title}</h3><p>{description}</p></article>
           })}
@@ -1306,9 +1360,9 @@ function FAQ() {
   return (
     <section className="section faq-section">
       <div className="container faq-layout">
-        <div className="faq-intro"><p className="eyebrow"><span className="story-index">07</span> QUESTIONS, ANSWERED</p><h2>Everything you need to know before you tap.</h2><p>Still have a question? Build a configuration and talk directly with Shygon Technologies on WhatsApp.</p></div>
+        <div className="faq-intro"><p className="eyebrow"><span className="story-index">07</span> QUESTIONS, ANSWERED</p><h2>Everything you need to know before you tap.</h2><p>Still have a question? {CARD_SALES_OPEN ? 'Build a configuration and talk' : 'Talk'} directly with Shygon Technologies on WhatsApp.</p></div>
         <div className="faq-list">
-          {faqs.map(([question, answer], index) => {
+          {faqsFor(CARD_SALES_OPEN).map(([question, answer], index) => {
             const open = openIndex === index
             const panelId = `faq-panel-${index}`
             return (
@@ -1347,7 +1401,7 @@ function Footer() {
   target="_blank"
   rel="noreferrer"
 >
-  WhatsApp ordering
+  {CARD_SALES_OPEN ? 'WhatsApp ordering' : 'WhatsApp'}
 </a><span>{siteContent.contact.location}</span></div>{(siteContent.contact.instagram || siteContent.contact.linkedin) && <div><small>FOLLOW</small>{siteContent.contact.instagram && <a href={siteContent.contact.instagram} target="_blank" rel="noreferrer"><Instagram size={16} /> Instagram</a>}{siteContent.contact.linkedin && <a href={siteContent.contact.linkedin} target="_blank" rel="noreferrer"><Linkedin size={16} /> LinkedIn</a>}</div>}</div>
       </div>
       <div className="container footer-bottom"><span>© {new Date().getFullYear()} SHYGON Technologies Pvt. Ltd. All rights reserved.</span><nav className="footer-legal" aria-label="Legal"><Link to={LEGAL_PAGES.privacy.path}>Privacy</Link><Link to={LEGAL_PAGES.terms.path}>Terms</Link><Link to={LEGAL_PAGES.refunds.path}>Refunds</Link><Link to={LEGAL_PAGES.shipping.path}>Shipping</Link><Link to={LEGAL_PAGES.cookies.path}>Cookies</Link></nav></div>

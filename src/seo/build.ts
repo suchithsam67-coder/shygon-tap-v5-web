@@ -1,4 +1,4 @@
-import { digitalPlans, faqs, products } from '../data/shygonTapData';
+import { digitalPlans, faqsFor, products } from '../data/shygonTapData';
 import {
   BRAND,
   COMPANY,
@@ -153,8 +153,12 @@ export function llmsTxt(site: string, { cardSales = false }: SalesOptions = {}):
     '',
     '## Pages',
     '',
-    `- [Home](${site}/shygontap): how the card and its digital experience work, the configurator and answers to common questions.`,
-    `- [Store](${site}/shygontap/store): every card, with filters for card type, material, finish and price.`,
+    cardSales
+      ? `- [Home](${site}/shygontap): how the card and its digital experience work, the configurator and answers to common questions.`
+      : `- [Home](${site}/shygontap): how a digital Tap works, its experiences, live demos and answers to common questions.`,
+    cardSales
+      ? `- [Store](${site}/shygontap/store): every card, with filters for card type, material, finish and price.`
+      : `- [Store](${site}/shygontap/store): every card design, with filters for card type and material. Cards are coming soon.`,
     '',
     '## Cards',
     '',
@@ -162,11 +166,14 @@ export function llmsTxt(site: string, { cardSales = false }: SalesOptions = {}):
     '',
     '## Digital experiences',
     '',
-    ...digitalPlans.map((plan) => `- ${plan.name} (${plan.price === 0 ? 'included with every card' : `${rupees(plan.price)}${plan.priceSuffix ?? ''}`}): ${plan.description}`),
+    // Essential comes with a card, so it is not offered while cards are not sold.
+    ...digitalPlans
+      .filter((plan) => cardSales || plan.price > 0)
+      .map((plan) => `- ${plan.name} (${plan.price === 0 ? 'included with every card' : `${rupees(plan.price)}${plan.priceSuffix ?? ''}`}): ${plan.description}`),
     '',
     '## Questions',
     '',
-    ...faqs.map(([q, a]) => `- **${q}** ${a}`),
+    ...faqsFor(cardSales).map(([q, a]) => `- **${q}** ${a}`),
     '',
     '## Policies',
     '',

@@ -606,6 +606,20 @@
   font-size: 12.5px;
   font-weight: 700;
 }
+/* "Try again" / "Reload": a class rather than inline styles, so the public Tap
+   entry bundle carries the rule once in CSS (V6-018 kept it within budget). */
+.tap-state-button {
+  margin-top: 24px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tap-state-button:focus-visible { outline: 2px solid #d4af37; outline-offset: 3px; }
 
 /* Visitors of a Tap are covered by the Privacy Policy (visit statistics). */
 .tap-footnote a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }

@@ -16,6 +16,7 @@ export const SUPPORT_CATEGORIES = [
   { value: 'card', label: 'NFC card' },
   { value: 'tap', label: 'Tap profile' },
   { value: 'payment', label: 'Payment or billing' },
+  { value: 'privacy', label: 'Privacy and your data' },
   { value: 'other', label: 'Something else' },
 ] as const;
 

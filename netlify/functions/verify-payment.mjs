@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { adminClient, getRequestUser, json, MissingSecretError, requireEnv } from '../lib/supabase.mjs';
 import { fulfilOrder, recordPayment } from '../lib/fulfilment.mjs';
 import { confirmPayment, PaymentNotConfirmedError } from '../lib/razorpay.mjs';
+import { requestLog } from '../lib/log.mjs';
 
 /**
  * POST /api/verify-payment
@@ -14,6 +15,11 @@ import { confirmPayment, PaymentNotConfirmedError } from '../lib/razorpay.mjs';
  * verified signature, using the service-role key.
  */
 export default async (request) => {
+  const log = requestLog('verify-payment', request);
+  return log.respond(await verifyPayment(request, log));
+};
+
+async function verifyPayment(request, log) {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   try {
@@ -21,7 +27,10 @@ export default async (request) => {
     const admin = adminClient();
 
     const user = await getRequestUser(admin, request);
-    if (!user) return json({ error: 'You must be signed in.' }, 401);
+    if (!user) {
+      log.warn('auth.refused', { reason: 'no valid session' });
+      return json({ error: 'You must be signed in.' }, 401);
+    }
 
     let body;
     try {
@@ -48,6 +57,7 @@ export default async (request) => {
     const a = Buffer.from(expected, 'utf8');
     const b = Buffer.from(signature, 'utf8');
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      log.warn('payment.signature-invalid', { userId: user.id, razorpayOrderId: orderId, razorpayPaymentId: paymentId });
       return json({ error: 'Payment signature verification failed.' }, 400);
     }
 
@@ -59,28 +69,38 @@ export default async (request) => {
       .maybeSingle();
 
     if (orderError) {
-      console.error('Order lookup failed', orderError.message);
+      log.error('order.lookup-failed', { razorpayOrderId: orderId, message: orderError.message });
       return json({ error: 'Could not load the order.' }, 500);
     }
-    if (!order) return json({ error: 'Order not found.' }, 404);
+    if (!order) {
+      log.warn('payment.unknown-order', { userId: user.id, razorpayOrderId: orderId });
+      return json({ error: 'Order not found.' }, 404);
+    }
 
     // A valid signature for someone else's order must not fulfil against the
     // caller's account.
     if (order.user_id !== user.id) {
-      console.warn('verify-payment customer mismatch on order', order.id);
+      // A valid signature presented by someone who is not the buyer.
+      log.warn('payment.customer-mismatch', { userId: user.id, orderId: order.order_id, razorpayOrderId: orderId });
       return json({ error: 'Order not found.' }, 404);
     }
 
     // Real money: ask Razorpay that it was actually paid, in full, for this
     // order — and complete it if it was only authorised — before fulfilling.
     try {
-      await confirmPayment({
-        paymentId,
-        razorpayOrderId: orderId,
-        amountInPaise: order.amount_in_paise ?? 0,
-      });
+      await confirmPayment(
+        {
+          paymentId,
+          razorpayOrderId: orderId,
+          amountInPaise: order.amount_in_paise ?? 0,
+        },
+        log,
+      );
     } catch (error) {
-      if (error instanceof PaymentNotConfirmedError) return json({ error: error.message }, error.status);
+      if (error instanceof PaymentNotConfirmedError) {
+        log.warn('payment.not-confirmed', { orderId: order.order_id, razorpayPaymentId: paymentId, status: error.status, reason: error.message });
+        return json({ error: error.message }, error.status);
+      }
       throw error;
     }
 
@@ -94,7 +114,13 @@ export default async (request) => {
       rawPayload: { source: 'verify-payment', orderId, paymentId },
     });
 
-    const result = await fulfilOrder(admin, order.id);
+    const result = await fulfilOrder(admin, order.id, log);
+    log.info('payment.verified', {
+      orderId: order.order_id,
+      razorpayOrderId: orderId,
+      razorpayPaymentId: paymentId,
+      newlyFulfilled: result.newlyFulfilled,
+    });
 
     return json({
       success: true,
@@ -106,10 +132,10 @@ export default async (request) => {
     });
   } catch (error) {
     if (error instanceof MissingSecretError) {
-      console.error(error.message);
+      log.error('config.missing', { setting: error.secretName });
       return json({ error: 'Payments are not configured on this server.' }, 503);
     }
-    console.error('Verify payment error', error);
+    log.error('payment.verify-error', { error });
     return json({ error: 'Unable to verify payment.' }, 500);
   }
-};
+}

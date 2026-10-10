@@ -4,6 +4,7 @@ import { assertLiveKeysAllowed, PaymentNotConfirmedError } from '../lib/razorpay
 // The same legacy-key mapping fulfilment grants by (V6-086: this file used it
 // without importing it, so a returning customer's upgrade failed with a 500).
 import { normaliseExperienceKey } from '../lib/fulfilment.mjs';
+import { requestLog } from '../lib/log.mjs';
 
 /**
  * POST /api/create-order
@@ -22,6 +23,11 @@ const MAX_QUANTITY = 10;
 const MIN_AMOUNT_IN_PAISE = 100;
 
 export default async (request) => {
+  const log = requestLog('create-order', request);
+  return log.respond(await createOrder(request, log));
+};
+
+async function createOrder(request, log) {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   try {
@@ -34,7 +40,10 @@ export default async (request) => {
     // The order must belong to a real, authenticated customer — otherwise an
     // anonymous caller could create orders against someone else's account.
     const user = await getRequestUser(admin, request);
-    if (!user) return json({ error: 'You must be signed in to place an order.' }, 401);
+    if (!user) {
+      log.warn('auth.refused', { reason: 'no valid session' });
+      return json({ error: 'You must be signed in to place an order.' }, 401);
+    }
 
     let body;
     try {
@@ -53,9 +62,12 @@ export default async (request) => {
 
     let lineItems;
     try {
-      lineItems = await resolveLineItems(admin, { body, orderType, quantity, str, user });
+      lineItems = await resolveLineItems(admin, { body, orderType, quantity, str, user, log });
     } catch (error) {
-      if (error instanceof IntentError) return json({ error: error.message }, error.status);
+      if (error instanceof IntentError) {
+        log.info('order.refused', { userId: user.id, orderType, status: error.status, reason: error.message });
+        return json({ error: error.message }, error.status);
+      }
       throw error;
     }
 
@@ -137,15 +149,18 @@ export default async (request) => {
         }),
       });
 
-      if (response.status === 401) return json({ error: 'Razorpay authentication failed.' }, 401);
+      if (response.status === 401) {
+        log.error('razorpay.auth-failed', { status: 401 });
+        return json({ error: 'Razorpay authentication failed.' }, 401);
+      }
       if (!response.ok) {
-        // Never echo the gateway body back — it can leak key details.
-        console.error('Razorpay create order failed', response.status, await response.text());
+        // Never echo or log the gateway body — it can carry key details.
+        log.error('razorpay.order-failed', { status: response.status });
         return json({ error: 'Unable to create the payment order.' }, 502);
       }
       rzpOrder = await response.json();
     } catch (error) {
-      console.error('Razorpay connection error', error);
+      log.error('razorpay.unreachable', { error });
       return json({ error: 'Unable to connect to Razorpay.' }, 502);
     }
 
@@ -184,7 +199,7 @@ export default async (request) => {
       .single();
 
     if (insertError || !created) {
-      console.error('Order insert failed', insertError);
+      log.error('order.insert-failed', { code: insertError?.code, message: insertError?.message });
       return json({ error: 'Could not save your order.' }, 500);
     }
 
@@ -203,10 +218,19 @@ export default async (request) => {
     );
 
     if (itemsError) {
-      console.error('Order items insert failed', itemsError);
+      log.error('order.items-insert-failed', { orderId: created.order_id, code: itemsError.code, message: itemsError.message });
       await admin.from('orders').delete().eq('id', created.id);
       return json({ error: 'Could not save your order.' }, 500);
     }
+
+    log.info('order.created', {
+      orderId: created.order_id,
+      razorpayOrderId: rzpOrder.id,
+      userId: user.id,
+      orderType,
+      amountInPaise,
+      skus: lineItems.map((item) => item.sku),
+    });
 
     return json({
       order_id: rzpOrder.id,
@@ -218,15 +242,18 @@ export default async (request) => {
       description: productName.slice(0, 255),
     });
   } catch (error) {
-    if (error instanceof PaymentNotConfirmedError) return json({ error: error.message }, error.status);
+    if (error instanceof PaymentNotConfirmedError) {
+      log.warn('order.refused', { status: error.status, reason: error.message });
+      return json({ error: error.message }, error.status);
+    }
     if (error instanceof MissingSecretError) {
-      console.error(error.message);
+      log.error('config.missing', { setting: error.secretName });
       return json({ error: 'Payments are not configured on this server.' }, 503);
     }
-    console.error('Create order error', error);
+    log.error('order.error', { error });
     return json({ error: 'Unable to create the order.' }, 500);
   }
-};
+}
 
 /** A problem with what the customer asked for, not with the server. */
 class IntentError extends Error {
@@ -257,15 +284,15 @@ const EXPERIENCE_RANKS = { essential: 0, business: 1, premium: 2, goat: 3 };
 /** The ₹999 Customization Pass, newest SKU first. */
 const PASS_SKUS = ['pass-customization', 'plan-lifetime'];
 
-async function lookupPass(admin) {
+async function lookupPass(admin, log) {
   for (const sku of PASS_SKUS) {
-    const product = await lookupProduct(admin, sku);
+    const product = await lookupProduct(admin, sku, log);
     if (product) return product;
   }
   return null;
 }
 
-async function resolveLineItems(admin, { body, orderType, quantity, str, user }) {
+async function resolveLineItems(admin, { body, orderType, quantity, str, user, log }) {
   const items = [];
 
   if (orderType === 'digitalUpgrade') {
@@ -300,7 +327,7 @@ async function resolveLineItems(admin, { body, orderType, quantity, str, user })
       );
     }
 
-    const plan = await lookupProduct(admin, `plan-${planId}`);
+    const plan = await lookupProduct(admin, `plan-${planId}`, log);
     if (!plan) throw new IntentError("This experience isn't currently available for your Tap.");
     if (plan.price_in_paise <= 0) throw new IntentError('That experience is already included.');
 
@@ -322,7 +349,7 @@ async function resolveLineItems(admin, { body, orderType, quantity, str, user })
       throw new IntentError('You already have the Customization Pass.', 409);
     }
 
-    const pass = await lookupPass(admin);
+    const pass = await lookupPass(admin, log);
     if (!pass) throw new IntentError('The Customization Pass is unavailable.');
     items.push(toLineItem(pass, 1, { planId: 'lifetime' }));
     return items;
@@ -349,7 +376,7 @@ async function resolveLineItems(admin, { body, orderType, quantity, str, user })
       // could pass 'plan-3d' and buy a tier at customization prices.
       if (!sku.startsWith('addon-')) throw new IntentError('Unknown customization.');
 
-      const addon = await lookupProduct(admin, sku);
+      const addon = await lookupProduct(admin, sku, log);
       if (!addon || addon.product_type !== 'customization') {
         throw new IntentError('That customization is not available.');
       }
@@ -379,7 +406,7 @@ async function resolveLineItems(admin, { body, orderType, quantity, str, user })
     throw new IntentError('Card, material and finish are all required.');
   }
 
-  const card = await lookupProduct(admin, `card-${productId}-${tier}-${material}`);
+  const card = await lookupProduct(admin, `card-${productId}-${tier}-${material}`, log);
   if (!card) throw new IntentError('That card configuration is not available.');
 
   items.push(toLineItem(card, quantity, { category: productId, material, tier }));
@@ -413,7 +440,7 @@ async function resolveLineItems(admin, { body, orderType, quantity, str, user })
       );
     }
 
-    const plan = await lookupProduct(admin, `plan-${planId}`);
+    const plan = await lookupProduct(admin, `plan-${planId}`, log);
     if (!plan) throw new IntentError("That digital experience isn't available.");
     if (plan.price_in_paise > 0) items.push(toLineItem(plan, 1, { planId }));
   }
@@ -434,7 +461,7 @@ function toLineItem(product, quantity, extra = {}) {
   };
 }
 
-async function lookupProduct(admin, sku) {
+async function lookupProduct(admin, sku, log) {
   const { data, error } = await admin
     .from('products')
     .select('id, sku, name, price_in_paise, stock, product_type, active')
@@ -442,12 +469,12 @@ async function lookupProduct(admin, sku) {
     .maybeSingle();
 
   if (error) {
-    console.error('Product lookup failed', sku, error.message);
+    log.error('product.lookup-failed', { sku, message: error.message });
     return null;
   }
   if (!data || data.active === false) return null;
   if (!Number.isInteger(data.price_in_paise)) {
-    console.error('Product has no price_in_paise', sku);
+    log.error('product.unpriced', { sku });
     return null;
   }
   return data;

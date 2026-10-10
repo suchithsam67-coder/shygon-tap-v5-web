@@ -192,7 +192,8 @@ await check('no function prints a secret value', async () => {
   const offenders = [];
   for (const f of fs.readdirSync(path.join(ROOT, 'netlify', 'functions'))) {
     const src = fs.readFileSync(path.join(ROOT, 'netlify', 'functions', f), 'utf8');
-    for (const m of src.matchAll(/console\.(log|warn|error)\(([^\n]*)/g)) {
+    // console.* and the structured logger (netlify/lib/log.mjs, V6-018).
+    for (const m of src.matchAll(/(?:console|log)\.(log|info|warn|error)\(([^\n]*)/g)) {
       if (/KEY_SECRET|SERVICE_ROLE|WEBHOOK_SECRET|keySecret|webhookSecret|process\.env/.test(m[2])) {
         offenders.push(`${f}: ${m[0].slice(0, 80)}`);
       }

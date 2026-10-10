@@ -20,6 +20,7 @@
 --   4. 023_taps_only_after_payment.sql
 --   5. 024_owner_or_admin_policies_to_authenticated.sql
 --   6. 025_public_tap_privacy_and_analytics.sql
+--   7. 026_orders_outlive_account_deletion.sql
 -- ============================================================================
 
 -- ###########################################################################
@@ -1338,4 +1339,69 @@ CREATE OR REPLACE FUNCTION public.enforce_tap_edit_rules() RETURNS trigger
     SET search_path TO 'public', 'pg_temp'
     AS $$ DECLARE v_tier TEXT;v_pass BOOLEAN;v_owned TEXT[];v_content BOOLEAN; BEGIN IF auth.uid() IS NULL OR NEW.user_id IS DISTINCT FROM auth.uid() THEN RETURN NEW; END IF; v_tier:=public.user_max_ui_tier(NEW.user_id); v_pass:=public.user_has_pass(NEW.user_id); NEW.enabled_customizations:=ARRAY(SELECT DISTINCT value FROM unnest(COALESCE(NEW.enabled_customizations,'{}'::text[])) AS u(value) WHERE value<>'' ORDER BY value); IF public.tier_rank(NEW.selected_ui_tier)>public.tier_rank(v_tier) THEN RAISE EXCEPTION 'You have not purchased the % experience.',NEW.selected_ui_tier USING ERRCODE='42501'; END IF; IF NEW.theme_palette<>ALL(public.theme_options('palette',v_tier,v_pass)) THEN RAISE EXCEPTION 'That colour palette is not unlocked on your plan.' USING ERRCODE='42501'; END IF; IF NEW.theme_layout<>ALL(public.theme_options('layout',v_tier,v_pass)) THEN RAISE EXCEPTION 'That layout is not unlocked on your plan.' USING ERRCODE='42501'; END IF; IF NEW.theme_buttons<>ALL(public.theme_options('buttons',v_tier,v_pass)) THEN RAISE EXCEPTION 'That button style is not unlocked on your plan.' USING ERRCODE='42501'; END IF; IF NEW.theme_font<>ALL(public.theme_options('font',v_tier,v_pass)) THEN RAISE EXCEPTION 'That font is not unlocked on your plan.' USING ERRCODE='42501'; END IF; IF NEW.theme_animation<>ALL(public.theme_options('animation',v_tier,v_pass)) THEN RAISE EXCEPTION 'That animation style is not unlocked on your plan.' USING ERRCODE='42501'; END IF; SELECT COALESCE(array_agg(e.key),'{}') INTO v_owned FROM public.entitlements e WHERE e.user_id=NEW.user_id AND e.is_active AND e.type='customization'; IF EXISTS(SELECT 1 FROM unnest(NEW.enabled_customizations) AS k(key) WHERE k.key<>ALL(v_owned||ARRAY['phone','email'])) THEN RAISE EXCEPTION 'That add-on has not been purchased.' USING ERRCODE='42501'; END IF; v_content:=NEW.display_name IS DISTINCT FROM OLD.display_name OR NEW.headline IS DISTINCT FROM OLD.headline OR NEW.designation IS DISTINCT FROM OLD.designation OR NEW.company IS DISTINCT FROM OLD.company OR NEW.bio IS DISTINCT FROM OLD.bio OR NEW.avatar_url IS DISTINCT FROM OLD.avatar_url OR NEW.location IS DISTINCT FROM OLD.location OR NEW.phone IS DISTINCT FROM OLD.phone OR NEW.whatsapp IS DISTINCT FROM OLD.whatsapp OR NEW.email IS DISTINCT FROM OLD.email OR NEW.website IS DISTINCT FROM OLD.website OR NEW.instagram IS DISTINCT FROM OLD.instagram OR NEW.linkedin IS DISTINCT FROM OLD.linkedin OR NEW.youtube IS DISTINCT FROM OLD.youtube OR NEW.custom_links IS DISTINCT FROM OLD.custom_links OR NEW.theme_palette IS DISTINCT FROM OLD.theme_palette OR NEW.theme_layout IS DISTINCT FROM OLD.theme_layout OR NEW.theme_buttons IS DISTINCT FROM OLD.theme_buttons OR NEW.theme_font IS DISTINCT FROM OLD.theme_font OR NEW.theme_animation IS DISTINCT FROM OLD.theme_animation OR (NEW.slug IS DISTINCT FROM OLD.slug AND OLD.slug IS NOT NULL); IF NOT v_content THEN RETURN NEW; END IF; IF NOT public.tap_can_edit(NEW.user_id) THEN RAISE EXCEPTION 'You can change your Tap once every % days. The Customization Pass removes the limit.',public.tap_edit_interval_days() USING ERRCODE='42501'; END IF; NEW.last_content_edit_at:=NOW(); RETURN NEW; END; $$;
 
+
+
+-- ###########################################################################
+-- ## 026_orders_outlive_account_deletion.sql
+-- ###########################################################################
+
+-- 026: deleting a customer's sign-in can no longer delete their orders and
+-- payment records.
+--
+-- Decision:  V6-072 (account data export and deletion, DEC-2026-035 Stage 4);
+--            the published Privacy Policy, "How long we keep it": orders,
+--            invoices and payment records are kept "for as long as Indian tax
+--            and company law requires (up to 8 years)"; D-12 (owner: confirm
+--            the deletion procedure, docs/runbooks/RUNBOOK-account-deletion.md);
+--            migration numbering N-1.
+-- Level:     L3 (a constraint on the orders table). Under DEC-2026-018 it needs
+--            a 24-hour cool-off plus the checklist review before it is approved
+--            or applied. Never applied by tooling to production.
+-- Origin:    the live schema baseline (DEC-2026-023 Option A), after 020-025.
+-- Data:      none. No row is read into the app or changed. Only what a future
+--            DELETE of an auth.users row does to that account's orders changes.
+--
+-- THE PROBLEM (live baseline)
+--   orders.user_id references auth.users ON DELETE CASCADE, and payments,
+--   order_items and order_status_history cascade from orders. Deleting a
+--   customer's sign-in, which is what Authentication > Users > Delete user in
+--   the Supabase dashboard does, therefore deletes every order and payment
+--   record the customer ever made, silently and irreversibly. Those are the
+--   records the Privacy Policy and tax law say are kept. Nothing in the code
+--   deletes users today: the risk is the action an operator would reach for
+--   when handling a deletion request.
+--
+-- THE FIX
+--   orders_user_id_fkey becomes ON DELETE RESTRICT. Deleting a sign-in that
+--   still has orders now fails (23001) and changes nothing; the runbook
+--   anonymises such an account instead. A sign-in with no orders deletes
+--   exactly as before. payments, order_items and order_status_history keep
+--   their CASCADE from orders: an order is not deleted while it must be kept.
+--   One ALTER TABLE statement, so the constraint is never absent. It is added
+--   NOT VALID (no scan under the lock) and then validated, which reads
+--   orders while still allowing writes; every order has its account today, so
+--   validation succeeds.
+--
+-- VERIFY ON LIVE before applying (read-only, human):
+--   SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint
+--    WHERE conrelid = 'public.orders'::regclass AND contype = 'f' ORDER BY 1;
+--        -- orders_customer_id_fkey ... ON DELETE SET NULL
+--        -- orders_user_id_fkey     ... ON DELETE CASCADE   (the problem)
+--   SELECT count(*) FROM public.orders o
+--    WHERE NOT EXISTS (SELECT 1 FROM auth.users u WHERE u.id = o.user_id);
+--        -- 0, or VALIDATE CONSTRAINT fails and nothing is changed
+--
+-- ROLLBACK (begin)
+-- ALTER TABLE public.orders
+--   DROP CONSTRAINT IF EXISTS orders_user_id_fkey,
+--   ADD CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+-- ROLLBACK (end)
+--
+-- Idempotent: safe to run more than once.
+
+ALTER TABLE public.orders
+  DROP CONSTRAINT IF EXISTS orders_user_id_fkey,
+  ADD CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE RESTRICT NOT VALID;
+
+ALTER TABLE public.orders VALIDATE CONSTRAINT orders_user_id_fkey;
 

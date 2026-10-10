@@ -19,6 +19,10 @@ import '@fontsource/inter/900.css'
 import './index.css'
 import './styles/tap.css'
 import App from './App.tsx'
+import ErrorBoundary from './components/ErrorBoundary'
+import { installGlobalErrorHandlers } from './lib/reportError'
+
+installGlobalErrorHandlers()
 
 /**
  * The session providers used to be mounted here, around everything. They now
@@ -28,8 +32,10 @@ import App from './App.tsx'
  */
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )

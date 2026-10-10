@@ -5,6 +5,22 @@ Nothing below has been deployed, and no migration has been applied anywhere exce
 
 ## [Unreleased]: branch `feat/m0-governance-ci` (not merged)
 
+### SHYGON V6 Stage 4: customer, admin and observability (2026-10-10), branch `v6/stage-4-customer-admin`
+- **Your data (V6-072):** Settings → Your data downloads a JSON copy of the account's own data. "Ask us to delete your account" opens one `privacy` support ticket. Deletion is the manual, tested runbook `docs/runbooks/RUNBOOK-account-deletion.md` (needs D-12).
+- **Migration 026 (V6-090):** an account delete can no longer cascade into the customer's orders and payment records (`orders_user_id_fkey` → `RESTRICT`). Proven against the live baseline's cascade by `test:account-deletion`.
+- **Observability (V6-018, V6-075):**
+  - structured, redacted JSON logs with request ids in every payment function and lib, and security events;
+  - `/api/health`, the React error boundary and the `shygon:error` hook;
+  - `docs/v6/observability.md`.
+- **Admin (V6-051):** `test:admin-edge` proves the edge role map equals the database's, and that a customer cannot reach admin by token or metadata edits.
+- **Copy (V6-089):** with card sales closed, the landing page, FAQ (and its JSON-LD and `llms.txt`) and sign-in page describe the digital Tap. Cards page "coming soon" state.
+- **Fixes:**
+  - page metadata now changes in the same commit as the page (V6-091);
+  - the webhook logs the `ST-` order number;
+  - add-on and Customization Pass checkouts covered by `payment-chain` (V6-092);
+  - the rollback suite compares constraints.
+- Report: `docs/v6/stage-4-report.md`.
+
 ### SHYGON V6 Stage 3: payments and the Tap lifecycle (2026-10-06), branch `v6/stage-3-payments-tap`
 **Governance:** DEC-2026-035 amendment A-1 (owner, 2026-10-06):
 - run Stages 3–6 back-to-back;

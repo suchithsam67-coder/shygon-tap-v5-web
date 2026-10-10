@@ -112,6 +112,13 @@ jobs:
       - name: migration rollbacks (live baseline)
         run: npm run test:rollbacks
 
+      # V6-072 / migration 026: the runbook's deletion procedure, run as
+      # written, deletes what the Privacy Policy says and keeps orders and
+      # payments; deleting a sign-in that has orders fails instead of
+      # cascading (the live baseline's defect is shown as a negative control).
+      - name: account deletion procedure (live baseline)
+        run: npm run test:account-deletion
+
       # V6-040: APPLY_ALL.sql holds only 020 onward and matches the migrations.
       - name: APPLY_ALL.sql is current
         run: npm run db:bundle:check
@@ -137,6 +144,17 @@ jobs:
       # controls. Outbound network denied.
       - name: public Tap lifecycle, privacy and analytics (local stack)
         run: npm run test:public-tap
+
+      # V6-051 (Stage 4): the admin edge functions' role checks against the
+      # real admin tables; a customer cannot reach admin by editing their
+      # token or metadata. Outbound network denied.
+      - name: admin edge functions, role checks (local stack)
+        run: npm run test:admin-edge
+
+      # V6-018 / V6-075 (Stage 4): structured, redacted logs with request ids;
+      # security events; /api/health. Outbound network denied.
+      - name: observability (local stack)
+        run: npm run test:observability
 
       # V6-083: the public Tap page in every state a visitor can meet.
       - name: component tests

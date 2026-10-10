@@ -20,10 +20,13 @@
     "test:payments:ci": "node --import ./scripts/ci/deny-network.mjs netlify/tests/payments-and-sms.mjs && node --import ./scripts/ci/deny-network.mjs netlify/tests/functions-security.mjs",
     "test:payment-chain": "node --import ./scripts/ci/deny-network.mjs netlify/tests/payment-chain.mjs",
     "test:public-tap": "node --import ./scripts/ci/deny-network.mjs supabase/tests/public-tap.mjs",
+    "test:admin-edge": "node --import ./scripts/ci/deny-network.mjs supabase/tests/admin-edge.mjs",
+    "test:observability": "node --import ./scripts/ci/deny-network.mjs netlify/tests/observability.mjs",
+    "test:account-deletion": "node supabase/tests/account-deletion.mjs",
     "test:components": "vitest run",
     "stack": "node supabase/local/serve.mjs",
     "test:e2e": "playwright test",
-    "test:db": "npm run db:apply && npm run db:verify && node supabase/tests/rls-adversarial.mjs && npm run test:rls-matrix && npm run test:identity && npm run test:admin-notes && npm run test:golden && npm run test:admin-contract && npm run test:rollbacks && npm run db:bundle:check && npm run test:db:history",
+    "test:db": "npm run db:apply && npm run db:verify && node supabase/tests/rls-adversarial.mjs && npm run test:rls-matrix && npm run test:identity && npm run test:admin-notes && npm run test:golden && npm run test:admin-contract && npm run test:rollbacks && npm run test:account-deletion && npm run db:bundle:check && npm run test:db:history",
     "test:identity": "node supabase/tests/identity-contract.mjs",
     "test:golden": "node supabase/tests/golden-public-tap.mjs",
     "test:admin-contract": "node supabase/tests/admin-contract.mjs",
@@ -35,7 +38,7 @@
     "test:push-guard": "node supabase/tests/db-push-guard.mjs",
     "test:bundle": "node scripts/check-bundle-size.mjs",
     "test:secrets": "node scripts/ci/secret-scan.mjs",
-    "ci": "npm run lint && npm run build && npm run test:bundle && npm run test:push-guard && npm run test:db && npm run test:payments:ci && npm run test:payment-chain && npm run test:public-tap && npm run test:components && npm run test:secrets && npm audit --audit-level=high"
+    "ci": "npm run lint && npm run build && npm run test:bundle && npm run test:push-guard && npm run test:db && npm run test:payments:ci && npm run test:payment-chain && npm run test:public-tap && npm run test:admin-edge && npm run test:observability && npm run test:components && npm run test:secrets && npm audit --audit-level=high"
   },
   "dependencies": {
     "@fontsource/geist": "^5.3.0",

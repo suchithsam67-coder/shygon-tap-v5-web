@@ -4,7 +4,7 @@
 |---|---|
 | Domain / Level | Product + Release + Security / **L3** (it authorizes RLS, payment and identity work) |
 | **Accountable Owner** | Repository owner (one-person model, DEC-2026-018) |
-| State | **APPROVED** in session, 2026-10-05 (D-1, D-2 and the four Stage 2 prerequisites). **Amendment A-1, 2026-10-06:** run mode, D-4, D-10, test dependencies. D-3, D-7, D-8, D-9 and the new D-11 are **OPEN** (see below) |
+| State | **APPROVED** in session, 2026-10-05 (D-1, D-2 and the four Stage 2 prerequisites). **Amendment A-1, 2026-10-06:** run mode, D-4, D-10, test dependencies. D-3, D-7, D-8, D-9, D-11 and the new D-12 are **OPEN** (see below) |
 | Evidence | `docs/v6/stage-1-audit.md` (commit `47ba691`); backlog `docs/v6/backlog.md` |
 | Related | DEC-2026-001 (the waiver extension), DEC-2026-018, DEC-2026-022, DEC-2026-024, DEC-2026-029, DEC-2026-034 (amended by N-1) |
 
@@ -45,6 +45,10 @@ The owner wrote **"complete software"** after the Stage 2 report, then answered 
 
 **Opened 2026-10-06 (Stage 3):**
 - **D-11, privacy by default for the login email.** Provisioning copies the account's login email into the new Tap's public email field, switched on, so it is public as soon as the owner publishes. CONFIRMED in `supabase/tests/public-tap.mjs`, where a characterisation test records it. Since migration 025 the owner can hide it. Should a new Tap start with that field empty? Recommended: yes. It is a product and privacy call, so it was not changed.
+- **D-12, account deletion (Stage 4, V6-072).** A customer's deletion request is a `privacy` support ticket, handled by hand with `docs/runbooks/RUNBOOK-account-deletion.md`, which follows the published Privacy Policy (deleted within 30 days; orders and payment records kept up to 8 years). Stage 4 found that the live schema cascades an account delete into the customer's orders and payments (V6-090). Migration 026 makes it `RESTRICT`. Needed from the owner:
+  - (a) approve the procedure (anonymise, rather than delete, a sign-in that has orders) and 026;
+  - (b) where the deletion register lives, and who may run the deletion;
+  - (c) O-17: whether deleted Tap addresses are reserved, so old links and QR codes cannot open someone else's Tap. A reserved address may contain a name.
 - **Audit fix, owner to confirm.** A high advisory published after the Stage 1 audit, `source-map-js` < 1.2.2 (GHSA-68fv-2mgg-jv7q), reached the build through Tailwind and PostCSS and turned the `npm audit --audit-level=high` gate red. It was fixed with `npm audit fix`: `source-map-js` 1.2.1 → 1.2.2 in the lockfile only. No other existing package changed version (checked). Precedent: DEC-2026-021.
 
 ## Unchanged

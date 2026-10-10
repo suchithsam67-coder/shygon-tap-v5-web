@@ -387,6 +387,56 @@ await t.check('verify-payment requires a signed-in caller (401)', async () => {
 });
 
 // ---------------------------------------------------------------------------
+t.section('Add-ons and the Customization Pass');
+
+await t.check('add-ons: priced by the server, granted under the key the Tap renders, never bought twice', async () => {
+  const customer = await signUp(stack);
+  const created = await callFunction(stack, 'create-order', {
+    token: customer.token,
+    body: { orderType: 'customization', customizationSkus: ['addon-whatsapp', 'addon-website', 'addon-whatsapp'], amount: 100 },
+  });
+  assertEqual(created.status, 200, 'status');
+  const expected = (await priceOf('addon-whatsapp')) + (await priceOf('addon-website'));
+  assertEqual(created.body.amount, expected, 'charged amount (duplicate collapsed, browser amount ignored)');
+  const paid = stack.sim.pay({ order_id: created.body.order_id });
+  const verified = await verify(customer, paid);
+  assertEqual([verified.status, verified.body.success], [200, true], 'verify');
+  assertEqual(await entitlementsOf(customer.userId), ['customization:website', 'customization:whatsapp'], 'entitlements');
+  assertEqual((await tapsOf(customer.userId)).length, 1, 'Taps');
+  const again = await callFunction(stack, 'create-order', {
+    token: customer.token,
+    body: { orderType: 'customization', customizationSkus: ['addon-whatsapp'] },
+  });
+  assertEqual(again.status, 409, 'buying an add-on already owned');
+});
+
+await t.check('the add-on path sells only active add-ons: no experiences, passes, delisted or unknown items', async () => {
+  const customer = await signUp(stack);
+  const tooMany = Array.from({ length: 21 }, (_, i) => `addon-x${i}`);
+  for (const skus of [['plan-goat'], ['pass-customization'], ['addon-gallery'], ['addon-nonsense'], [], tooMany]) {
+    const response = await callFunction(stack, 'create-order', {
+      token: customer.token,
+      body: { orderType: 'customization', customizationSkus: skus },
+    });
+    assert(response.status === 400, `${JSON.stringify(skus).slice(0, 40)}: expected 400, got ${response.status}`);
+  }
+  const orders = await sql(`SELECT count(*)::int AS n FROM public.orders WHERE user_id = $1`, [customer.userId]);
+  assertEqual(orders[0].n, 0, 'orders written');
+});
+
+await t.check('the Customization Pass grants editing only, never an experience, and is bought once', async () => {
+  const customer = await signUp(stack);
+  const created = await callFunction(stack, 'create-order', { token: customer.token, body: { orderType: 'lifetimeCustomization' } });
+  assertEqual([created.status, created.body.amount], [200, await priceOf('pass-customization')], 'order');
+  const paid = stack.sim.pay({ order_id: created.body.order_id });
+  const webhook = await stack.sim.sendWebhook('payment.captured', paid.razorpay_payment_id);
+  assertEqual([webhook.status, webhook.body.newlyFulfilled], [200, true], 'webhook');
+  assertEqual(await entitlementsOf(customer.userId), ['lifetime:lifetime'], 'entitlements');
+  const again = await callFunction(stack, 'create-order', { token: customer.token, body: { orderType: 'lifetimeCustomization' } });
+  assertEqual(again.status, 409, 'a second Pass');
+});
+
+// ---------------------------------------------------------------------------
 t.section('Consistency across everything above');
 
 await t.check('every active entitlement traces to a paid, fulfilled order that bought it', async () => {

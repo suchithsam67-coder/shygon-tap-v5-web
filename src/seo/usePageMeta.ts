@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { SITE_URL } from '../lib/site';
 import type { PageMeta } from './meta';
 
@@ -86,9 +86,15 @@ export function applyPageMeta(meta: PageMeta) {
   }
 }
 
-/** Applies `meta` while the calling page is mounted. Pass a stable value. */
+/**
+ * Applies `meta` while the calling page is mounted. Pass a stable value.
+ *
+ * A layout effect, so the head changes in the same commit as the page: there
+ * is never a moment where, say, a paused Tap is on screen under the previous
+ * page's title and "index" robots tag. (The app is client-rendered only.)
+ */
 export function usePageMeta(meta: PageMeta | null) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (meta) applyPageMeta(meta);
   }, [meta]);
 }
