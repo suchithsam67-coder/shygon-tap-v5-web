@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import BrandMark from '../components/brand/BrandMark';
 import ThemeToggle from '../components/ThemeToggle';
 import {
@@ -65,6 +65,8 @@ import { usePageMeta } from "../seo/usePageMeta";
 import { editionAvailability, useEditions } from "../lib/editions";
 import { CARD_SALES_OPEN, TIERS_PATH } from '../lib/commerce'
 import CardsComingSoon from '../components/CardsComingSoon'
+import AarohHero from '../components/aaroh/AarohHero'
+import '../styles/aaroh.css'
 
 const HOME_META = homeMeta(SITE_URL, { cardSales: CARD_SALES_OPEN })
 
@@ -274,56 +276,37 @@ function TiltCard({ src, alt, className = '' }: { src: string; alt: string; clas
   )
 }
 
+/**
+ * The home hero: SHYGON AAROH, the store's flagship preview (owner,
+ * 2026-10-16). The owner's copy sits beside the hero card, which plays the
+ * AAROH intro. Nothing about AAROH is priced or sold yet; SHYGON TAP V5 is one
+ * press away, and the rest of the page is V5's, unchanged.
+ */
 function Hero() {
-  const productRef = useRef<HTMLDivElement>(null)
-
-  // A very low-amplitude highlight follow — the glass notices the cursor
-  // without ever turning into a blob that chases it. Desktop pointers only;
-  // touch never fires mousemove in a way that would make this jitter.
-  const trackGlassLight = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === 'touch') return
-    const bounds = event.currentTarget.getBoundingClientRect()
-    const x = ((event.clientX - bounds.left) / bounds.width) * 100
-    const y = ((event.clientY - bounds.top) / bounds.height) * 100
-    productRef.current?.style.setProperty('--lg-x', `${x}%`)
-    productRef.current?.style.setProperty('--lg-y', `${y}%`)
-  }
-
+  const navigate = useNavigate()
   return (
-    <section className="hero" id="home">
+    <section className="hero hero-aaroh aaroh-store" id="home" aria-labelledby="home-title">
       <div className="hero-grid" aria-hidden="true" />
       <div className="container hero-layout">
         <div className="hero-copy reveal-up">
-          <p className="eyebrow"><Nfc size={16} /> {siteContent.hero.eyebrow}</p>
-          <h1>
-            {siteContent.hero.title.map((line, index, lines) => (
-              // The space keeps the heading's text "ONE TAP. ONE IDENTITY." for
-              // search engines and screen readers; the lines are blocks anyway.
-              <Fragment key={line}>{index > 0 && ' '}<span className={index === lines.length - 1 ? 'accent-line' : ''}>{line}</span></Fragment>
-            ))}
-          </h1>
-          <p className="hero-subtitle">{siteContent.hero.subtitle}</p>
-          <p className="hero-description">{siteContent.hero.description}</p>
+          {!CARD_SALES_OPEN && <p className="aaroh-preview-badge">Coming soon</p>}
+          <h1 id="home-title" className="hero-aaroh-title">SHYGON AAROH</h1>
+          <p className="eyebrow hero-aaroh-tagline">VERSION 01 · ONE CARD. MORE POSSIBILITIES.</p>
+          <p className="hero-subtitle">A physical card, connected to a digital experience powered by SHYGON OS.</p>
+          {!CARD_SALES_OPEN && <p className="hero-aaroh-price"><strong>Pricing announced when card sales open.</strong></p>}
+          <p className="hero-description">Explore the collection, discover the planned capabilities, and preview the AAROH experience.</p>
           <div className="hero-actions">
-            <button className="button" onClick={() => scrollToId('cards')}>Explore Shygon Tap <ArrowDownRight size={18} /></button>
-            <button className="button button-secondary" onClick={() => scrollToId('builder')}>Configure your Tap <ArrowRight size={18} /></button>
+            <Link className="button" to={AAROH_PRODUCT_PATH}>Explore the collection <ArrowRight size={18} /></Link>
+            <Link className="button button-secondary" to={designPath(AAROH_EDITIONS[0]!)}>Preview the experience</Link>
           </div>
           <div className="hero-proof">
             <span><BadgeCheck size={15} /> No app required</span>
             <span><Zap size={15} /> Opens instantly</span>
-            <span><Palette size={15} /> Made around you</span>
+            <button type="button" className="hero-aaroh-v5" onClick={() => scrollToId('cards')}><Nfc size={15} /> Shop SHYGON TAP V5 <ArrowDownRight size={15} /></button>
           </div>
         </div>
-        <div className="hero-product reveal-scale" ref={productRef} onPointerMove={trackGlassLight}>
-          <div className="liquid-glass liquid-glass-one" aria-hidden="true" />
-          <div className="liquid-glass liquid-glass-two" aria-hidden="true" />
-          <div className="hero-card-float">
-            <TiltCard src={cardArt({ id: 'business' }, 'metal', 'premium')} alt="Brushed metal SHYGON Tap Business NFC card, Obsidian Feather design" />
-          </div>
-          <div className="nfc-pulse" aria-hidden="true"><Nfc size={26} /><i /><i /></div>
-          <div className="hero-chip hero-chip-top"><span>01</span><div><small>PHYSICAL</small><strong>Premium NFC card</strong></div></div>
-          <div className="hero-chip hero-chip-bottom"><span>02</span><div><small>DIGITAL</small><strong>Your chosen UI</strong></div></div>
-          <div className="tap-path" aria-hidden="true"><i /><i /><i /></div>
+        <div className="hero-aaroh-stage reveal-scale">
+          <AarohHero onOpen={(edition) => navigate(designPath(edition))} headingId="home-title" />
         </div>
       </div>
       <button className="scroll-cue" onClick={() => scrollToId('cards')} aria-label="Scroll to cards">

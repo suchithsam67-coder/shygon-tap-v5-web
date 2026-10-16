@@ -1,8 +1,8 @@
 /* =============================================================================
- * The SHYGON store (SHYGON TAP V5 and AAROH) and the AAROH product page
- * (DEC-2026-036, DEC-2026-037).
+ * The SHYGON store (SHYGON TAP V5 and AAROH), the AAROH product page and the
+ * home page's AAROH hero (DEC-2026-036, DEC-2026-037).
  *
- * Imported by those two pages only, so the public Tap never downloads it. It
+ * Imported by those pages only, so the public Tap never downloads it. It
  * speaks the storefront's language (ink, porcelain, the champagne metal,
  * hairlines) with more air: the cards are the heroes, the type is quiet and
  * wide, and structure comes from thin rules rather than boxes.
@@ -572,6 +572,33 @@
   /* The card's corners: 3.18 mm on 85.60 × 53.98. */
   --card-corner: 3.7% / 5.9%;
 }
+
+/* --------------------------------------------- home page hero (AAROH) --- */
+
+/* The home hero keeps the storefront's hero frame; AAROH's title is set wide, like the card. */
+.hero-aaroh .hero-layout { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 72px); }
+body:has(.storefront) .hero-aaroh .hero-copy h1.hero-aaroh-title {
+  margin: 14px 0 12px;
+  font-family: var(--ds-font-family-display);
+  font-size: clamp(2.4rem, 5.6vw, 5rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.16em;
+}
+.hero-aaroh-tagline { margin: 0 0 18px; }
+.hero-aaroh-price { margin: 14px 0 0; color: var(--ds-text); }
+.hero-aaroh-stage { width: 100%; min-width: 0; }
+.hero-aaroh-v5 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--ds-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.hero-aaroh-v5:focus-visible { outline: 2px solid var(--ds-color-focus); outline-offset: 3px; }
 
 /* ------------------------------------------------- hero and intro (AAROH) --- */
 
@@ -1221,6 +1248,7 @@
 /* ------------------------------------------------------------ responsive --- */
 
 @media (max-width: 960px) {
+  .hero-aaroh .hero-layout { grid-template-columns: minmax(0, 1fr); }
   .aaroh-hero-intro { grid-template-columns: minmax(0, 1fr); }
   .ah-orbit { position: static; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
   .ah-orbit li { position: static; }

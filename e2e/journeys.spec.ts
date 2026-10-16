@@ -181,6 +181,17 @@ test('cards are not for sale in the release candidate: the store says so and off
 });
 
 test('AAROH (DEC-2026-037): ten editions beside V5; one themed overview explains, previews and hands off', async ({ page }) => {
+  // The home page leads with SHYGON AAROH: the preview copy beside the hero intro, and V5 one press away.
+  await page.goto('/shygontap');
+  await dismissCookieNotice(page);
+  const home = page.locator('#home');
+  await expect(home.getByRole('heading', { level: 1, name: 'SHYGON AAROH' })).toBeVisible();
+  await expect(home.getByText('Pricing announced when card sales open.')).toBeVisible();
+  await expect(home.getByText('Meet AAROH.')).toBeVisible();
+  await expect(home.getByRole('link', { name: /Explore the collection/ })).toHaveAttribute('href', '/shygontap/store/aaroh');
+  await expect(home.getByRole('button', { name: /Shop SHYGON TAP V5/ })).toBeVisible();
+  await expect(home).not.toContainText('₹');
+
   // V5 stays on sale beside AAROH: its product pages are not redirected.
   await page.goto('/shygontap/store');
   await dismissCookieNotice(page);
