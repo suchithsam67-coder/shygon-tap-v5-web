@@ -9,6 +9,40 @@ import { QrCodeCanvas } from '../components/app/QrCode';
 import { TAP_STATUS_HINTS, TAP_STATUS_LABELS, tapUrl } from '../services/tap';
 
 /**
+ * Rasterises the on-screen QR (an SVG) to a `size`×`size` PNG: the SVG is
+ * serialised, loaded as an image and drawn onto an offscreen canvas. The copy
+ * drops the on-screen rounded corners and draws with crisp edges, so the file
+ * is a square with no anti-aliased seams between neighbouring modules.
+ */
+function svgToPng(svg: SVGSVGElement, size: number): Promise<Blob> {
+  const copy = svg.cloneNode(true) as SVGSVGElement;
+  copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  copy.setAttribute('width', String(size));
+  copy.setAttribute('height', String(size));
+  copy.setAttribute('shape-rendering', 'crispEdges');
+  copy.removeAttribute('style');
+  const source = new XMLSerializer().serializeToString(copy);
+
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onerror = () => reject(new Error('The QR image could not be loaded.'));
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(new Error('No 2D canvas.'));
+        return;
+      }
+      context.drawImage(image, 0, 0, size, size);
+      canvas.toBlob((png) => (png ? resolve(png) : reject(new Error('No PNG.'))), 'image/png');
+    };
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
+  });
+}
+
+/**
  * The customer's QR code.
  *
  * The code encodes the Tap's public address and nothing else, which is what
@@ -47,21 +81,25 @@ export default function TapQr() {
   }
 
   /**
-   * Downloads the canvas the page already drew, so the file is exactly the code
-   * on screen. Rendered at 1024px for print rather than at the on-screen size.
+   * Downloads the code the page already drew, so the file is exactly the code
+   * on screen, rasterised to a PNG at the size picked on the slider.
    */
-  function download() {
-    const canvas = holder.current?.querySelector('canvas');
-    if (!canvas || !tap?.slug) {
+  async function download() {
+    const svg = holder.current?.querySelector('svg');
+    if (!svg || !tap?.slug) {
       toast.error('Nothing to download', 'Claim your Tap address first.');
       return;
     }
+    const filename = `shygon-tap-${tap.slug}.png`;
     try {
+      const href = URL.createObjectURL(await svgToPng(svg, size));
       const link = document.createElement('a');
-      link.download = `shygon-tap-${tap.slug}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.download = filename;
+      link.href = href;
       link.click();
-      toast.success('QR downloaded', `Saved as shygon-tap-${tap.slug}.png`);
+      // Revoked later, not at once: some browsers read the URL after click() returns.
+      window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
+      toast.success('QR downloaded', `Saved as ${filename}`);
     } catch {
       toast.error('Could not download', 'Your browser blocked the download. Try a screenshot.');
     }
@@ -130,7 +168,7 @@ export default function TapQr() {
                   marginTop: 18,
                 }}
               >
-                <button className="btn btn-blue btn-sm" onClick={download}>
+                <button className="btn btn-blue btn-sm" onClick={() => void download()}>
                   <Download size={14} /> Download PNG
                 </button>
                 <button className="btn btn-ghost btn-sm" onClick={copyLink}>
@@ -156,7 +194,8 @@ export default function TapQr() {
                   type="range"
                   min={180}
                   max={1024}
-                  step={20}
+                  // 1024 − 180 is a multiple of 4, so the slider can reach 1024 (with 20 it stops at 1020).
+                  step={4}
                   value={size}
                   onChange={(e) => setSize(Number(e.target.value))}
                 />
