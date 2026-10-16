@@ -17,6 +17,7 @@ import {
 import { aarohPrice, aarohVariant, inStock, type Catalog } from '../../services/catalog';
 import { CARD_SALES_OPEN } from '../../lib/commerce';
 import CardsComingSoon from '../CardsComingSoon';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 import AarohCard from './AarohCard';
 import FeatureShowcase from './FeatureShowcase';
 import { SHOWCASE_ICONS } from './showcaseIcons';
@@ -47,19 +48,6 @@ function markIntroSeen() {
   } catch {
     /* private mode: the welcome simply plays again next time */
   }
-}
-
-function useReducedMotion(): boolean {
-  const query = '(prefers-reduced-motion: reduce)';
-  const [reduced, setReduced] = useState(() => typeof window !== 'undefined' && window.matchMedia?.(query).matches);
-  useEffect(() => {
-    const list = window.matchMedia?.(query);
-    if (!list) return;
-    const update = () => setReduced(list.matches);
-    list.addEventListener('change', update);
-    return () => list.removeEventListener('change', update);
-  }, []);
-  return Boolean(reduced);
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ChevronRight, Search, SlidersHorizontal } from 'lucide-react';
 import {
   materialLabels,
@@ -11,12 +11,9 @@ import {
 } from '../../data/shygonTapData';
 import {
   AAROH_BULK_MINIMUM,
-  AAROH_DEFAULT_FINISH,
   AAROH_EDITIONS,
   AAROH_FINISHES,
-  AAROH_IMAGE_SIZE_SMALL,
   AAROH_PRODUCT_PATH,
-  aarohImages,
   designPath,
 } from '../../data/aaroh';
 import { aarohPrice, cardPriceIndex, fetchCatalog } from '../../services/catalog';
@@ -28,6 +25,7 @@ import { editionAvailability, useEditions } from '../../lib/editions';
 import { CARD_SALES_OPEN } from '../../lib/commerce';
 import StoreFooter from '../../components/StoreFooter';
 import AarohHeader from '../../components/aaroh/AarohHeader';
+import AarohHero from '../../components/aaroh/AarohHero';
 import EditionCollection from '../../components/aaroh/EditionCollection';
 import CardsComingSoon from '../../components/CardsComingSoon';
 import '../../styles/aaroh.css';
@@ -90,6 +88,7 @@ const EDITION_NAMES = AAROH_EDITIONS.map((e) => e.title).join(', ').replace(/, (
 
 export default function Store() {
   usePageMeta(META);
+  const navigate = useNavigate();
   const catalog = useCatalog();
   const { fromPrice } = useCardPrices();
   const v5From = Math.min(...products.map(fromPrice));
@@ -122,16 +121,8 @@ export default function Store() {
           <div className="store-choice">
             {/* SHYGON AAROH, the store's flagship preview (owner, 2026-10-16): no price, no purchase. */}
             <article className="store-choice-card store-choice-aaroh store-flagship" aria-labelledby="choice-aaroh">
-              <div className="store-choice-art store-choice-fan" aria-hidden="true">
-                {AAROH_EDITIONS.slice(0, 3).map((edition, index) => (
-                  <img
-                    key={edition.id}
-                    className={`store-choice-fan-card store-choice-fan-${index + 1}`}
-                    src={aarohImages(edition, AAROH_DEFAULT_FINISH).frontSmall}
-                    alt=""
-                    {...AAROH_IMAGE_SIZE_SMALL}
-                  />
-                ))}
+              <div className="store-choice-art store-hero-card">
+                <AarohHero compact onOpen={(edition) => navigate(designPath(edition))} headingId="choice-aaroh" />
               </div>
               {!CARD_SALES_OPEN && <p className="aaroh-preview-badge">Coming soon</p>}
               <h2 id="choice-aaroh">SHYGON AAROH</h2>

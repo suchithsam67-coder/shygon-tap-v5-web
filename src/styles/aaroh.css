@@ -408,19 +408,9 @@
   background: var(--aaroh-stage);
   overflow: hidden;
 }
-.store-choice-art img { width: min(78%, 360px); height: auto; filter: drop-shadow(0 18px 24px rgba(0, 0, 0, 0.5)); transform: rotate(-3deg); }
-/* Three landscape cards, laid in a loose stack; more specific than the single-card rule above. */
-.store-choice-fan .store-choice-fan-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: min(62%, 300px);
-  height: auto;
-  border-radius: 3.7% / 5.9%;
-}
-.store-choice-fan .store-choice-fan-1 { transform: translate(-50%, -50%) translate(-24%, -20%) rotate(-7deg); }
-.store-choice-fan .store-choice-fan-2 { z-index: 2; transform: translate(-50%, -50%) translate(0, 0) rotate(-2deg); }
-.store-choice-fan .store-choice-fan-3 { z-index: 3; transform: translate(-50%, -50%) translate(24%, 20%) rotate(3deg); }
+.store-choice-art > img { width: min(78%, 360px); height: auto; filter: drop-shadow(0 18px 24px rgba(0, 0, 0, 0.5)); transform: rotate(-3deg); }
+/* The flagship's display case holds the live hero card. */
+.store-hero-card { padding: 0; }
 
 .store-compare tbody th { width: 11rem; }
 .store-compare thead th { font-family: var(--ds-font-family-display); font-size: 1.05rem; }
@@ -583,12 +573,118 @@
   --card-corner: 3.7% / 5.9%;
 }
 
+/* ------------------------------------------------- hero and intro (AAROH) --- */
+
+.aaroh-hero-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  align-items: center;
+  gap: clamp(24px, 4vw, 64px);
+  padding-block: clamp(8px, 2vw, 24px) clamp(48px, 7vw, 88px);
+}
+/* "SHYGON AAROH", sized from its own column so the wide tracking never overflows; it may wrap between the words. */
+.aaroh-hero-copy { container-type: inline-size; }
+.aaroh-hero-copy .aaroh-product-title { font-size: clamp(2rem, 11cqi, 4.4rem); letter-spacing: 0.22em; }
+.aaroh-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+
+/*
+ * The hero card. Its display case stays dark in both themes, like the
+ * store's other product stages, and is lit in the shown edition's light; the
+ * light is a registered colour, so it eases from one edition to the next.
+ */
+@property --ah-glow { syntax: '<color>'; inherits: true; initial-value: #d9bf85; }
+.ah { --ah-ink: #f3efe6; --ah-soft: rgba(243, 239, 230, 0.74); transition: --ah-glow var(--m-slow) var(--m-ease); }
+.ah-stage {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  padding: clamp(18px, 2.6vw, 32px);
+  border-radius: var(--aaroh-radius);
+  background:
+    radial-gradient(70% 60% at 60% 34%, color-mix(in srgb, var(--ah-glow) 24%, transparent), transparent 72%),
+    var(--aaroh-stage);
+  color: var(--ah-ink);
+}
+/* The caption keeps one height, so the card never jumps as the words change. */
+.ah-caption { min-height: 7.6rem; }
+.ah-lines > * { animation: ao-rise var(--m-scene) var(--m-ease) both; }
+.ah-lines > :nth-child(2) { animation-delay: 140ms; }
+.ah-lines > :nth-child(3) { animation-delay: 280ms; }
+.ah-kicker { margin: 0 0 8px; color: var(--ah-accent); font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; }
+.ah-big { margin: 0; font-family: var(--ds-font-family-display); font-size: clamp(1.9rem, 3.6vw, 3rem); font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; }
+.ah-soft { margin: 6px 0 0; color: var(--ah-soft); font-size: clamp(1.15rem, 2.2vw, 1.6rem); font-weight: 500; }
+.ah-caps { margin: 0; font-size: clamp(1.05rem, 2vw, 1.4rem); font-weight: 600; line-height: 1.35; letter-spacing: 0.12em; text-transform: uppercase; }
+.ah-note { max-width: 48ch; margin: 10px 0 0; color: var(--ah-soft); line-height: 1.6; }
+
+.ah-object-wrap { position: relative; display: grid; place-items: center; perspective: 1800px; }
+.ah-object { display: grid; place-items: center; width: 100%; padding: 6px 0 18px; border: 0; border-radius: 18px; background: none; cursor: pointer; }
+.ah-object:focus-visible { outline: 2px solid var(--ds-color-focus); outline-offset: 4px; }
+.ah-object .ac { width: min(100%, 600px); transition: transform var(--m-scene) var(--m-ease); }
+.ah[data-beat='meaning'] .ah-object .ac { transform: scale(0.72); }
+
+.ah-orbit { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; pointer-events: none; }
+.ah-orbit li {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid rgba(243, 239, 230, 0.18);
+  border-radius: 999px;
+  background: rgba(17, 18, 21, 0.88);
+  color: var(--ah-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: ao-rise var(--m-scene) var(--m-ease) both;
+  animation-delay: calc(300ms + var(--i) * 150ms);
+}
+.ah-orbit li svg { color: var(--ah-accent); }
+.ah-orbit li:nth-child(1) { top: 2%; left: 2%; }
+.ah-orbit li:nth-child(2) { top: 2%; right: 2%; }
+.ah-orbit li:nth-child(3) { top: 42%; left: -1%; }
+.ah-orbit li:nth-child(4) { top: 42%; right: -1%; }
+.ah-orbit li:nth-child(5) { bottom: 8%; left: 4%; }
+.ah-orbit li:nth-child(6) { bottom: 8%; right: 4%; }
+
+.ah-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.ah-icon { display: grid; flex: none; place-items: center; width: 44px; height: 44px; border: 1px solid rgba(243, 239, 230, 0.24); border-radius: 999px; color: var(--ah-ink); }
+.ah-icon:hover { border-color: var(--ah-accent); }
+.ah-editions { display: flex; flex-wrap: wrap; gap: 6px; }
+.ah-swatch {
+  width: 30px;
+  height: 30px;
+  border: 2px solid rgba(243, 239, 230, 0.22);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--sw) 0 55%, var(--sw2) 55% 100%);
+}
+.ah-swatch:hover { border-color: rgba(243, 239, 230, 0.6); }
+.ah-swatch[aria-pressed='true'] { border-color: var(--ah-accent); box-shadow: 0 0 0 2px var(--ah-accent); }
+.ah-icon:focus-visible,
+.ah-swatch:focus-visible,
+.ah-open:focus-visible { outline: 2px solid var(--ds-color-focus); outline-offset: 3px; }
+.ah-open { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-left: auto; color: var(--ah-ink); font-weight: 600; }
+.ah-name { color: var(--ah-soft); font-size: 0.88rem; font-weight: 600; }
+
+/* The store's compact hero card: the display case is the store tile's own. */
+.ah-compact { width: 100%; height: 100%; }
+.ah-compact .ah-stage { height: 100%; padding: 0 0 52px; background: none; align-content: center; }
+.ah-compact .ah-object { padding: 0; }
+.ah-compact .ah-object .ac { width: min(76%, 420px); }
+.ah-compact .ah-controls { position: absolute; right: 16px; bottom: 12px; left: 16px; }
+
 /* ------------------------------------------------------------ collection --- */
 
 .aaroh-collection { padding-block: clamp(8px, 2vw, 24px) clamp(48px, 7vw, 88px); }
 .aaroh-collection-head { max-width: 760px; margin-bottom: clamp(28px, 4vw, 48px); container-type: inline-size; }
-/* "SHYGON AAROH", sized from its own column so the wide tracking never overflows; it may wrap between the words. */
-.aaroh-collection-head .aaroh-product-title { font-size: clamp(2rem, 8.5cqi, 4.4rem); letter-spacing: 0.22em; }
+.aaroh-collection-title {
+  margin: 0;
+  font-family: var(--ds-font-family-display);
+  font-size: clamp(1.8rem, 3.6vw, 2.6rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
 .aaroh-collection-note { margin: 18px 0 0; }
 .aaroh-collection-tagline { margin: 14px 0 0; }
 .aaroh-collection-headline {
@@ -1125,6 +1221,10 @@
 /* ------------------------------------------------------------ responsive --- */
 
 @media (max-width: 960px) {
+  .aaroh-hero-intro { grid-template-columns: minmax(0, 1fr); }
+  .ah-orbit { position: static; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+  .ah-orbit li { position: static; }
+  .ah[data-beat='meaning'] .ah-object .ac { transform: none; }
   .ao-stage {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: 'object' 'sides' 'copy' 'controls';
@@ -1156,6 +1256,11 @@
 /* --------------------------------------------------------- reduced motion --- */
 
 @media (prefers-reduced-motion: reduce) {
+  .ah { transition: none; }
+  .ah-lines > *,
+  .ah-orbit li { animation: ao-fade 200ms linear both; }
+  .ah-object .ac,
+  .ah[data-beat='meaning'] .ah-object .ac { transform: none; transition: none; }
   .ao { transition: none; }
   .ao-scene > *,
   .ao-orbit li,

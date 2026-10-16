@@ -32,6 +32,7 @@ import { CARD_SALES_OPEN } from '../../lib/commerce';
 import { aarohProductMeta, LEGAL_PAGES } from '../../seo/meta';
 import { usePageMeta } from '../../seo/usePageMeta';
 import AarohHeader from '../../components/aaroh/AarohHeader';
+import AarohHero from '../../components/aaroh/AarohHero';
 import AarohOverview from '../../components/aaroh/AarohOverview';
 import BulkEnquiry from '../../components/aaroh/BulkEnquiry';
 import EditionCollection from '../../components/aaroh/EditionCollection';
@@ -161,9 +162,11 @@ export default function AarohProduct() {
         </nav>
 
         {/* ------------------------------------------------ collection */}
-        <section className="aaroh-collection" aria-labelledby="aaroh-product-title">
-          {/* The owner's premium-preview copy (2026-10-16). No AAROH price before card sales open. */}
-          <header className="aaroh-collection-head">
+        {/* --------------------------------------------- hero and intro */}
+        {/* The owner's premium-preview copy (2026-10-16), beside the hero card,
+            which plays the AAROH intro. No AAROH price before card sales open. */}
+        <section id="intro" className="aaroh-hero-intro" aria-labelledby="aaroh-product-title">
+          <div className="aaroh-hero-copy">
             {!CARD_SALES_OPEN && <p className="aaroh-preview-badge">Coming soon</p>}
             <h1 id="aaroh-product-title" className="aaroh-product-title">SHYGON AAROH</h1>
             <p className="aaroh-kicker aaroh-collection-tagline">VERSION 01 · ONE CARD. MORE POSSIBILITIES.</p>
@@ -176,6 +179,26 @@ export default function AarohProduct() {
               )}
             </p>
             <p className="aaroh-buy-lede">Explore the collection, discover the planned capabilities, and preview the AAROH experience.</p>
+            <div className="aaroh-hero-actions">
+              <a href="#editions" className="btn btn-blue">
+                Explore the collection <ArrowRight size={16} aria-hidden="true" />
+              </a>
+              <button type="button" className="btn btn-ghost" onClick={() => openEdition(AAROH_EDITIONS[0]!)}>
+                Preview the experience
+              </button>
+            </div>
+          </div>
+          <AarohHero onOpen={openEdition} headingId="aaroh-product-title" />
+        </section>
+
+        {/* ------------------------------------------------ collection */}
+        <section id="editions" className="aaroh-collection" aria-labelledby="aaroh-editions-title">
+          <header className="aaroh-collection-head">
+            <p className="aaroh-kicker">The collection</p>
+            <h2 id="aaroh-editions-title" className="aaroh-collection-title">Ten editions of the same card.</h2>
+            <p className="aaroh-buy-lede">
+              Every edition carries the same chip, QR code and SHYGON profile. Choose one to see it up close.
+            </p>
           </header>
           <EditionCollection ref={collectionRef} onOpen={openEdition} current={open?.id} finish={finish.id} />
           <p className="aaroh-muted aaroh-collection-note">The editions are shown as concept renders while the cards are validated with our manufacturer.</p>

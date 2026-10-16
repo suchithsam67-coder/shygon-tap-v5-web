@@ -211,8 +211,17 @@ test('AAROH (DEC-2026-037): ten editions beside V5; one themed overview explains
     'Emerald Cipher', 'Prism', 'Carbon Weave', 'Heritage Geometry', 'Liquid Form',
   ]);
 
+  // The hero card plays the intro; it can be paused and pointed at an edition.
+  const hero = page.locator('#intro');
+  await expect(hero.getByText('Meet AAROH.')).toBeVisible();
+  await hero.getByRole('button', { name: 'Pause the intro' }).click();
+  await hero.getByRole('button', { name: 'Show Prism' }).click();
+  await expect(hero.getByRole('button', { name: 'Show Prism' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(hero.getByText('Controlled iridescence behind a lenticular screen.')).toBeVisible();
+  await expect(hero.getByRole('button', { name: 'Explore Prism' })).toBeVisible();
+
   // Opening an edition: a modal dialog at a deep link, in that edition's theme.
-  await page.getByRole('button', { name: 'Explore Cobalt' }).click();
+  await collection.getByRole('button', { name: 'Explore Cobalt' }).click();
   await expect(page).toHaveURL(/\/shygontap\/store\/aaroh\?design=cobalt$/);
   let overview = page.getByRole('dialog', { name: /AAROH Cobalt/ });
   await expect(overview).toBeVisible();
@@ -250,10 +259,10 @@ test('AAROH (DEC-2026-037): ten editions beside V5; one themed overview explains
   await overview.getByRole('button', { name: 'Close the overview' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(/\/shygontap\/store\/aaroh$/);
-  await expect(page.getByRole('button', { name: 'Explore Emerald Cipher' })).toBeFocused();
+  await expect(collection.getByRole('button', { name: 'Explore Emerald Cipher' })).toBeFocused();
 
   // A returning visitor goes straight to the overview; Escape closes it.
-  await page.getByRole('button', { name: 'Explore Obsidian' }).click();
+  await collection.getByRole('button', { name: 'Explore Obsidian' }).click();
   await expect(page.getByRole('dialog').getByRole('button', { name: 'Replay intro' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -281,4 +290,12 @@ test('AAROH overview with reduced motion: nothing plays by itself, every scene i
   await expect(overview.getByRole('button', { name: 'Replay intro' })).toBeVisible();
   const turn = await overview.locator('.ao-object .ac-body').evaluate((el) => getComputedStyle(el).transform);
   expect(turn).toBe('none');
+
+  // The hero intro behind it never moves by itself either.
+  await overview.getByRole('button', { name: 'Close the overview' }).click();
+  const hero = page.locator('#intro');
+  await expect(hero.getByText('Meet AAROH.')).toBeVisible();
+  await expect(hero.getByRole('button', { name: /Pause the intro|Play the intro/ })).toHaveCount(0);
+  await page.waitForTimeout(4500);
+  await expect(hero.getByText('Meet AAROH.')).toBeVisible();
 });
