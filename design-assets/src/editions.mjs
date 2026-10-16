@@ -548,11 +548,14 @@ export function cardSvg(storeId, { side = 'front', finish = 'premium', px = 16, 
     u[k] = 'url(#' + ids[k] + ')';
   }
   // Tier B mockups show metal only where the edition is foiled; ink stays ink.
-  const foiled = B && !print && Boolean(fin.foil);
+  // Finishes are front-only: the back's art is a 40-60% tint, and foil or
+  // relief cannot be a tint, so the back prints its art as ink.
+  const finished = B && !back;
+  const foiled = finished && !print && Boolean(fin.foil);
   const metal = foiled ? u.metal : c.flat;
-  const filters = B && !print ? { rel: fin.rel || fin.foilAs ? u.rel : null, deb: fin.deb ? u.deb : null, foil: fin.foil ? u.foil : fin.foilAs ? u.rel : null } : {};
+  const filters = finished && !print ? { rel: fin.rel || fin.foilAs ? u.rel : null, deb: fin.deb ? u.deb : null, foil: fin.foil ? u.foil : fin.foilAs ? u.rel : null } : {};
   let layers = artLayers(storeId, { tierB: B, metal, artA: u.artA, artB: u.artB, filters });
-  if (print && B) {
+  if (print && finished) {
     // Foil goes on its own plate; an emboss-only relief has no ink.
     layers = layers.filter((l) => !(l.role === 'foil' && fin.foil) && !(l.role === 'rel' && fin.relNoInk));
   }

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import {
-  AAROH,
   AAROH_BULK_MINIMUM,
   AAROH_DEFAULT_FINISH,
   AAROH_EDITIONS,
@@ -15,7 +14,7 @@ import {
   type AarohFinish,
 } from '../../data/aaroh';
 import {
-  AAROH_FAQS,
+  aarohFaqs,
   ROLES,
   SOFTWARE_FEATURES,
   STATUS_LABEL,
@@ -163,17 +162,21 @@ export default function AarohProduct() {
 
         {/* ------------------------------------------------ collection */}
         <section className="aaroh-collection" aria-labelledby="aaroh-product-title">
+          {/* The owner's hero copy (2026-10-16). No AAROH price is shown before card sales open. */}
           <header className="aaroh-collection-head">
-            <p className="aaroh-kicker">SHYGON · {AAROH.version}</p>
-            <h1 id="aaroh-product-title" className="aaroh-product-title">AAROH</h1>
-            <p className="aaroh-collection-headline">{AAROH.headline}</p>
-            <p className="aaroh-buy-lede">{AAROH.lede}</p>
+            <h1 id="aaroh-product-title" className="aaroh-product-title">SHYGON AAROH</h1>
+            <p className="aaroh-collection-headline">A new way to carry your digital identity.</p>
             <p className="aaroh-collection-price">
-              From <strong>{inr(from)}</strong> per card, paid once. Choose an edition to see it up close.
+              {CARD_SALES_OPEN ? (
+                <>From <strong>{inr(from)}</strong> per card, paid once.</>
+              ) : (
+                <strong>Pricing announced when card sales open.</strong>
+              )}
             </p>
-            {!CARD_SALES_OPEN && <p className="aaroh-muted">AAROH cards are not on sale yet. The editions are shown as concept renders.</p>}
+            <p className="aaroh-buy-lede">Discover the AAROH collection and explore the SHYGON OS experience ahead of launch.</p>
           </header>
           <EditionCollection ref={collectionRef} onOpen={openEdition} current={open?.id} finish={finish.id} />
+          <p className="aaroh-muted aaroh-collection-note">The editions are shown as concept renders while the cards are validated with our manufacturer.</p>
           <p className="aaroh-bulk-link">
             Ordering {AAROH_BULK_MINIMUM} or more, for example for your team?{' '}
             <a href="#teams" className="aaroh-link">Request a quotation <ArrowRight size={14} aria-hidden="true" /></a>
@@ -304,7 +307,7 @@ export default function AarohProduct() {
             <h2 id="aaroh-faq-title">Frequently asked questions</h2>
           </header>
           <div className="aaroh-faq">
-            {AAROH_FAQS.map(([question, answer]) => (
+            {aarohFaqs(CARD_SALES_OPEN).map(([question, answer]) => (
               <details key={question}>
                 <summary>{question}</summary>
                 <p>{answer}</p>
@@ -373,12 +376,19 @@ function Included({ catalog, selected }: { catalog: Catalog | null; selected: Aa
             <li>The Essential experience, included with the card</li>
           </ul>
           <ul className="aaroh-price-list">
-            {AAROH_FINISHES.map((item) => (
-              <li key={item.id}>
-                <span>{item.title}</span>
-                <strong>{inr(aarohPrice(catalog, selected.id, item))}</strong>
+            {CARD_SALES_OPEN ? (
+              AAROH_FINISHES.map((item) => (
+                <li key={item.id}>
+                  <span>{item.title}</span>
+                  <strong>{inr(aarohPrice(catalog, selected.id, item))}</strong>
+                </li>
+              ))
+            ) : (
+              <li>
+                <span>{AAROH_FINISHES.map((item) => item.title).join(' or ')}</span>
+                <strong>Announced when card sales open</strong>
               </li>
-            ))}
+            )}
             <li>
               <span>{AAROH_BULK_MINIMUM} cards or more</span>
               <strong>Quotation</strong>

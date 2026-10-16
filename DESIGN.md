@@ -1,5 +1,20 @@
 # SHYGON Version 1 — AAROH: physical card design specification
 
+> **SUPERSEDED (2026-10-14/16). The rest of this file describes round 2 (three upright editions with a proposed lotus) and is kept as history only.**
+>
+> Current direction, on the owner's instructions:
+> - **Editions.** The ten editions of the AAROH design system, E01 Obsidian to E10 Liquid Form, with that system's own materials, motifs and colours.
+> - **Format.** **Landscape** ID-1, 85.60 × 53.98 mm.
+> - **Logo.** The **official SHYGON logo** (ribbon S and wordmark), not the lotus.
+> - **Name.** "SHYGON AAROH, Version 01".
+> - **Print.** Printer-ready to the design system's print rules.
+>
+> Sources of truth:
+> - `design-assets/src/editions.mjs`: geometry, materials, CMYK values and Tier B finishes per edition;
+> - `design-assets/src/print.mjs` and `design-assets/PRINT.md`: the printer files, and the serial and card-registry decision;
+> - `src/data/aaroh.ts`: store data and the per-edition UI themes;
+> - the design canvas, https://claude.ai/artifact/PDDgqUPUVtd2SShFBXfUXz.
+>
 > **Status: PROPOSED — REQUIRES VALIDATION.** This is the design baseline for the SHYGON Version 1 — AAROH smart-card collection (round 2, 2026-10-12). No dimension, process, material or colour here is approved for manufacturing until the selected card supplier validates it. The renders are **concept** artwork drawn from this specification, with lighting filters for relief and foil. They are not photographs and not production files. No manufacturing approval or test result is claimed anywhere in this document.
 
 | | |

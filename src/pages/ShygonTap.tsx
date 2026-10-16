@@ -422,8 +422,8 @@ function DesignCollection({ onChoose, prices }: { onChoose: (id: ProductId) => v
 /**
  * SHYGON Version 1 — AAROH (DEC-2026-037): the premium card, sold beside the
  * SHYGON TAP V5 cards. Each tile shows the Standard print and, on hover, the
- * Premium Finish of the same edition. Prices come from the catalogue
- * (migration 027), with the display fallback until it answers.
+ * Premium Finish of the same edition. No price before card sales open; then
+ * prices come from the catalogue (migration 027), with the display fallback.
  */
 function AarohCollection() {
   const catalog = useCatalog()
@@ -449,7 +449,7 @@ function AarohCollection() {
                   <h3>AAROH {edition.title}</h3>
                   <p>{edition.character}</p>
                   <div className="design-tile-foot">
-                    <span>from {listed ? rupees(listed.priceInPaise) : currency(standard!.price)}</span>
+                    <span>{CARD_SALES_OPEN ? `from ${listed ? rupees(listed.priceInPaise) : currency(standard!.price)}` : 'Pricing at launch'}</span>
                     <Link className="text-button" to={designPath(edition)}>
                       View edition <ArrowRight size={15} />
                     </Link>

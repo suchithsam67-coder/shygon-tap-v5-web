@@ -163,64 +163,115 @@ test('cards are not for sale in the release candidate: the store says so and off
   await dismissCookieNotice(page);
   await expect(page.getByText('SHYGON cards are coming soon')).toBeVisible();
   await expect(page.getByRole('button', { name: /Cart/ })).toHaveCount(0);
-  await page.goto('/shygontap/store/aaroh');
-  await expect(page.getByText('SHYGON cards are coming soon')).toBeVisible();
-  await expect(page.getByText('The price is announced when card sales open.')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Buy Now|Add to Cart/i })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Choose your Tap experience' }).click();
+
+  // The AAROH overview's selection offers no purchase while card sales are closed.
+  await page.goto('/shygontap/store/aaroh?design=obsidian');
+  const overview = page.getByRole('dialog', { name: /AAROH Obsidian/ });
+  await expect(overview).toBeVisible();
+  await overview.getByRole('button', { name: 'Skip intro' }).click();
+  const choose = overview.locator('#ao-choose');
+  await choose.scrollIntoViewIfNeeded();
+  await expect(choose.getByText('SHYGON cards are coming soon')).toBeVisible();
+  await expect(choose.getByRole('button', { name: 'Choose Obsidian' })).toHaveCount(0);
+  await expect(choose.getByText('Pricing announced when card sales open.')).toBeVisible();
+  await expect(choose).not.toContainText('₹');
+  await choose.getByRole('button', { name: 'Choose your Tap experience' }).click();
   await page.waitForURL('**/shygontap/auth');
 });
 
-test('AAROH (DEC-2026-036): one product in three designs, explained before purchase; old card pages redirect', async ({ page }) => {
-  // The store answers the four questions first and links only to AAROH.
+test('AAROH (DEC-2026-037): ten editions beside V5; one themed overview explains, previews and hands off', async ({ page }) => {
+  // V5 stays on sale beside AAROH: its product pages are not redirected.
   await page.goto('/shygontap/store');
   await dismissCookieNotice(page);
-  await expect(page.getByRole('heading', { level: 1, name: 'AAROH' })).toBeVisible();
-  for (const question of ['What is AAROH?', 'How does the card work?', 'What software comes with it?', 'What do I receive?']) {
-    await expect(page.getByText(question, { exact: true })).toBeVisible();
-  }
-  await expect(page.locator('a[href^="/shygontap/store/"]:not([href^="/shygontap/store/aaroh"])')).toHaveCount(0);
-  await page.getByRole('link', { name: 'Explore AAROH' }).click();
-  await page.waitForURL('**/shygontap/store/aaroh');
+  await expect(page.getByRole('heading', { level: 1, name: 'Two cards. One SHYGON profile.' })).toBeVisible();
+  // No AAROH price before card sales open (owner, 2026-10-16).
+  await expect(page.locator('.store-choice-aaroh')).toContainText('Pricing announced when card sales open.');
+  await expect(page.locator('.store-choice-aaroh')).not.toContainText('₹');
+  await expect(page.locator('#compare')).toContainText('Announced when card sales open');
+  const v5 = await page.request.get('/shygontap/store/business', { maxRedirects: 0 });
+  expect(v5.status()).toBe(200);
 
-  // One product page; choosing a design changes the variation and is kept in the URL.
-  await expect(page.getByRole('heading', { level: 1, name: 'AAROH' })).toBeVisible();
-  const designs = page.getByRole('radiogroup', { name: 'Design' }).getByRole('radio');
-  await expect(designs).toHaveCount(3);
-  await page.getByRole('radio', { name: 'Ivory Atelier' }).click();
-  await expect(page.getByRole('radio', { name: 'Ivory Atelier' })).toHaveAttribute('aria-checked', 'true');
-  await expect(page).toHaveURL(/\?design=ivory-atelier$/);
-  await expect(page.getByRole('img', { name: 'AAROH Ivory Atelier, front, concept render' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await expect(page.getByRole('img', { name: 'AAROH Ivory Atelier, back, concept render' })).toBeVisible();
-  await page.reload();
-  await expect(page.getByRole('radio', { name: 'Ivory Atelier' })).toHaveAttribute('aria-checked', 'true');
+  // The collection: the design system's ten editions, in order.
+  await page.goto('/shygontap/store/aaroh');
+  await expect(page.getByRole('heading', { level: 1, name: 'SHYGON AAROH' })).toBeVisible();
+  await expect(page.getByText('A new way to carry your digital identity.')).toBeVisible();
+  await expect(page.getByText('Pricing announced when card sales open.')).toBeVisible();
+  await expect(page.locator('.aaroh-collection')).not.toContainText('₹');
+  const collection = page.getByRole('list', { name: 'The ten AAROH editions' });
+  await expect(collection.getByRole('listitem')).toHaveCount(10);
+  await expect(collection.getByRole('heading', { level: 3 })).toHaveText([
+    'Obsidian', 'Aureate', 'Monolith', 'Ivory Veil', 'Cobalt',
+    'Emerald Cipher', 'Prism', 'Carbon Weave', 'Heritage Geometry', 'Liquid Form',
+  ]);
 
-  // Every section the brief asks for, and nothing unbuilt presented as available.
-  for (const heading of [
-    'A card you hold. Software that works for you.',
-    'Four steps, from choosing to tapping.',
-    'More Than a Card. A Connected Digital Experience.',
-    'You hold the card. They see your profile.',
-    'One platform, many possibilities.',
-    'Three designs of the same card.',
-    'Know what you get before you pay.',
-    'Frequently asked questions',
-  ]) {
-    await expect(page.getByRole('heading', { level: 2, name: heading })).toBeVisible();
-  }
-  const badges = (section: string, label: string) => page.locator(`${section} .aaroh-status`).getByText(label, { exact: true });
-  await expect(badges('#software', 'With the card release')).toHaveCount(1);
-  await expect(badges('#possibilities', 'Not available yet')).toHaveCount(2);
-  await expect(page.locator('#faq details')).toHaveCount(14);
+  // Opening an edition: a modal dialog at a deep link, in that edition's theme.
+  await page.getByRole('button', { name: 'Explore Cobalt' }).click();
+  await expect(page).toHaveURL(/\/shygontap\/store\/aaroh\?design=cobalt$/);
+  let overview = page.getByRole('dialog', { name: /AAROH Cobalt/ });
+  await expect(overview).toBeVisible();
+  await expect(overview.getByText('Meet AAROH.')).toBeVisible();
+  await expect.poll(() => overview.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(8, 20, 47)');
 
-  // Old card pages move to AAROH: 301 from the host, and the design addresses inside the app.
-  for (const from of ['/shygontap/store/business', '/shygontap/store/rose-marble', '/shygontap/store/aurora-glass']) {
-    const response = await page.request.get(from, { maxRedirects: 0 });
-    expect(response.status(), from).toBe(301);
-    expect(new URL(response.headers().location, 'http://host').pathname, from).toBe('/shygontap/store/aaroh');
-  }
-  await page.goto('/shygontap/store/aaroh/midnight-titanium');
-  await page.waitForURL('**/shygontap/store/aaroh?design=midnight-titanium');
-  await expect(page.getByRole('radio', { name: 'Midnight Titanium' })).toHaveAttribute('aria-checked', 'true');
+  // The welcome can be skipped; then the card turns to its back on request.
+  await overview.getByRole('button', { name: 'Skip intro' }).click();
+  await expect(overview.getByRole('button', { name: 'Replay intro' })).toBeVisible();
+  await overview.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(overview.locator('.ao-object .ac')).toHaveAttribute('data-side', 'back');
+
+  // Switching edition re-themes in place and keeps the deep link current.
+  await overview.getByRole('button', { name: 'Next edition: Emerald Cipher' }).click();
+  await expect(page).toHaveURL(/\?design=emerald-cipher$/);
+  overview = page.getByRole('dialog', { name: /AAROH Emerald Cipher/ });
+  await expect(overview).toBeVisible();
+  await expect.poll(() => overview.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(12, 33, 26)');
+
+  // Features: live ones link to the account; the roadmap is labelled Planned, its actions disabled; no Privé.
+  const features = overview.locator('#ao-features');
+  await features.scrollIntoViewIfNeeded();
+  await expect(features.getByRole('heading', { name: 'Available now' })).toBeVisible();
+  await expect(features.getByRole('heading', { name: 'Upcoming SHYGON OS features' })).toBeVisible();
+  await expect(features.getByText(/does not include or guarantee/)).toBeVisible();
+  await expect(features.getByText(/Privé/)).toHaveCount(0);
+  await features.getByRole('button', { name: /^Analytics/ }).click();
+  await expect(features.getByRole('link', { name: /Open analytics/ })).toHaveAttribute('href', '/shygontap/analytics');
+  await features.getByRole('button', { name: /^Student Passport/ }).click();
+  await expect(features.getByRole('heading', { level: 3, name: 'Student Passport' })).toBeVisible();
+  await expect(features.getByRole('button', { name: 'Not available yet' })).toBeDisabled();
+  await expect(features.getByRole('link', { name: /Open analytics/ })).toHaveCount(0);
+
+  // Closing returns to the collection, with focus on the edition last shown.
+  await overview.getByRole('button', { name: 'Close the overview' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/shygontap\/store\/aaroh$/);
+  await expect(page.getByRole('button', { name: 'Explore Emerald Cipher' })).toBeFocused();
+
+  // A returning visitor goes straight to the overview; Escape closes it.
+  await page.getByRole('button', { name: 'Explore Obsidian' }).click();
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Replay intro' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  // An edition's old address is a 301 to its deep link.
+  const old = await page.request.get('/shygontap/store/aaroh/cobalt', { maxRedirects: 0 });
+  expect(old.status()).toBe(301);
+  expect(new URL(old.headers().location, 'http://host').pathname + new URL(old.headers().location, 'http://host').search).toBe('/shygontap/store/aaroh?design=cobalt');
+});
+
+test('AAROH overview with reduced motion: nothing plays by itself, every scene is one press away', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/shygontap/store/aaroh?design=prism');
+  await dismissCookieNotice(page);
+  const overview = page.getByRole('dialog', { name: /AAROH Prism/ });
+  await expect(overview.getByText('Meet AAROH.')).toBeVisible();
+  await page.waitForTimeout(4500);
+  await expect(overview.getByText('Meet AAROH.')).toBeVisible();
+  await expect(overview.getByRole('button', { name: /Pause the welcome/ })).toHaveCount(0);
+  await overview.getByRole('button', { name: 'Continue' }).click();
+  await expect(overview.getByText('Controlled iridescence behind a lenticular screen.')).toBeVisible();
+  await overview.getByRole('button', { name: 'Continue' }).click();
+  await expect(overview.getByText('One physical card. Multiple digital experiences.')).toBeVisible();
+  await overview.getByRole('button', { name: 'Explore', exact: true }).click();
+  await expect(overview.getByRole('button', { name: 'Replay intro' })).toBeVisible();
+  const turn = await overview.locator('.ao-object .ac-body').evaluate((el) => getComputedStyle(el).transform);
+  expect(turn).toBe('none');
 });

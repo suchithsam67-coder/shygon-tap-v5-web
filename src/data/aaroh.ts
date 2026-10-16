@@ -135,8 +135,8 @@ export const AAROH_IMAGE_SIZE_SMALL = { width: 600, height: 378 } as const
 
 export const AAROH = {
   family: 'AAROH',
-  version: 'Version 1',
-  name: 'SHYGON Version 1 — AAROH',
+  version: 'Version 01',
+  name: 'SHYGON AAROH, Version 01',
   headline: 'One card. Ten editions.',
   lede:
     'AAROH by SHYGON brings a physical smart card and your SHYGON digital profile together. Someone taps the card with a compatible phone, or scans its QR code, and your profile opens in their browser.',

@@ -17,7 +17,7 @@ import {
   AAROH_STORE_PATH,
   aarohImages,
 } from '../data/aaroh';
-import { AAROH_FAQS } from '../data/aarohProduct';
+import { aarohFaqs } from '../data/aarohProduct';
 
 /**
  * Page metadata for every public page: title, description, canonical path,
@@ -107,9 +107,9 @@ function website(site: string): JsonLd {
  * city, the published mailbox and the WhatsApp ordering number. No street
  * address or opening hours, because none are published.
  */
-function localBusiness(site: string): JsonLd {
-  // Both card families: SHYGON TAP V5 and AAROH (DEC-2026-037).
-  const all = [...products.flatMap((p) => [lowestPrice(p), highestPrice(p)]), AAROH_PRICE_RANGE.from, AAROH_PRICE_RANGE.to];
+function localBusiness(site: string, cardSales: boolean): JsonLd {
+  // Both card families (DEC-2026-037); AAROH's prices only once card sales open.
+  const all = [...products.flatMap((p) => [lowestPrice(p), highestPrice(p)]), ...(cardSales ? [AAROH_PRICE_RANGE.from, AAROH_PRICE_RANGE.to] : [])];
   return {
     '@type': 'Store',
     '@id': `${site}/#store`,
@@ -195,7 +195,7 @@ function productLd(site: string, product: Product, cardSales: boolean): JsonLd {
   };
 }
 
-/** AAROH: one product in three editions and two finishes. The offer appears only while cards are sold. */
+/** AAROH: one product in ten editions and two finishes. The offer, and any price, appear only while cards are sold. */
 function aarohProductLd(site: string, cardSales: boolean): JsonLd {
   return {
     '@type': 'Product',
@@ -222,10 +222,10 @@ function aarohProductLd(site: string, cardSales: boolean): JsonLd {
 }
 
 /** The same questions the AAROH product page shows. */
-function aarohFaqPage(): JsonLd {
+function aarohFaqPage(cardSales: boolean): JsonLd {
   return {
     '@type': 'FAQPage',
-    mainEntity: AAROH_FAQS.map(([question, answer]) => ({
+    mainEntity: aarohFaqs(cardSales).map(([question, answer]) => ({
       '@type': 'Question',
       name: question,
       acceptedAnswer: { '@type': 'Answer', text: answer },
@@ -262,7 +262,7 @@ export function homeMeta(site: string, { cardSales = false }: SalesOptions = {})
     path: '/shygontap',
     image: DEFAULT_SHARE_IMAGE,
     imageAlt: 'A SHYGON Tap NFC card beside the words One tap. One identity.',
-    jsonLd: [organization(site), website(site), localBusiness(site), faqPage(cardSales)],
+    jsonLd: [organization(site), website(site), localBusiness(site, cardSales), faqPage(cardSales)],
   };
 }
 
@@ -271,8 +271,8 @@ export function storeMeta(site: string, { cardSales = false }: SalesOptions = {}
   return {
     title: `Shop NFC Cards: SHYGON TAP V5 and AAROH | ${BRAND}`,
     description: cardSales
-      ? `Two SHYGON cards: TAP V5, the simple tap-to-open card from ${rupees(from)}, and AAROH, the premium card in three editions from ${rupees(AAROH_PRICE_RANGE.from)}.`
-      : `Two SHYGON cards: TAP V5, the simple tap-to-open card, and AAROH, the premium card in three editions. Coming soon; your digital profile is available today.`,
+      ? `Two SHYGON cards: TAP V5, the simple tap-to-open card from ${rupees(from)}, and AAROH, the premium card in ten editions from ${rupees(AAROH_PRICE_RANGE.from)}.`
+      : `Two SHYGON cards: TAP V5, the simple tap-to-open card, and AAROH, the premium card in ten editions. Coming soon; your digital profile is available today.`,
     path: AAROH_STORE_PATH,
     image: DEFAULT_SHARE_IMAGE,
     imageAlt: `${BRAND} NFC cards`,
@@ -302,8 +302,8 @@ export function aarohProductMeta(site: string, { cardSales = false }: SalesOptio
   return {
     title: `${AAROH.name}: Card, Software and Designs | ${BRAND}`,
     description: cardSales
-      ? `The AAROH NFC card and its software: how they work, what each purchase includes, and three editions (${AAROH_EDITIONS.map((e) => e.title).join(', ')}) from ${rupees(AAROH_PRICE_RANGE.from)}.`
-      : `The AAROH NFC card and its software: how they work, what you can buy today, and three editions coming soon: ${AAROH_EDITIONS.map((e) => e.title).join(', ')}.`,
+      ? `SHYGON AAROH, the premium NFC card in ten editions and two finishes, from ${rupees(AAROH_PRICE_RANGE.from)}: how it works and what each purchase includes.`
+      : `SHYGON AAROH, the premium NFC card in ten editions. Explore the collection and the SHYGON OS experience; pricing is announced when card sales open.`,
     path: AAROH_PRODUCT_PATH,
     image: DEFAULT_SHARE_IMAGE,
     imageAlt: `${AAROH.name} NFC smart card`,
@@ -311,7 +311,7 @@ export function aarohProductMeta(site: string, { cardSales = false }: SalesOptio
     jsonLd: [
       breadcrumbList(site, [[BRAND, '/shygontap'], ['Store', AAROH_STORE_PATH], ['AAROH', AAROH_PRODUCT_PATH]]),
       aarohProductLd(site, cardSales),
-      aarohFaqPage(),
+      aarohFaqPage(cardSales),
     ],
   };
 }

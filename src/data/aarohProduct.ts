@@ -21,7 +21,8 @@ const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`
 /**
  * Availability, in the words the owner-app plan uses: available; available
  * once you have set something up; on an eligible experience; a paid add-on;
- * arriving with the card release; or not supported yet.
+ * arriving with the card release; or planned (on the SHYGON OS roadmap, not
+ * built, no date, and never included with a card by implication).
  */
 export type FeatureStatus = 'available' | 'setup' | 'package' | 'addon' | 'card-release' | 'future'
 
@@ -31,7 +32,7 @@ export const STATUS_LABEL: Record<FeatureStatus, string> = {
   package: 'Requires an eligible plan',
   addon: 'Paid add-on',
   'card-release': 'With the card release',
-  future: 'Not yet supported',
+  future: 'Planned',
 }
 
 /** The four questions the store answers first. */
@@ -180,8 +181,12 @@ export const BULK_ORDER = {
     'Not available yet: assigning cards to employees or managing their profiles from one organisation account. An AAROH card is an identity and contact card, not a building-access, attendance or authentication credential.',
 } as const
 
-/** Answers to the store's questions. Unknowns say what is still to be confirmed. */
-export const AAROH_FAQS: readonly (readonly [question: string, answer: string])[] = [
+/**
+ * Answers to the store's questions. Unknowns say what is still to be
+ * confirmed. `cardSales` is passed in (the page and the SEO build each know
+ * it) so no AAROH price is shown before card sales open (owner, 2026-10-16).
+ */
+export const aarohFaqs = (cardSales: boolean): readonly (readonly [question: string, answer: string])[] => [
   [
     'What is an AAROH card?',
     `AAROH is SHYGON’s premium smart card: a physical card with an NFC chip and a QR code, linked to your SHYGON digital profile. It comes in ${AAROH_EDITION_COUNT} editions (${editionNames}) and two finishes, and every one works the same way.`,
@@ -212,7 +217,9 @@ export const AAROH_FAQS: readonly (readonly [question: string, answer: string])[
   ],
   [
     'How much does an AAROH card cost?',
-    `${STANDARD.title} is ${inr(STANDARD.price)} and ${PREMIUM.title} is ${inr(PREMIUM.price)}, per card, paid once. Orders of ${AAROH_BULK_MINIMUM} cards or more are priced by quotation. Delivery and tax terms are published before card sales open.`,
+    cardSales
+      ? `${STANDARD.title} is ${inr(STANDARD.price)} and ${PREMIUM.title} is ${inr(PREMIUM.price)}, per card, paid once. Orders of ${AAROH_BULK_MINIMUM} cards or more are priced by quotation.`
+      : `Pricing is announced when card sales open, and every edition shows its price before you pay. A card is paid once, with no subscription, and orders of ${AAROH_BULK_MINIMUM} cards or more are priced by quotation. Delivery and tax terms are published before card sales open.`,
   ],
   [
     'What is the difference between SHYGON TAP V5 and AAROH?',
@@ -237,6 +244,14 @@ export const AAROH_FAQS: readonly (readonly [question: string, answer: string])[
   [
     'Can one account manage multiple cards?',
     'An account can hold several cards, and every one of them opens the same profile: each SHYGON account has one profile.',
+  ],
+  [
+    'Will future SHYGON OS features be included with my card?',
+    'Planned SHYGON OS features, such as Return to owner or Student Passport, are shown as a roadmap so you can see where the platform is heading. They are not available today, have no release dates, and buying a card does not include or guarantee them. If one launches, its price and terms are shown before you can use it.',
+  ],
+  [
+    'How is my AAROH card numbered?',
+    'Every AAROH card carries a printed serial number and is numbered in its edition’s chapters of 100. The serial is for reference only: it is not a password, and nobody can use it to open or change your profile.',
   ],
   [
     'Are subscriptions or renewals required?',
@@ -267,7 +282,6 @@ export type ShowcaseIcon =
   | 'student'
   | 'event'
   | 'place'
-  | 'hospitality'
   | 'cloud'
 
 /** One entry in the AAROH feature showcase. */
@@ -289,6 +303,11 @@ export interface ShowcaseFeature {
   configurable: boolean
   /** The experience or purchase it depends on, when the code says so. */
   requires?: string
+  /**
+   * Where a cardholder manages it today: a real page of the SHYGON account
+   * (sign-in first). Only live features have one; planned ones never do.
+   */
+  action?: { label: string; to: string }
 }
 
 /**
@@ -296,11 +315,13 @@ export interface ShowcaseFeature {
  *
  * The first group is what the SHYGON account and profile do today, from the
  * code (the same evidence as SOFTWARE_FEATURES above). The second group is the
- * candidate SHYGON OS modules in the owner-app plan
- * (SHYGON_AAROH_Owner_App_and_SHYGON_OS_Experience_Plan, 2026-10): none is
- * built, none has a release date, and none may be described as working.
- * Access and credential modules are left out on purpose: an AAROH card is not
- * an access, attendance or authentication credential (DEC-2026-037).
+ * SHYGON OS roadmap: candidate modules from the owner-app plan
+ * (SHYGON_AAROH_Owner_App_and_SHYGON_OS_Experience_Plan, 2026-10), shown as
+ * "Planned" on the owner's decision of 2026-10-16. None is built, none has a
+ * release date, buying a card does not include or guarantee any of them, and
+ * none has an action. Left out on purpose: SHYGON Privé (the owner decided not
+ * to launch it), and access and credential modules (an AAROH card is not an
+ * access, attendance or authentication credential, DEC-2026-037).
  */
 export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
   {
@@ -313,6 +334,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     ownerControls: 'You write it, choose a photo and publish it from your SHYGON account, and you can change it later.',
     privacy: 'Only what you publish is shown. Pause your profile and nobody sees it.',
     configurable: true,
+    action: { label: 'Set up your profile', to: '/shygontap/tap' },
   },
   {
     id: 'contact',
@@ -324,6 +346,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     ownerControls: 'Show or hide your phone number and email at any time. Doing so never counts as an edit.',
     privacy: 'A detail you hide is not on the page at all.',
     configurable: true,
+    action: { label: 'Choose what you show', to: '/shygontap/tap' },
   },
   {
     id: 'buttons',
@@ -335,6 +358,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     ownerControls: 'Each button is bought once and appears only when you switch it on.',
     privacy: 'A button you have not switched on is never shown.',
     configurable: true,
+    action: { label: 'See the add-ons', to: '/shygontap/customizations' },
     requires: 'Bought once, per button',
   },
   {
@@ -347,6 +371,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     ownerControls: 'Essential has the basics. Business, Premium and GOAT unlock more, and the Customization Pass unlocks every palette.',
     privacy: 'How your profile looks changes nothing about what it shares.',
     configurable: true,
+    action: { label: 'Choose your look', to: '/shygontap/customize' },
     requires: 'Business, Premium or GOAT, or the Customization Pass',
   },
   {
@@ -359,6 +384,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     ownerControls: 'Copy or share your link and QR code from your account.',
     privacy: 'The link opens the same public profile a tap does, and nothing more.',
     configurable: true,
+    action: { label: 'Open your QR code', to: '/shygontap/qr' },
   },
   {
     id: 'analytics',
@@ -370,6 +396,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     ownerControls: 'Profile views, visitors, QR scans and your most-clicked buttons, over 7, 30 or 90 days.',
     privacy: 'Totals and trends. Visitors never sign in to see your profile.',
     configurable: false,
+    action: { label: 'Open analytics', to: '/shygontap/analytics' },
   },
   {
     id: 'visibility',
@@ -381,6 +408,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     ownerControls: 'Publish or pause, and switch each detail and button on or off, from your SHYGON account.',
     privacy: 'A tap shows your published profile only. While it is paused, nobody sees it.',
     configurable: true,
+    action: { label: 'Manage what visitors see', to: '/shygontap/tap' },
   },
   {
     id: 'card',
@@ -400,7 +428,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     icon: 'return',
     status: 'future',
     useCase: 'A candidate SHYGON OS module: someone who finds a lost card could reach you without seeing your details.',
-    ownerControls: 'Not part of AAROH Version 1. No release date.',
+    ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'Its privacy rules would be decided and published before any launch.',
     configurable: false,
   },
@@ -411,7 +439,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     icon: 'emergency',
     status: 'future',
     useCase: 'A candidate SHYGON OS module for emergency details that you approve, shown only in an emergency flow.',
-    ownerControls: 'Not part of AAROH Version 1. No release date.',
+    ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'Highly sensitive: nothing like it is shown or stored today.',
     configurable: false,
   },
@@ -422,7 +450,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     icon: 'student',
     status: 'future',
     useCase: 'A candidate SHYGON OS module for students to share selected achievements.',
-    ownerControls: 'Not part of AAROH Version 1. No release date.',
+    ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'It would need a student privacy review and verified schools first.',
     configurable: false,
   },
@@ -433,7 +461,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     icon: 'event',
     status: 'future',
     useCase: 'A candidate SHYGON OS module for event-specific details. Ticketing and check-in are not part of AAROH.',
-    ownerControls: 'Not part of AAROH Version 1. No release date.',
+    ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'Its privacy rules would be decided and published before any launch.',
     configurable: false,
   },
@@ -444,18 +472,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     icon: 'place',
     status: 'future',
     useCase: 'A candidate SHYGON OS module for information attached to a card placed somewhere.',
-    ownerControls: 'Not part of AAROH Version 1. No release date.',
-    privacy: 'Its privacy rules would be decided and published before any launch.',
-    configurable: false,
-  },
-  {
-    id: 'prive',
-    name: 'SHYGON Privé',
-    benefit: 'Hospitality, where a real partner exists.',
-    icon: 'hospitality',
-    status: 'future',
-    useCase: 'A candidate SHYGON OS concept for hospitality. No hotel or venue is connected.',
-    ownerControls: 'Not part of AAROH Version 1. No release date.',
+    ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'Its privacy rules would be decided and published before any launch.',
     configurable: false,
   },
@@ -466,7 +483,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     icon: 'cloud',
     status: 'future',
     useCase: 'A candidate SHYGON OS module for private contacts and files.',
-    ownerControls: 'Not part of AAROH Version 1. No release date.',
+    ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'Nothing is uploaded or stored today.',
     configurable: false,
   },

@@ -61,7 +61,7 @@ export default function NotFound() {
                 <img src={aarohImages(AAROH_EDITIONS[0]!, AAROH_DEFAULT_FINISH).frontSmall} alt="" loading="lazy" {...AAROH_IMAGE_SIZE_SMALL} />
                 <span>
                   <strong>{AAROH.name}</strong>
-                  <small>The premium SHYGON card, in three editions.</small>
+                  <small>The premium SHYGON card, in ten editions.</small>
                 </span>
                 <ArrowRight size={16} aria-hidden="true" />
               </Link>

@@ -158,7 +158,13 @@ export default function Store() {
                 relief and foil.
               </p>
               <p className="store-choice-price">
-                <strong>{inr(standardPrice)}</strong> Standard · <strong>{inr(premiumPrice)}</strong> Premium Finish
+                {CARD_SALES_OPEN ? (
+                  <>
+                    <strong>{inr(standardPrice)}</strong> Standard · <strong>{inr(premiumPrice)}</strong> Premium Finish
+                  </>
+                ) : (
+                  <strong>Pricing announced when card sales open.</strong>
+                )}
               </p>
               <Link to={AAROH_PRODUCT_PATH} className="btn btn-blue">
                 Explore AAROH <ArrowRight size={16} aria-hidden="true" />
@@ -179,7 +185,7 @@ export default function Store() {
             <h2 id="aaroh-editions-title">Ten editions of the same card.</h2>
             <p>
               Every edition carries the same chip, QR code and SHYGON profile. Open one to see it up close, then choose
-              its finish. From {inr(standardPrice)} per card{CARD_SALES_OPEN ? '' : ', coming soon'}. Ordering{' '}
+              its finish. {CARD_SALES_OPEN ? `From ${inr(standardPrice)} per card.` : 'Pricing is announced when card sales open.'} Ordering{' '}
               {AAROH_BULK_MINIMUM} or more for a team?{' '}
               <Link to={`${AAROH_PRODUCT_PATH}#teams`} className="aaroh-link">Request a quotation</Link>
             </p>
@@ -212,7 +218,7 @@ function Comparison({ v5From, standardPrice, premiumPrice }: { v5From: number; s
     ['Materials and finish', 'PVC, metal or transparent; standard or premium finish', 'Standard print, or a Premium Finish with each edition’s relief and foil. Materials are being validated with our manufacturer'],
     ['Numbered editions', 'Every design, in chapters of 100', 'Every edition, in chapters of 100'],
     ['Digital profile', 'Your SHYGON profile, with the same experiences and add-ons', 'The same profile, experiences and add-ons'],
-    ['Price per card', `From ${inr(v5From)}`, `${inr(standardPrice)} Standard, ${inr(premiumPrice)} Premium Finish`],
+    ['Price per card', `From ${inr(v5From)}`, CARD_SALES_OPEN ? `${inr(standardPrice)} Standard, ${inr(premiumPrice)} Premium Finish` : 'Announced when card sales open'],
     ['Ordering', 'Up to 10 cards per order', `Up to ${AAROH_BULK_MINIMUM - 1} per order; ${AAROH_BULK_MINIMUM} or more by quotation`],
     ['Not available yet, for both', 'Linking a card to your account, switching a lost card off, and replacements arrive with the card release', 'The same'],
   ];

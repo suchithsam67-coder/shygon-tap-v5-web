@@ -164,7 +164,7 @@ export function llmsTxt(site: string, { cardSales = false }: SalesOptions = {}):
     '',
     `## Card: ${AAROH.name}`,
     '',
-    `${AAROH.lede} One product in three editions and two finishes (${AAROH_FINISHES.map((f) => `${f.title}${cardSales ? `, ${rupees(f.price)}` : ''}`).join('; ')}). Organisations can order ${AAROH_BULK_MINIMUM} or more through a bulk enquiry, priced by quotation.`,
+    `${AAROH.lede} One product in ten editions and two finishes (${AAROH_FINISHES.map((f) => `${f.title}${cardSales ? `, ${rupees(f.price)}` : ''}`).join('; ')}). Organisations can order ${AAROH_BULK_MINIMUM} or more through a bulk enquiry, priced by quotation.`,
     '',
     ...AAROH_EDITIONS.map((e) => `- AAROH ${e.title}: ${e.description}${cardSales ? '' : ' Coming soon.'}`),
     '',

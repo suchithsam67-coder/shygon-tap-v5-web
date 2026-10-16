@@ -72,7 +72,8 @@ function useReducedMotion(): boolean {
  * replayed, and is skipped on later visits (this browser only). Below it: the
  * feature showcase, what the cardholder controls, the privacy promise, the
  * edition's story, and the selection, which hands off to the existing
- * checkout through the page's `onBuy`.
+ * checkout through the page's `onBuy`. No price is shown before card sales
+ * open (owner, 2026-10-16).
  *
  * The store only explains: nothing here writes a mode, a setting or a card.
  * With reduced motion nothing plays by itself, the card cross-fades instead of
@@ -430,14 +431,20 @@ export default function AarohOverview({
                 selected={finish}
                 onSelect={onFinish}
                 labelledBy="ao-finish-label"
-                priceFor={(item) => inr(aarohPrice(catalog, edition.id, item))}
+                priceFor={(item) => (CARD_SALES_OPEN ? inr(aarohPrice(catalog, edition.id, item)) : '')}
               />
               <p className="ao-finish-note">{finish.description}</p>
-              <div className="ao-price">
-                <span>AAROH {edition.title}, {finish.title}</span>
-                <strong>{inr(unitPrice)}</strong>
-                <small>Per card, paid once. Your digital experience is a separate choice.</small>
-              </div>
+              {CARD_SALES_OPEN ? (
+                <div className="ao-price">
+                  <span>AAROH {edition.title}, {finish.title}</span>
+                  <strong>{inr(unitPrice)}</strong>
+                  <small>Per card, paid once. Your digital experience is a separate choice.</small>
+                </div>
+              ) : (
+                <p className="ao-price ao-price-later">
+                  <strong>Pricing announced when card sales open.</strong>
+                </p>
+              )}
               {buyable ? (
                 <div className="ao-purchase">
                   <div className="aaroh-quantity" role="group" aria-label="Number of cards">

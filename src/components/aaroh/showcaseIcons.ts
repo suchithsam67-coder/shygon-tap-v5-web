@@ -5,7 +5,6 @@ import {
   CreditCard,
   Eye,
   HeartPulse,
-  Hotel,
   LifeBuoy,
   MapPin,
   MessageCircle,
@@ -33,6 +32,5 @@ export const SHOWCASE_ICONS: Record<ShowcaseIcon, LucideIcon> = {
   student: GraduationCap,
   event: CalendarDays,
   place: MapPin,
-  hospitality: Hotel,
   cloud: Cloud,
 };

@@ -390,7 +390,7 @@ export const digitalPlans: DigitalPlan[] = [
 // The card-release copy (shown only once card sales open): SHYGON TAP V5 and
 // AAROH, the premium card (DEC-2026-037).
 export const howItWorks = [
-  ['01', 'Choose your card', 'SHYGON TAP V5 (Business, Restaurant, Event, Google Review or a Design Collection card) or AAROH, the premium card in three editions.'],
+  ['01', 'Choose your card', 'SHYGON TAP V5 (Business, Restaurant, Event, Google Review or a Design Collection card) or AAROH, the premium card in ten editions.'],
   ['02', 'Choose your material or finish', 'PVC, Metal or Transparent for V5; Standard or Premium Finish for AAROH.'],
   ['03', 'Choose your digital experience', 'Essential, Business, Premium or GOAT.'],
   ['04', 'Order your Shygon Tap', 'Log in, add delivery details and pay securely online.'],
@@ -427,7 +427,7 @@ export const faqs = [
     'Every card design is released in numbered chapters of 100. When your order is paid your card takes the next number in its design — for example Obsidian Feather, Chapter I · Nº 042 of 100. The number is printed on your card and shown in your account and on your e-bill. When a chapter’s 100 cards are gone, the next chapter begins.',
   ],
   ['Can I choose different card materials?', 'Yes. Select PVC, metal or transparent material while building your Tap. Additional personalization options are available through your customer account.'],
-  ['What is AAROH?', 'AAROH is the premium SHYGON card: three editions, Heritage Geometry, Obsidian and Aureate, in a printed Standard or a Premium Finish with relief and foil. It opens the same SHYGON profile as every SHYGON TAP V5 card.'],
+  ['What is AAROH?', 'AAROH is the premium SHYGON card: ten editions from the AAROH design system, from Obsidian to Liquid Form, each in a printed Standard or a Premium Finish with relief and foil. It opens the same SHYGON profile as every SHYGON TAP V5 card.'],
   ['How do I order?', 'Build your configuration, create or log into your account, add delivery details and continue to secure online checkout.'],
   ['Can I change my selection before paying?', 'Yes. Your saved configuration stays available in your account so you can edit the card, material, finish or Digital UI before checkout.'],
 ] as const

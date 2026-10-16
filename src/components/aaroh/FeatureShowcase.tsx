@@ -1,4 +1,6 @@
 import { useId, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 import { AAROH_IMAGE_SIZE_SMALL, aarohImages, type AarohEdition, type AarohFinishId } from '../../data/aaroh';
 import { AAROH_SHOWCASE, STATUS_LABEL, type ShowcaseFeature } from '../../data/aarohProduct';
 import { SHOWCASE_ICONS } from './showcaseIcons';
@@ -13,8 +15,10 @@ const PLANNED = AAROH_SHOWCASE.filter((feature) => feature.status === 'future');
  * every edition (only the theme around it changes). Choosing a tile moves it
  * into focus and rewrites the panel: what it does, an example, what the
  * cardholder controls, and what a visitor can see. Nothing here writes
- * anything: the store only explains; the cardholder configures features in
- * their SHYGON account.
+ * anything: the store only explains. A live feature links to the page of the
+ * SHYGON account where it is managed (sign-in first); a planned one shows its
+ * action disabled, and the roadmap says plainly that a card does not include
+ * or guarantee it.
  */
 export default function FeatureShowcase({ edition, finish }: { edition: AarohEdition; finish: AarohFinishId }) {
   const [selectedId, setSelectedId] = useState(TODAY[0]!.id);
@@ -72,7 +76,7 @@ export default function FeatureShowcase({ edition, finish }: { edition: AarohEdi
   return (
     <div className="fs">
       <div className="fs-today">
-        <h3 className="fs-group">With AAROH today</h3>
+        <h3 className="fs-group">Available now</h3>
         <ul className="fs-grid">{TODAY.map(tile)}</ul>
       </div>
 
@@ -106,13 +110,24 @@ export default function FeatureShowcase({ edition, finish }: { edition: AarohEdi
               </div>
             )}
           </dl>
+          {selected.action ? (
+            <Link className="fs-action" to={selected.action.to}>
+              {selected.action.label} <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+          ) : (
+            <button type="button" className="fs-action" disabled>
+              {selected.status === 'card-release' ? 'Arrives with the card release' : 'Not available yet'}
+            </button>
+          )}
+          {selected.action && <p className="fs-action-note">In your SHYGON account, after you sign in.</p>}
         </div>
       </section>
 
       <div className="fs-planned">
-        <h3 className="fs-group">Planned for SHYGON OS, not yet supported</h3>
+        <h3 className="fs-group">Upcoming SHYGON OS features</h3>
         <p className="fs-group-note">
-          Candidate modules from the SHYGON OS plan. None is part of AAROH Version 1, and none has a release date.
+          Planned, to show where SHYGON OS is heading. They are not available today and have no release dates, and
+          buying a card does not include or guarantee them.
         </p>
         <ul className="fs-grid">{PLANNED.map(tile)}</ul>
       </div>

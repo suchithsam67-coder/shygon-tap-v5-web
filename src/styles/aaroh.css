@@ -565,7 +565,10 @@
 /* ------------------------------------------------------------ collection --- */
 
 .aaroh-collection { padding-block: clamp(8px, 2vw, 24px) clamp(48px, 7vw, 88px); }
-.aaroh-collection-head { max-width: 760px; margin-bottom: clamp(28px, 4vw, 48px); }
+.aaroh-collection-head { max-width: 760px; margin-bottom: clamp(28px, 4vw, 48px); container-type: inline-size; }
+/* "SHYGON AAROH", sized from its own column so the wide tracking never overflows; it may wrap between the words. */
+.aaroh-collection-head .aaroh-product-title { font-size: clamp(2rem, 8.5cqi, 4.4rem); letter-spacing: 0.22em; }
+.aaroh-collection-note { margin: 18px 0 0; }
 .aaroh-collection-headline {
   margin: 10px 0 0;
   font-family: var(--ds-font-family-display);
@@ -1005,6 +1008,25 @@
 .fs-facts dt { color: var(--ed-accent); font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
 .fs-facts dd { margin: 4px 0 0; line-height: 1.6; }
 
+.fs-action {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 0 18px;
+  border: 1px solid var(--ed-accent);
+  border-radius: var(--ed-radius);
+  color: var(--ed-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.fs-action:hover { background: color-mix(in srgb, var(--ed-accent) 14%, transparent); }
+.fs-action:disabled { border-color: var(--ed-line); color: var(--ed-muted); cursor: not-allowed; }
+.fs-action:disabled:hover { background: transparent; }
+.fs-action-note { margin: -4px 0 0; color: var(--ed-muted); font-size: 0.82rem; }
+
 /* Status chips: the words carry the meaning; colour and the dot only echo them. */
 .fs-status {
   display: inline-flex;
@@ -1068,6 +1090,7 @@
 .ao-price span { color: var(--ed-muted); }
 .ao-price strong { font-family: var(--ds-font-family-display); font-size: 1.4rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ao-price small { grid-column: 1 / -1; color: var(--ed-muted); font-size: 0.82rem; }
+.ao-price-later { display: block; margin: 0; }
 .ao-purchase { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .ao .aaroh-quantity { border-color: var(--ed-line); }
 .ao .aaroh-quantity button { color: var(--ed-text); }
