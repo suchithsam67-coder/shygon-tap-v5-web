@@ -33,6 +33,22 @@ export interface CardProduct {
   inStock: boolean;
 }
 
+/**
+ * One AAROH card option (DEC-2026-037): an edition in a finish. Rows from
+ * migration 027 (SKU card-aaroh-<edition>-<finish>, category aaroh-<edition>).
+ * Kept apart from the V5 cards, which are a design, a finish and a material.
+ */
+export interface AarohVariant {
+  sku: string;
+  /** The edition id: the category without its `aaroh-` prefix. */
+  edition: string;
+  /** standard | premium */
+  finish: string;
+  priceInPaise: number;
+  stock: number | null;
+  name: string;
+}
+
 export interface ExperienceProduct {
   sku: string;
   /** The experience id. Since migration 004 this is also the SKU suffix. */
@@ -59,7 +75,10 @@ export interface CustomizationProduct {
 }
 
 export interface Catalog {
+  /** SHYGON TAP V5 cards, by design. */
   cards: CardProduct[];
+  /** SHYGON AAROH cards, one entry per edition and finish. */
+  aaroh: AarohVariant[];
   experiences: ExperienceProduct[];
   customizations: CustomizationProduct[];
   /** The one-time ₹999 Customization Pass. */
@@ -135,7 +154,19 @@ async function loadCatalog(): Promise<Catalog> {
 
   const byCategory = new Map<string, CardProduct>();
 
-  for (const row of priced.filter((r) => r.product_type === 'card')) {
+  const isAaroh = (row: ProductRow) => categoryOf(row).startsWith('aaroh-');
+  const aaroh: AarohVariant[] = priced
+    .filter((row) => row.product_type === 'card' && isAaroh(row))
+    .map((row) => ({
+      sku: row.sku!,
+      edition: categoryOf(row).slice('aaroh-'.length),
+      finish: row.tier ?? 'standard',
+      priceInPaise: row.price_in_paise!,
+      stock: row.stock,
+      name: row.name,
+    }));
+
+  for (const row of priced.filter((r) => r.product_type === 'card' && !isAaroh(r))) {
     const category = categoryOf(row);
     const existing = byCategory.get(category) ?? {
       category,
@@ -211,7 +242,7 @@ async function loadCatalog(): Promise<Catalog> {
       shortDescription: row.short_description,
     }));
 
-  return { cards, experiences, customizations, pass };
+  return { cards, aaroh, experiences, customizations, pass };
 }
 
 /**
@@ -246,6 +277,25 @@ export function cardPriceIndex(catalog: Catalog | null): Map<string, number> {
     }
   }
   return index;
+}
+
+/** The listed AAROH option for an edition and finish, or undefined. */
+export function aarohVariant(catalog: Catalog | null, edition: string, finish: string): AarohVariant | undefined {
+  return catalog?.aaroh.find((v) => v.edition === edition && v.finish === finish);
+}
+
+/**
+ * An AAROH card's display price in rupees: the catalogue, or the finish's
+ * bundled fallback until it answers. Display only; checkout prices again.
+ */
+export function aarohPrice(catalog: Catalog | null, edition: string, finish: { id: string; price: number }): number {
+  const listed = aarohVariant(catalog, edition, finish.id);
+  return listed ? listed.priceInPaise / 100 : finish.price;
+}
+
+/** True when a variant can be bought now: listed and with stock (or untracked stock). */
+export function inStock(variant: { stock: number | null } | undefined): boolean {
+  return Boolean(variant) && (variant!.stock === null || variant!.stock > 0);
 }
 
 export function findVariant(

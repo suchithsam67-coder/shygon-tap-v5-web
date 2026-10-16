@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AAROH collection moodboard</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;family=Inter:wght@400;500;600&amp;family=Playfair+Display:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1700px; box-sizing: border-box; padding: 72px; background: #0b0a09; color: #f3efe6; font-family: Inter, Arial, sans-serif; display: flex; flex-direction: column; gap: 32px">
+
+<header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 48px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 0.16em; color: #c9b486">SHYGON VERSION 1 — AAROH · THE COLLECTION</div>
+<h1 style="margin: 0; font-family: 'Playfair Display', serif; font-weight: 400; font-size: 76px; line-height: 1; letter-spacing: 0.02em">One card. Ten editions.</h1>
+</div>
+<p style="margin: 0; max-width: 470px; font-size: 16px; line-height: 1.55; color: #d0cbc1">Portrait, lit like an object on a table: real texture, relief you can feel, one metal per edition and a fine metal edge. The lotus and the wide-set AAROH stay the same on every card.</p>
+</header>
+
+<div style="position: relative; height: 470px; border-radius: 24px; overflow: hidden; background: radial-gradient(70% 90% at 50% 10%, #3a3128 0%, #1a1714 45%, #0b0a09 100%)">
+<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 120px; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,0.55))"></div>
+<sc-for list="{{fan}}" as="f" hint-placeholder-count="10">
+<div style="{{f.style}}">
+<dc-import name="Card" design="{{f.id}}" side="front" tier="B" width="170" hint-size="170px,270px"></dc-import>
+</div>
+</sc-for>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 32px 24px">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="10">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="height: 268px; display: flex; align-items: center; justify-content: center; border-radius: 16px; background: radial-gradient(80% 70% at 40% 25%, #26221e 0%, #121110 75%)">
+<div style="width: 150px; height: 238px; border-radius: 9px; box-shadow: 0 18px 36px rgba(0,0,0,0.6)">
+<dc-import name="Card" design="{{t.id}}" side="front" tier="B" width="150" hint-size="150px,238px"></dc-import>
+</div>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<span style="font-family: 'Playfair Display', serif; font-size: 20px">{{t.name}}</span>
+<span style="font-family: 'Geist Mono', monospace; font-size: 11px; color: #aaa49a">{{t.no}}</span>
+</div>
+<div style="font-size: 12.5px; line-height: 1.45; color: #d0cbc1; min-height: 36px">{{t.line}}</div>
+<div style="display: flex; align-items: center; gap: 6px">
+<sc-for list="{{t.chips}}" as="c" hint-placeholder-count="4"><span style="{{c}}"></span></sc-for>
+<span style="margin-left: 6px; font-size: 11px; color: #aaa49a">{{t.finish}}</span>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 32px; align-items: center; border-top: 1px solid rgba(243,239,230,0.14); padding-top: 24px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: Geist, sans-serif; font-weight: 600; font-size: 17px">Surfaces in the family</span>
+<span style="font-size: 13px; line-height: 1.5; color: #aaa49a">Eight finishes, all available from Indian card printers. Each edition uses at most three.</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 14px">
+<sc-for list="{{finishes}}" as="m" hint-placeholder-count="8">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="{{m.sw}}"></span>
+<span style="font-size: 12px; font-weight: 600">{{m.n}}</span>
+<span style="font-size: 11px; color: #aaa49a">{{m.p}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+const ED = [
+  ['obsidian', 'Obsidian', '01', 'Textured black, a raised ogee lattice, champagne arches.', ['#0E0E10', '#1F1F24', '#B8975A', '#E9D29B'], 'Soft-touch · UV · foil'],
+  ['aureate', 'Aureate', '02', 'Sunrise rings embossed in ivory, struck in champagne.', ['#F1E8D6', '#E2D4B8', '#B08C4E', '#EBD7A4'], 'Satin · emboss · foil'],
+  ['monolith', 'Monolith', '03', 'Concrete slabs standing on a 2.5 mm grid.', ['#36373A', '#404145', '#2D2E31', '#E7E3DB'], 'Matte · raised UV'],
+  ['ivoryveil', 'Ivory Veil', '04', 'Drapery ripples in blind emboss — felt more than seen.', ['#F6F1E8', '#F2ECE1', '#B3A385', '#A89068'], 'Pearl satin · emboss'],
+  ['cobalt', 'Cobalt', '05', 'Brushed midnight, a halftone wave, a silver rule.', ['#0C1E4A', '#3F73FA', '#7AA6FF', '#D3DCEB'], 'Satin · UV dots · foil'],
+  ['emerald', 'Emerald Cipher', '06', 'A Truchet maze with one brass thread through it.', ['#0F2A21', '#1D4636', '#B59B62', '#E4D8B8'], 'Matte · raised UV · foil'],
+  ['prism', 'Prism', '07', 'Controlled iridescence behind a lenticular screen.', ['#ECEBF1', '#CBB8FF', '#A6E1F5', '#FFD2B5'], 'Gloss · line UV'],
+  ['carbon', 'Carbon Weave', '08', '2 × 2 twill in matte black, one vermilion line.', ['#141516', '#2C2E31', '#E5482F', '#C9CBCE'], 'Matte · tactile varnish'],
+  ['heritage', 'Heritage Geometry', '09', 'A debossed octagon jaali on laterite, gold at every diamond.', ['#7A3323', '#5C2417', '#EAD8B8', '#C9A35E'], 'Matte · deboss · foil'],
+  ['liquid', 'Liquid Form', '10', 'Poured layers of plum, edged in copper.', ['#26122D', '#46255D', '#724486', '#D49A7A'], 'Soft-touch · copper foil']
+];
+class Component extends DCLogic {
+  renderVals() {
+    const fan = ED.map((e, i) => {
+      const k = i - 4.5;
+      return {
+        id: e[0],
+        style: 'position: absolute; width: 170px; height: 270px; border-radius: 10px; box-shadow: 0 34px 60px rgba(0,0,0,0.65); left: ' + (34 + i * 120) + 'px; top: ' + Math.round(86 + k * k * 3.2) + 'px; transform: rotate(' + (k * 3.2).toFixed(1) + 'deg)'
+      };
+    });
+    const tiles = ED.map((e) => ({
+      id: e[0], name: e[1], no: 'E' + e[2], line: e[3], finish: e[5],
+      chips: e[4].map((c) => 'display: block; width: 16px; height: 16px; border-radius: 999px; border: 1px solid rgba(243,239,230,0.2); background: ' + c)
+    }));
+    const sw = (bg) => 'display: block; height: 64px; border-radius: 10px; border: 1px solid rgba(243,239,230,0.14); background: ' + bg;
+    const finishes = [
+      { n: 'Soft-touch matte', p: 'Velvet laminate', sw: sw('linear-gradient(160deg, #1d1e21, #121315)') },
+      { n: 'Satin', p: 'Satin laminate', sw: sw('linear-gradient(160deg, #f4efe5 0%, #e6dccb 60%, #f6f1e8 100%)') },
+      { n: 'Gloss', p: 'Gloss laminate', sw: sw('linear-gradient(135deg, #2a2c33 0%, #5a5e6b 45%, #2a2c33 55%, #1d1f24 100%)') },
+      { n: 'Spot gloss UV', p: 'Flat clear varnish', sw: sw('repeating-linear-gradient(135deg, #18191c 0 10px, #2b2d33 10px 12px)') },
+      { n: 'Raised UV', p: 'Tactile clear, 30–80 µm', sw: sw('radial-gradient(circle at 30% 30%, #4a4c52 0 3px, transparent 4px) 0 0 / 12px 12px, #1b1c1f') },
+      { n: 'Hot foil', p: 'Metallic, kept off the coil', sw: sw('linear-gradient(120deg, #9c7a3c 0%, #e6cf97 35%, #b08d4e 55%, #f0dca8 75%, #a7864a 100%)') },
+      { n: 'Blind emboss', p: 'Raised, no ink', sw: sw('repeating-linear-gradient(170deg, #f7f3ec 0 6px, #ffffff 6px 7px, #ddd4c4 7px 8px)') },
+      { n: 'Deboss', p: 'Pressed in, no ink', sw: sw('repeating-linear-gradient(45deg, #7a3323 0 8px, #5c2417 8px 9px, #8a3d2a 9px 10px)') }
+    ];
+    return { fan, tiles, finishes };
+  }
+}
+</script>
+</body>
+</html>

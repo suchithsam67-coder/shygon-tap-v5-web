@@ -437,6 +437,115 @@ await t.check('the Customization Pass grants editing only, never an experience, 
 });
 
 // ---------------------------------------------------------------------------
+t.section('Physical cards: V5 and AAROH (card sales opened for these checks only)');
+
+const SHIP = { name: 'A Customer', phone: '9876543210', address: '1 Test Street', city: 'Bengaluru', state: 'Karnataka', pincode: '560001' };
+const cardsOf = (orderId) =>
+  sql(
+    `SELECT card_id, card_slot, sku, status, user_id, activation_code, edition_design, edition_serial, edition_count
+       FROM public.cards WHERE order_id = $1 ORDER BY sku, card_slot`,
+    [orderId],
+  );
+const stockOf = async (sku) => (await sql(`SELECT stock FROM public.products WHERE sku = $1`, [sku]))[0].stock;
+const buyCard = (customer, card) =>
+  callFunction(stack, 'create-order', { token: customer.token, body: { orderType: 'physical', quantity: 1, shipping: SHIP, ...card } });
+
+const salesBefore = process.env.CARD_SALES_ENABLED;
+process.env.CARD_SALES_ENABLED = 'true';
+try {
+  await t.check('I-4: a V5 order of 3 cards becomes 3 numbered card records, each with an activation code', async () => {
+    const customer = await signUp(stack);
+    const sku = 'card-obsidian-smoke-premium-metal';
+    const stock = await stockOf(sku);
+    const created = await buyCard(customer, { productId: 'obsidian-smoke', tier: 'premium', material: 'metal', quantity: 3, amount: 1 });
+    assertEqual(created.status, 200, `create-order ${JSON.stringify(created.body)}`);
+    assertEqual(created.body.amount, (await priceOf(sku)) * 3, 'charged amount is the server price x 3');
+    const paid = stack.sim.pay({ order_id: created.body.order_id });
+    const verified = await verify(customer, paid);
+    assertEqual([verified.status, verified.body.success], [200, true], 'verify');
+
+    const order = await orderRow(created.body.order_id);
+    assertEqual([order.payment_status, order.fulfillment_status], ['paid', 'fulfilled'], 'order state');
+    const cards = await cardsOf(order.id);
+    assertEqual(cards.map((c) => c.card_slot), [1, 2, 3], 'one record per card, slots 1..3');
+    assertEqual(new Set(cards.map((c) => c.card_id)).size, 3, 'distinct card ids');
+    assert(cards.every((c) => c.user_id === customer.userId && c.status === 'pending' && /^SHY-/.test(c.activation_code)), 'owner, status and activation codes');
+    const serials = cards.map((c) => c.edition_serial);
+    assert(serials.every(Number.isInteger), `numbered: ${serials}`);
+    assertEqual(serials, [serials[0], serials[0] + 1, serials[0] + 2], 'consecutive serials, one per card');
+    assert(cards.every((c) => c.edition_count === 1 && c.edition_design === 'obsidian-smoke'), 'each card carries its own number');
+    assertEqual(await stockOf(sku), stock - 3, 'stock consumed once');
+    assert((await entitlementsOf(customer.userId)).includes(`card:${sku}`), 'card entitlement');
+
+    const webhook = await stack.sim.sendWebhook('payment.captured', paid.razorpay_payment_id);
+    assertEqual([webhook.status, webhook.body.newlyFulfilled], [200, false], 'replayed webhook');
+    assertEqual((await cardsOf(order.id)).length, 3, 'no extra cards after the webhook');
+    assertEqual(await stockOf(sku), stock - 3, 'stock unchanged by the webhook');
+    return `serials ${serials.join(', ')}`;
+  });
+
+  await t.check('fulfilment that stopped part-way issues only the missing cards on retry', async () => {
+    const customer = await signUp(stack);
+    const created = await buyCard(customer, { productId: 'business', tier: 'standard', material: 'pvc', quantity: 2 });
+    assertEqual(created.status, 200, 'create-order');
+    const paid = stack.sim.pay({ order_id: created.body.order_id });
+    await verify(customer, paid);
+    const order = await orderRow(created.body.order_id);
+    // Simulate an interruption after the first card: remove slot 2 and mark the fulfilment retryable.
+    await sql(`DELETE FROM public.cards WHERE order_id = $1 AND card_slot = 2`, [order.id]);
+    await sql(`UPDATE public.orders SET fulfillment_status = 'retry' WHERE id = $1`, [order.id]);
+    const webhook = await stack.sim.sendWebhook('payment.captured', paid.razorpay_payment_id);
+    assertEqual([webhook.status, webhook.body.newlyFulfilled], [200, true], 'retry fulfils');
+    assertEqual((await cardsOf(order.id)).map((c) => c.card_slot), [1, 2], 'slot 2 re-issued, slot 1 kept');
+  });
+
+  await t.check('AAROH: an unstocked edition cannot be sold; once stocked, it is priced by the server per finish', async () => {
+    const customer = await signUp(stack);
+    const standard = 'card-aaroh-heritage-geometry-standard';
+    const premium = 'card-aaroh-obsidian-premium';
+    assertEqual([await priceOf(standard), await priceOf(premium)], [99900, 149900], 'catalogue prices (027)');
+    const refused = await buyCard(customer, { productId: 'aaroh-heritage-geometry', tier: 'standard' });
+    assertEqual(refused.status, 409, 'stock 0 until the owner counts the inventory');
+
+    await sql(`UPDATE public.products SET stock = 20 WHERE sku IN ($1, $2)`, [standard, premium]);
+    const created = await buyCard(customer, { productId: 'aaroh-heritage-geometry', tier: 'standard', quantity: 2, price_in_paise: 100 });
+    assertEqual(created.status, 200, `create-order ${JSON.stringify(created.body)}`);
+    assertEqual(created.body.amount, 2 * 99900, 'Standard x 2');
+    const paid = stack.sim.pay({ order_id: created.body.order_id });
+    assertEqual((await verify(customer, paid)).status, 200, 'verify');
+    const order = await orderRow(created.body.order_id);
+    assertEqual([order.tier, order.material, order.product_id], ['standard', null, 'aaroh-heritage-geometry'], 'order records the edition and finish');
+    const cards = await cardsOf(order.id);
+    assertEqual(cards.map((c) => [c.sku, c.card_slot, c.edition_design]), [
+      [standard, 1, 'aaroh-heritage-geometry'],
+      [standard, 2, 'aaroh-heritage-geometry'],
+    ], 'two AAROH cards in the edition series');
+    assertEqual(cards.map((c) => c.edition_serial), [cards[0].edition_serial, cards[0].edition_serial + 1], 'numbered');
+
+    const premiumOrder = await buyCard(customer, { productId: 'aaroh-obsidian', tier: 'premium' });
+    assertEqual([premiumOrder.status, premiumOrder.body.amount], [200, 149900], 'Premium Finish');
+  });
+
+  await t.check('AAROH and V5: invented finishes, editions and materials are refused', async () => {
+    const customer = await signUp(stack);
+    for (const card of [
+      { productId: 'aaroh-heritage-geometry', tier: 'gold' },
+      { productId: 'aaroh-prive', tier: 'standard' },
+      { productId: 'aaroh-obsidian' },
+      { productId: 'business', tier: 'standard' },
+      { productId: 'business', tier: 'standard', material: 'gold' },
+    ]) {
+      const response = await buyCard(customer, card);
+      assertEqual(response.status, 400, `${JSON.stringify(card)}`);
+    }
+    assertEqual((await sql(`SELECT count(*)::int AS n FROM public.orders WHERE user_id = $1`, [customer.userId]))[0].n, 0, 'no orders written');
+  });
+} finally {
+  if (salesBefore === undefined) delete process.env.CARD_SALES_ENABLED;
+  else process.env.CARD_SALES_ENABLED = salesBefore;
+}
+
+// ---------------------------------------------------------------------------
 t.section('Consistency across everything above');
 
 await t.check('every active entitlement traces to a paid, fulfilled order that bought it', async () => {

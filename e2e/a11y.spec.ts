@@ -65,8 +65,8 @@ test('public pages: no serious or critical WCAG 2.2 AA violation', async ({ page
   const { slug } = await publishedTap('Axe Visitor View', 'business');
   await page.goto('/shygontap');
   await dismissCookieNotice(page);
-  const product = await page.locator('a[href^="/shygontap/store/"]').first().getAttribute('href');
-  const pages = ['/shygontap', '/shygontap/store', product!, '/shygontap/auth', '/shygontap/privacy-policy', '/no-such-page', `/t/${slug}`, '/t/no-such-tap'];
+  const product = await page.locator('a[href^="/shygontap/store/aaroh"]').first().getAttribute('href');
+  const pages = ['/shygontap', '/shygontap/store', product!, '/shygontap/store/aaroh', '/shygontap/auth', '/shygontap/privacy-policy', '/no-such-page', `/t/${slug}`, '/t/no-such-tap'];
   const blocking: string[] = [];
   for (const path of pages) {
     await page.goto(path);

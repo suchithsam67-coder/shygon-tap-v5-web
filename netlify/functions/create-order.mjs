@@ -390,9 +390,9 @@ async function resolveLineItems(admin, { body, orderType, quantity, str, user, l
   }
 
   // --- Physical card ------------------------------------------------------
-  // The V6 release candidate sells no physical cards (DEC-2026-035, D-10): a
-  // paid card order cannot yet become an activatable card (I-4, deferred to
-  // the card release). The card release opens sales with CARD_SALES_ENABLED.
+  // Card checkout opens with CARD_SALES_ENABLED (DEC-2026-037). It stays
+  // closed until the owner's launch prerequisites are met (delivery and GST
+  // terms, the legal details, the production gates).
   if (process.env.CARD_SALES_ENABLED !== 'true') {
     throw new IntentError('SHYGON cards are coming soon and cannot be ordered yet.', 409);
   }
@@ -402,14 +402,19 @@ async function resolveLineItems(admin, { body, orderType, quantity, str, user, l
   const tier = str(body?.tier);
   const planId = str(body?.planId);
 
-  if (!productId || !material || !tier) {
+  // Two card families share one checkout. SHYGON TAP V5: a design, a finish
+  // and a material (card-<design>-<finish>-<material>). AAROH: an edition and a
+  // finish (card-aaroh-<edition>-<finish>); its material is not part of the SKU.
+  const isAaroh = productId.startsWith('aaroh-');
+  if (!productId || !tier || (!isAaroh && !material)) {
     throw new IntentError('Card, material and finish are all required.');
   }
 
-  const card = await lookupProduct(admin, `card-${productId}-${tier}-${material}`, log);
-  if (!card) throw new IntentError('That card configuration is not available.');
+  const sku = isAaroh ? `card-${productId}-${tier}` : `card-${productId}-${tier}-${material}`;
+  const card = await lookupProduct(admin, sku, log);
+  if (!card || card.product_type !== 'card') throw new IntentError('That card configuration is not available.');
 
-  items.push(toLineItem(card, quantity, { category: productId, material, tier }));
+  items.push(toLineItem(card, quantity, { category: productId, material: isAaroh ? null : material, tier }));
 
   // 'essential' is bundled at ₹0; anything else is a paid experience bought
   // once, regardless of how many cards are in the order.

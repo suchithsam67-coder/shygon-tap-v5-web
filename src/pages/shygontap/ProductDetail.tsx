@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import BrandMark from '../../components/brand/BrandMark';
 import ThemeToggle from '../../components/ThemeToggle';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { ArrowRight, Check, ChevronRight, ShieldCheck, ShoppingCart, Truck, Zap } from 'lucide-react';
 import {
   cardArt,
@@ -23,6 +23,7 @@ import { editionAvailability, useEditions } from '../../lib/editions';
 import { CARD_SALES_OPEN } from '../../lib/commerce';
 import CardsComingSoon from '../../components/CardsComingSoon';
 import NotFound from '../NotFound';
+import { AAROH_PRODUCT_PATH, designPath, editionById } from '../../data/aaroh';
 
 /**
  * Amazon-style product detail page.
@@ -37,7 +38,15 @@ const MATERIALS: MaterialId[] = ['pvc', 'metal', 'transparent'];
 const TIERS: TierId[] = ['standard', 'premium'];
 
 export default function ProductDetail() {
-  const { productId } = useParams();
+  const { productId, edition } = useParams<{ productId?: string; edition?: string }>();
+
+  // An AAROH edition address (/shygontap/store/aaroh/<edition>) opens the AAROH
+  // product page with that edition selected (DEC-2026-036).
+  if (edition !== undefined) {
+    const design = editionById(edition);
+    return <Navigate replace to={design ? designPath(design) : AAROH_PRODUCT_PATH} />;
+  }
+
   // Keying on the id remounts the configurator when the customer moves between
   // products, so no stale material/finish selection carries over.
   return <ProductDetailView key={productId ?? ''} productId={productId} />;

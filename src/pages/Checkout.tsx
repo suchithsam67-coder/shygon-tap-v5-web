@@ -21,6 +21,7 @@ import { ErrorState, Skeleton } from '../components/app/States';
 import {
   experiencePrice,
   fetchCatalog,
+  aarohVariant,
   findVariant,
   rupees,
   type Catalog,
@@ -236,8 +237,11 @@ export default function Checkout() {
     const items: { label: string; detail?: string; paise: number }[] = [];
 
     if (orderType === 'physical') {
-      const product = catalog.cards.find((c) => c.category === pending.productId);
-      const variant = findVariant(product, pending.tier ?? 'standard', pending.material ?? 'pvc');
+      // An AAROH card is an edition and a finish; a V5 card adds a material.
+      const productId = pending.productId ?? '';
+      const variant = productId.startsWith('aaroh-')
+        ? aarohVariant(catalog, productId.slice('aaroh-'.length), pending.tier ?? 'standard')
+        : findVariant(catalog.cards.find((c) => c.category === productId), pending.tier ?? 'standard', pending.material ?? 'pvc');
       const quantity = Math.max(1, Number(pending.quantity ?? 1));
       if (variant) {
         items.push({
@@ -348,7 +352,7 @@ export default function Checkout() {
           ? {
               orderType: 'physical',
               productId: pending.productId!,
-              material: pending.material!,
+              material: pending.material,
               tier: pending.tier!,
               planId: pending.planId,
               quantity: Math.max(1, Number(pending.quantity ?? 1)),

@@ -32,8 +32,9 @@ function font(key) {
  * Outlines `text` and returns { d, width }.
  * size: font size in user units. tracking: extra space per letter, in em.
  * anchor: where x sits — 'start', 'middle' or 'end'.
+ * decimals: coordinate precision; raise it for art drawn in millimetres.
  */
-export function text(str, { font: key = 'inter500', size = 20, tracking = 0, x = 0, y = 0, anchor = 'start' } = {}) {
+export function text(str, { font: key = 'inter500', size = 20, tracking = 0, x = 0, y = 0, anchor = 'start', decimals = 1 } = {}) {
   const f = font(key);
   const scale = size / f.unitsPerEm;
   const glyphs = f.stringToGlyphs(str);
@@ -46,7 +47,7 @@ export function text(str, { font: key = 'inter500', size = 20, tracking = 0, x =
   let cx = anchor === 'middle' ? x - width / 2 : anchor === 'end' ? x - width : x;
   const parts = [];
   glyphs.forEach((g, i) => {
-    const d = g.getPath(cx, y, size).toPathData(1);
+    const d = g.getPath(cx, y, size).toPathData(decimals);
     if (d) parts.push(d);
     cx += advances[i];
   });

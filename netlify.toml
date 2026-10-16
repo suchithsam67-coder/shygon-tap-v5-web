@@ -93,6 +93,20 @@
   to = "/shygontap/store.html"
   status = 200
 
+# SHYGON Version 1 — AAROH (DEC-2026-036, DEC-2026-037). Before the card
+# pages, so "aaroh" is never read as a card id.
+[[redirects]]
+  from = "/shygontap/store/aaroh"
+  to = "/shygontap/store/aaroh.html"
+  status = 200
+
+# An edition's address opens the AAROH page with that edition selected.
+[[redirects]]
+  from = "/shygontap/store/aaroh/*"
+  to = "/shygontap/store/aaroh?design=:splat"
+  status = 301
+
+# SHYGON TAP V5.
 [[redirects]]
   from = "/shygontap/store/business"
   to = "/shygontap/store/business.html"

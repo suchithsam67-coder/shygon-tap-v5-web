@@ -20,6 +20,7 @@
 | `npm run test:account-deletion` | the same, plus `020+` | the deletion procedure in `docs/runbooks/account-deletion.sql`, as written: what it deletes and keeps, every refusal, and 026 (with the live baseline's cascade as the negative control) |
 | `npm run db:bundle` / `db:bundle:check` | the baseline | writes / checks `supabase/APPLY_ALL.sql` (`020+` only) and proves it applies twice |
 | `npm run test:db:history` | the old stand-in `supabase/tests/baseline.sql` + `001–019`, in isolated PGlite | the catalogue seed-data checks only (owner decision D-U1-a) |
+| `npm run test:aaroh` | the history catalogue above + `027`; then the local stack (`020+` + `seed.sql`) | 027 (DEC-2026-036) on real catalogue rows: all 60 legacy card rows delisted, never deleted, idempotent, rollback exact; the seed matches it; no AAROH design is sellable yet; the server refuses every legacy card when card sales are opened and still sells the digital experiences |
 | `node supabase/tests/schema-drift.mjs` | both of the above | live vs repository drift report |
 
 None of these touch a real Supabase project.

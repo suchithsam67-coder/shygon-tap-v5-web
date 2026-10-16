@@ -7,6 +7,17 @@ import {
   type MaterialId,
   type Product,
 } from '../data/shygonTapData';
+import {
+  AAROH,
+  AAROH_DEFAULT_FINISH,
+  AAROH_EDITIONS,
+  AAROH_FINISHES,
+  AAROH_PRICE_RANGE,
+  AAROH_PRODUCT_PATH,
+  AAROH_STORE_PATH,
+  aarohImages,
+} from '../data/aaroh';
+import { AAROH_FAQS } from '../data/aarohProduct';
 
 /**
  * Page metadata for every public page: title, description, canonical path,
@@ -97,13 +108,14 @@ function website(site: string): JsonLd {
  * address or opening hours, because none are published.
  */
 function localBusiness(site: string): JsonLd {
-  const all = products.flatMap((p) => [lowestPrice(p), highestPrice(p)]);
+  // Both card families: SHYGON TAP V5 and AAROH (DEC-2026-037).
+  const all = [...products.flatMap((p) => [lowestPrice(p), highestPrice(p)]), AAROH_PRICE_RANGE.from, AAROH_PRICE_RANGE.to];
   return {
     '@type': 'Store',
     '@id': `${site}/#store`,
     name: BRAND,
     description:
-      'Premium NFC business cards in PVC, metal and transparent finishes, with a digital profile that opens in one tap.',
+      'NFC cards with a QR code and a digital profile that opens in one tap, no app needed: SHYGON TAP V5 and the AAROH premium card.',
     url: `${site}/shygontap`,
     image: abs(site, DEFAULT_SHARE_IMAGE),
     logo: abs(site, '/icons/icon-512.png'),
@@ -183,15 +195,58 @@ function productLd(site: string, product: Product, cardSales: boolean): JsonLd {
   };
 }
 
+/** AAROH: one product in three editions and two finishes. The offer appears only while cards are sold. */
+function aarohProductLd(site: string, cardSales: boolean): JsonLd {
+  return {
+    '@type': 'Product',
+    '@id': `${site}${AAROH_PRODUCT_PATH}#product`,
+    name: AAROH.name,
+    description: AAROH.lede,
+    category: 'NFC smart card',
+    brand: { '@type': 'Brand', name: 'SHYGON' },
+    image: AAROH_EDITIONS.map((edition) => abs(site, aarohImages(edition, AAROH_DEFAULT_FINISH).front)),
+    ...(cardSales
+      ? {
+          offers: {
+            '@type': 'AggregateOffer',
+            priceCurrency: 'INR',
+            lowPrice: AAROH_PRICE_RANGE.from,
+            highPrice: AAROH_PRICE_RANGE.to,
+            offerCount: AAROH_EDITIONS.length * AAROH_FINISHES.length,
+            url: abs(site, AAROH_PRODUCT_PATH),
+            seller: { '@id': `${site}/#organization` },
+          },
+        }
+      : {}),
+  };
+}
+
+/** The same questions the AAROH product page shows. */
+function aarohFaqPage(): JsonLd {
+  return {
+    '@type': 'FAQPage',
+    mainEntity: AAROH_FAQS.map(([question, answer]) => ({
+      '@type': 'Question',
+      name: question,
+      acceptedAnswer: { '@type': 'Answer', text: answer },
+    })),
+  };
+}
+
+/** Every card on the store: AAROH first, then the SHYGON TAP V5 cards. */
 function itemList(site: string): JsonLd {
+  const entries: Array<[name: string, path: string]> = [
+    [AAROH.name, AAROH_PRODUCT_PATH],
+    ...products.map((product): [string, string] => [product.name, productPath(product)]),
+  ];
   return {
     '@type': 'ItemList',
     name: `${BRAND} NFC cards`,
-    itemListElement: products.map((product, index) => ({
+    itemListElement: entries.map(([name, path], index) => ({
       '@type': 'ListItem',
       position: index + 1,
-      name: product.name,
-      url: abs(site, productPath(product)),
+      name,
+      url: abs(site, path),
     })),
   };
 }
@@ -202,8 +257,8 @@ export function homeMeta(site: string, { cardSales = false }: SalesOptions = {})
   return {
     title: `${BRAND} — Premium NFC Business Cards & Digital Profiles`,
     description: cardSales
-      ? 'Premium NFC business cards in PVC, metal and transparent finishes, with a digital profile that opens in one tap — no app needed. Delivered across India.'
-      : 'A digital profile that opens in one tap, no app needed. Premium NFC cards in PVC, metal and transparent finishes are coming soon.',
+      ? 'NFC cards with a digital profile that opens in one tap, no app needed: SHYGON TAP V5 and AAROH, the premium SHYGON card. Delivered across India.'
+      : 'A digital profile that opens in one tap, no app needed. SHYGON TAP V5 and AAROH, the premium SHYGON card, are coming soon.',
     path: '/shygontap',
     image: DEFAULT_SHARE_IMAGE,
     imageAlt: 'A SHYGON Tap NFC card beside the words One tap. One identity.',
@@ -214,17 +269,14 @@ export function homeMeta(site: string, { cardSales = false }: SalesOptions = {})
 export function storeMeta(site: string, { cardSales = false }: SalesOptions = {}): PageMeta {
   const from = Math.min(...products.map(lowestPrice));
   return {
-    title: `Shop NFC Cards | ${BRAND}`,
+    title: `Shop NFC Cards: SHYGON TAP V5 and AAROH | ${BRAND}`,
     description: cardSales
-      ? `Compare ${BRAND} NFC cards for business, restaurants, events and Google reviews. Available in PVC, metal and transparent, from ${rupees(from)}.`
-      : `${BRAND} NFC cards for business, restaurants, events and Google reviews, in PVC, metal and transparent. Coming soon; your digital Tap is available today.`,
-    path: '/shygontap/store',
+      ? `Two SHYGON cards: TAP V5, the simple tap-to-open card from ${rupees(from)}, and AAROH, the premium card in three editions from ${rupees(AAROH_PRICE_RANGE.from)}.`
+      : `Two SHYGON cards: TAP V5, the simple tap-to-open card, and AAROH, the premium card in three editions. Coming soon; your digital profile is available today.`,
+    path: AAROH_STORE_PATH,
     image: DEFAULT_SHARE_IMAGE,
     imageAlt: `${BRAND} NFC cards`,
-    jsonLd: [
-      breadcrumbList(site, [[BRAND, '/shygontap'], ['Store', '/shygontap/store']]),
-      itemList(site),
-    ],
+    jsonLd: [breadcrumbList(site, [[BRAND, '/shygontap'], ['Store', AAROH_STORE_PATH]]), itemList(site)],
   };
 }
 
@@ -239,8 +291,27 @@ export function productMeta(site: string, product: Product, { cardSales = false 
     imageAlt: `${BRAND} ${shortName(product)} NFC card`,
     type: 'product',
     jsonLd: [
-      breadcrumbList(site, [[BRAND, '/shygontap'], ['Store', '/shygontap/store'], [product.name, productPath(product)]]),
+      breadcrumbList(site, [[BRAND, '/shygontap'], ['Store', AAROH_STORE_PATH], [product.name, productPath(product)]]),
       productLd(site, product, cardSales),
+    ],
+  };
+}
+
+/** The AAROH product page. Its offer appears only while cards are sold. */
+export function aarohProductMeta(site: string, { cardSales = false }: SalesOptions = {}): PageMeta {
+  return {
+    title: `${AAROH.name}: Card, Software and Designs | ${BRAND}`,
+    description: cardSales
+      ? `The AAROH NFC card and its software: how they work, what each purchase includes, and three editions (${AAROH_EDITIONS.map((e) => e.title).join(', ')}) from ${rupees(AAROH_PRICE_RANGE.from)}.`
+      : `The AAROH NFC card and its software: how they work, what you can buy today, and three editions coming soon: ${AAROH_EDITIONS.map((e) => e.title).join(', ')}.`,
+    path: AAROH_PRODUCT_PATH,
+    image: DEFAULT_SHARE_IMAGE,
+    imageAlt: `${AAROH.name} NFC smart card`,
+    type: 'product',
+    jsonLd: [
+      breadcrumbList(site, [[BRAND, '/shygontap'], ['Store', AAROH_STORE_PATH], ['AAROH', AAROH_PRODUCT_PATH]]),
+      aarohProductLd(site, cardSales),
+      aarohFaqPage(),
     ],
   };
 }

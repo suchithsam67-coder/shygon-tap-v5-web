@@ -150,6 +150,13 @@ jobs:
       - name: payment chain on the local stack (outbound network denied)
         run: npm run test:payment-chain
 
+      # DEC-2026-036 (migration 027): the AAROH catalogue on the history
+      # catalogue rows (delisted, never deleted; rollback restores), the seed
+      # matching it, and the server pricing editions and refusing delisted
+      # designs when card sales are opened. Outbound network denied.
+      - name: AAROH catalogue (027) on the catalogue rows and the local stack
+        run: npm run test:aaroh
+
       # V6-071 / V6-073 / V6-032 (migration 025): the Tap lifecycle, the six
       # public states, field privacy and analytics, with live-baseline negative
       # controls. Outbound network denied.

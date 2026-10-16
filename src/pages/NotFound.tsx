@@ -4,6 +4,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import { ArrowRight } from 'lucide-react';
 import { products } from '../data/shygonTapData';
 import { notFoundMeta, productPath } from '../seo/meta';
+import { AAROH, AAROH_DEFAULT_FINISH, AAROH_EDITIONS, AAROH_IMAGE_SIZE_SMALL, AAROH_PRODUCT_PATH, aarohImages } from '../data/aaroh';
 import { usePageMeta } from '../seo/usePageMeta';
 import StoreFooter from '../components/StoreFooter';
 
@@ -55,6 +56,16 @@ export default function NotFound() {
         <nav aria-labelledby="not-found-cards" className="not-found-cards">
           <h2 id="not-found-cards">Popular cards</h2>
           <ul>
+            <li>
+              <Link to={AAROH_PRODUCT_PATH}>
+                <img src={aarohImages(AAROH_EDITIONS[0]!, AAROH_DEFAULT_FINISH).frontSmall} alt="" loading="lazy" {...AAROH_IMAGE_SIZE_SMALL} />
+                <span>
+                  <strong>{AAROH.name}</strong>
+                  <small>The premium SHYGON card, in three editions.</small>
+                </span>
+                <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+            </li>
             {products.map((product) => (
               <li key={product.id}>
                 <Link to={productPath(product)}>

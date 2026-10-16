@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AAROH edition sheet</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;family=Inter:wght@400;500;600&amp;family=Playfair+Display:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1720px; height: 1240px; box-sizing: border-box; padding: 56px; background: #0b0c0e; color: #f3efe6; font-family: Inter, Arial, sans-serif; display: flex; flex-direction: column; gap: 32px">
+
+<header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 8px; max-width: 960px">
+<div style="font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 0.16em; color: #c9b486">AAROH VERSION 1 · EDITION {{e.no}} OF 10 · CODE {{e.code}}</div>
+<h1 style="margin: 0; font-family: 'Playfair Display', serif; font-weight: 400; font-size: 60px; line-height: 1">{{e.name}}</h1>
+<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #d0cbc1">{{e.concept}}</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; max-width: 520px">
+<sc-for list="{{chips}}" as="c" hint-placeholder-count="4">
+<span style="display: flex; flex-direction: column; gap: 2px; border: 1px solid rgba(243,239,230,0.24); border-radius: 12px; padding: 8px 12px">
+<span style="font-size: 10.5px; letter-spacing: 0.12em; color: #aaa49a">{{c.k}}</span>
+<span style="font-size: 13.5px; font-weight: 600">{{c.v}}</span>
+</span>
+</sc-for>
+</div>
+</header>
+
+<div style="display: grid; grid-template-columns: 520px minmax(0, 1fr) 390px; gap: 44px; align-items: start">
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; letter-spacing: 0.1em; color: #aaa49a">FRONT AND BACK · TIER B PREMIUM MOCKUP</span>
+<div style="display: flex; gap: 20px; padding: 26px 0 30px; justify-content: center; border-radius: 18px; background: radial-gradient(90% 80% at 40% 30%, #2a2723 0%, #121214 70%)">
+<div style="width: 230px; height: 365px; border-radius: 14px; box-shadow: 0 28px 60px rgba(0,0,0,0.6)">
+<dc-import name="Card" design="{{id}}" side="front" tier="B" width="230" hint-size="230px,365px"></dc-import>
+</div>
+<div style="width: 230px; height: 365px; border-radius: 14px; box-shadow: 0 28px 60px rgba(0,0,0,0.6)">
+<dc-import name="Card" design="{{id}}" side="back" tier="B" width="230" hint-size="230px,365px"></dc-import>
+</div>
+</div>
+<span style="font-size: 12px; letter-spacing: 0.1em; color: #aaa49a; margin-top: 18px">TIER A · STANDARD CMYK PRINT, FRONT AND BACK</span>
+<div style="display: flex; gap: 16px; align-items: flex-end">
+<div style="width: 150px; height: 238px; border-radius: 9px; box-shadow: 0 14px 30px rgba(0,0,0,0.45)">
+<dc-import name="Card" design="{{id}}" side="front" tier="A" width="150" hint-size="150px,238px"></dc-import>
+</div>
+<div style="width: 150px; height: 238px; border-radius: 9px; box-shadow: 0 14px 30px rgba(0,0,0,0.45)">
+<dc-import name="Card" design="{{id}}" side="back" tier="A" width="150" hint-size="150px,238px"></dc-import>
+</div>
+<p style="margin: 0; flex: 1; font-size: 12.5px; line-height: 1.5; color: #aaa49a">Same artwork with no relief, foil or edge paint: metals print as ink and the texture is printed, not felt.</p>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-family: Geist, sans-serif; font-weight: 600; font-size: 20px">Texture &amp; finish</h2>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="12">
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 16px; padding: 9px 0; border-top: 1px solid rgba(243,239,230,0.1)">
+<span style="font-size: 12.5px; color: #aaa49a">{{r.k}}</span>
+<span style="font-size: 13.5px; line-height: 1.45; color: #f3efe6">{{r.v}}</span>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; gap: 10px; align-items: center; padding-top: 6px">
+<sc-for list="{{chipsColor}}" as="c" hint-placeholder-count="5">
+<span style="display: flex; align-items: center; gap: 6px; font-family: 'Geist Mono', monospace; font-size: 11px; color: #d0cbc1"><span style="{{c.s}}"></span>{{c.h}}</span>
+</sc-for>
+</div>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #aaa49a">CMYK starting values and spot / foil choices for this edition are on the colour &amp; typography sheet. The texture in the mockup is drawn artwork; only the “physical finish” row needs a manufacturing process.</p>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 12px; letter-spacing: 0.1em; color: #aaa49a">MATCHING DIGITAL PROFILE THEME</span>
+<div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; border: 1px solid rgba(243,239,230,0.18)">
+<dc-import name="Profile" theme="{{id}}" hint-size="390px,844px"></dc-import>
+</div>
+<span style="font-size: 12.5px; line-height: 1.45; color: #d0cbc1">{{e.theme}}</span>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"design":{"editor":"enum","options":["obsidian","aureate","monolith","ivoryveil","cobalt","emerald","prism","carbon","heritage","liquid"],"default":"obsidian"},"$preview":{"width":1720,"height":1240}}'>
+const E = {
+  obsidian: { no: '01', code: 'OB', name: 'Obsidian', colors: ['#0E0E10', '#1F1F24', '#B8975A', '#E9D29B', '#EFE6D3'],
+    concept: 'The signature edition. Textured black with a raised tone-on-tone ogee lattice — the Mughal onion arch, repeated — and five champagne arches rising from the foot of the card. Luxury by restraint.',
+    printed: 'Leather-like grain, tonal ogee lattice at 0.38 mm with buds, five nested arches and a plinth line.',
+    physical: 'Raised clear UV on the lattice over soft-touch matte; champagne hot foil on the lotus, AAROH and the arches; champagne edge paint.',
+    surface: 'Soft-touch (velvet) matte laminate', spot: 'Raised clear UV on the lattice (Tier B)', emboss: 'None — raised UV gives the relief', foil: 'Champagne gold: lotus, wordmark, arches (0.20–0.32 mm lines)', edge: 'Black core; champagne edge paint (Tier B, after abrasion test)',
+    digital: 'Yes — CMYK with rich black', cx: 'A Low · B Medium', batch: 'Yes — digital UV and digital foil need no plates', tier: 'A and B',
+    simplify: 'Tier A prints the lattice tone-on-tone and the gold as CMYK ochre. The arches and the lotus carry the identity without any finish.',
+    nfc: 'Low–medium — the arches are open foil curves; keep them off the coil path.',
+    theme: 'Black interface, champagne accent and a gold primary button, as in the moodboard’s screens. Loader: the lotus draws itself in gold, then the profile fades up.' },
+  aureate: { no: '02', code: 'AU', name: 'Aureate', colors: ['#F2EADA', '#D9CBAF', '#B8975A', '#3A2E1F', '#6B5C45'],
+    concept: 'Sunrise over warm ivory: forty concentric rings and a fan of rays rise from beyond the bottom-right corner — aaroh, the ascent, drawn as light.',
+    printed: 'Paper-fine grain, fine rings at 0.34 mm, every sixth ring heavy, 33 rays at 0.09 mm, a ringed sun at the foot.',
+    physical: 'Blind emboss on the fine rings; champagne hot foil on the heavy rings, the sun, the lotus and AAROH; gold edge paint.',
+    surface: 'Satin laminate', spot: 'Optional — gloss UV on the lotus only', emboss: 'Blind emboss on the rings — needs a die', foil: 'Champagne gold; lines ≥ 0.15 mm (heavy rings 0.24 mm). The 0.09 mm rays print', edge: 'White core, or gold edge paint',
+    digital: 'Yes — champagne prints as CMYK ochre', cx: 'A Low · B Medium–High', batch: 'A yes — B needs an emboss die', tier: 'A and B',
+    simplify: 'Tier A prints every line in champagne ink. The sunrise still reads; it loses only the glint.',
+    nfc: 'Medium — the largest foil area in the family. Arcs are open, never closed loops; keep foil inside the supplier’s allowed zone.',
+    theme: 'Warm ivory interface, umber text, champagne button with a dark label. Loader: rings expand from the corner. Needs a new light palette — today every Tap palette is dark.' },
+  monolith: { no: '03', code: 'MO', name: 'Monolith', colors: ['#333437', '#424347', '#2B2C2F', '#4C4E52', '#E7E3DB'],
+    concept: 'Architecture at card scale: nine concrete slabs of different heights stand on a plinth, measured against a 2.5 mm grid. Industrial calm, no metal at all.',
+    printed: 'Concrete grain, 0.05 mm grid, two slab tones, side shadows and form-tie holes.',
+    physical: 'Raised tactile UV on the slab tops and the plinth line — you can feel the skyline.',
+    surface: 'Matte laminate', spot: 'Raised UV, 30–60 µm (to validate)', emboss: 'None — raised UV replaces it', foil: 'None', edge: 'Grey or black core',
+    digital: 'Yes', cx: 'A Low · B Medium', batch: 'Yes — digital raised UV needs no tooling', tier: 'A and B',
+    simplify: 'Tier A drops the raised UV; slab tops print as lighter lines. Nothing in the identity depends on the finish.',
+    nfc: 'Lowest risk in the family — no metallic material.',
+    theme: 'Concrete-grey interface, bone accent, square 4 px corners, outline-first buttons. Loader: slabs rise from the plinth.' },
+  ivoryveil: { no: '04', code: 'IV', name: 'Ivory Veil', colors: ['#F7F3EC', '#EFE9DE', '#D6CCBA', '#6C6357', '#3F3933'],
+    concept: 'A veil of warm white. Twenty-seven drapery ripples cross the card — clear under raking light, almost gone head-on. The quietest edition.',
+    printed: 'Shadow lines at 0.20 mm and tonal folds in porcelain and stone tints.',
+    physical: 'Blind emboss of the ripples. The highlight side exists only as real relief — it cannot be printed.',
+    surface: 'Pearl-satin laminate', spot: 'None', emboss: 'Blind emboss, 0.03–0.06 mm — needs a die', foil: 'None — identity in taupe ink', edge: 'White core',
+    digital: 'Yes, as printed tonal lines', cx: 'A Low · B High', batch: 'Tier A yes. Tier B needs an emboss die — better from about 500 cards', tier: 'B-led; A is a valid quiet print',
+    simplify: 'Tier A prints the shadow lines only. Still the veil, but flatter — this edition loses most without its finish.',
+    nfc: 'Low. Emboss depth over the coil must stay within the inlay maker’s limit.',
+    theme: 'Bright, minimal interface, taupe accent, generous 22 px radius. Loader: the lotus surfaces through a slow ripple.' },
+  cobalt: { no: '05', code: 'CB', name: 'Cobalt', colors: ['#0B1C45', '#2753C9', '#3B6EF5', '#6F9DFF', '#E6EEFB'],
+    concept: 'A precision instrument in midnight blue: a halftone wave rides one calibrated line under a ruled scale. Technology shown as measurement, not science fiction.',
+    printed: 'A brushed-metal effect across the face; three dot sizes (0.17 / 0.30 / 0.44 mm) riding a calibrated wave; 0.07 mm ruler ticks down the right edge.',
+    physical: 'Raised UV on the densest dots; silver foil on the lotus, AAROH and crosshairs; silver edge paint. The brushing stays printed — no metallised film.',
+    surface: 'Satin laminate', spot: 'Raised UV on the densest dots (Tier B)', emboss: 'None', foil: 'Silver: lotus, wordmark, crosshairs', edge: 'Blue core; silver edge paint (Tier B)',
+    digital: 'Partly — electric blue is outside CMYK; best as a 5th spot ink', cx: 'A Medium · B Medium', batch: 'Yes with a spot station; otherwise CMYK-only with a duller blue', tier: 'A and B',
+    simplify: 'Tier A runs the dots in CMYK blue. The wave and ruler carry the identity even when the blue is less electric.',
+    nfc: 'Low. Do not use conductive metallic inks for the blue.',
+    theme: 'Midnight interface, ice text, electric-blue button with a white label. Loader: dots resolve along the wave. Close to the existing “midnight” palette.' },
+  emerald: { no: '06', code: 'EC', name: 'Emerald Cipher', colors: ['#0F2A21', '#123226', '#1E4A3A', '#B59B62', '#E4D8B8'],
+    concept: 'A cipher in deep forest green: a Truchet maze of quarter-arcs, and one brass thread you can follow from edge to edge — the message hidden in the pattern.',
+    printed: 'Tonal maze at 0.34 mm on a 3.0 mm tile, checker tint, a dark halo under the thread.',
+    physical: 'Brass hot foil on the thread and the mark; the maze stays tonal.',
+    surface: 'Matte laminate', spot: 'Optional gloss UV on the maze', emboss: 'None', foil: 'Brass / pale gold at 0.34 mm', edge: 'Green or black core',
+    digital: 'Yes', cx: 'A Low · B Medium', batch: 'Yes', tier: 'A and B',
+    simplify: 'Tier A prints the thread in brass ink. The thread is a shape, not a shine, so the idea survives whole.',
+    nfc: 'Low. The thread is one open path, never a closed loop.',
+    theme: 'Deep green interface, brass accent, neutral text. Loader: the brass thread draws itself into the lotus. Close to the existing “forest” palette.' },
+  prism: { no: '07', code: 'PR', name: 'Prism', colors: ['#ECEBF1', '#CBB8FF', '#A6E1F5', '#FFD2B5', '#2C2B33'],
+    concept: 'Controlled iridescence: a lilac–ice–mint–peach field behind a fine lenticular screen, cut by one precise diagonal. Colour as light, kept to one side of the card.',
+    printed: 'Two overlapping gradient fields, a 0.6 mm white line screen, graphite rules.',
+    physical: 'Clear line UV over gloss laminate — a lenticular shift as the card tilts.',
+    surface: 'Gloss laminate', spot: 'Line UV (Tier B)', emboss: 'None', foil: 'No holographic foil (metallised). Non-metallic iridescent ink only after testing', edge: 'White core',
+    digital: 'Yes — gradients print well digitally', cx: 'A Low · B Medium–High', batch: 'A yes; B depends on UV registration', tier: 'A and B',
+    simplify: 'Tier A is the printed gradient on gloss — already most of the effect.',
+    nfc: 'Low as specified; medium if anyone substitutes holographic foil.',
+    theme: 'Light interface with a soft iridescent header and graphite button. Loader: the lotus takes the gradient petal by petal.' },
+  carbon: { no: '08', code: 'CW', name: 'Carbon Weave', colors: ['#141516', '#0C0D0E', '#2A2C2F', '#E5482F', '#C9CBCE'],
+    concept: 'Performance surface: 2 × 2 twill in matte black and one vermilion line. The look of a composite, made entirely of ink.',
+    printed: 'Twill tows on a 1.5 mm cell with a repeating sheen; double vermilion rule.',
+    physical: 'Fine tactile (sand) varnish over the weave so it feels technical.',
+    surface: 'Matte laminate', spot: 'Tactile varnish (Tier B)', emboss: 'None', foil: 'Optional silver foil on the mark', edge: 'Black core; optional red edge paint',
+    digital: 'Yes', cx: 'A Low · B Medium', batch: 'Yes', tier: 'A and B',
+    simplify: 'Tier A is the printed weave. Real carbon fibre is never used — it is conductive and blocks NFC.',
+    nfc: 'Low as printed. High if real carbon or metal is ever substituted.',
+    theme: 'Dark performance interface, vermilion accent, tight 8 px radius. Loader: the lotus snaps in, petals 40 ms apart.' },
+  heritage: { no: '09', code: 'HG', name: 'Heritage Geometry', colors: ['#7A3323', '#5C2417', '#EAD8B8', '#C9A35E', '#D9C0A3'],
+    concept: 'An original jaali in lime plaster on laterite: octagons and diamonds (the 4.8.8 tiling), each octagon holding an eight-petal rosette, gold at every diamond. Indian architecture as geometry, not ornament.',
+    printed: 'Octagon lattice 0.15 mm, inner ring 0.07 mm, rosettes 0.10 mm, deep-laterite diamonds.',
+    physical: 'Deboss the octagon lattice; gold foil on the 0.9 mm diamonds and the mark.',
+    surface: 'Matte laminate', spot: 'None', emboss: 'Deboss lattice, 0.03–0.06 mm — needs a die', foil: 'Gold — 140 small separate diamonds, no continuous area', edge: 'Terracotta or cream edge paint',
+    digital: 'Yes', cx: 'A Low · B High', batch: 'A yes. B needs a deboss die — better for the second batch', tier: 'A and B',
+    simplify: 'Tier A prints the lattice and the diamonds in ochre ink. The geometry carries the identity.',
+    nfc: 'Low. Foil is many small islands; check deboss depth over the coil.',
+    theme: 'Cream interface, laterite button, terracotta accent. Loader: petals open like the steps of a baoli. Needs a new light palette.' },
+  liquid: { no: '10', code: 'LF', name: 'Liquid Form', colors: ['#26122D', '#43245A', '#6E4183', '#D49A7A', '#F3E4EE'],
+    concept: 'Sculpture in motion: four poured layers of plum flow diagonally across the card, each edged in copper and traced by fine tonal contours.',
+    printed: 'Four gradient layers, 0.07 mm contour lines, copper edges at 0.17 mm.',
+    physical: 'Copper (rose-gold) hot foil on the four flow edges, over soft-touch laminate.',
+    surface: 'Soft-touch matte laminate', spot: 'Optional gloss UV on the front layer', emboss: 'None', foil: 'Copper at 0.17 mm — at the minimum; widen to 0.20 mm if needed', edge: 'Plum or black core',
+    digital: 'Yes', cx: 'A Low · B Medium', batch: 'Yes', tier: 'A and B',
+    simplify: 'Tier A prints the edges in copper ink. The layered flow stays intact.',
+    nfc: 'Low–medium. Foil edges are long open curves; confirm against the antenna drawing.',
+    theme: 'Plum interface, copper accent, pill buttons (22 px). Loader: the lotus opens with a liquid ease-out.' }
+};
+class Component extends DCLogic {
+  renderVals() {
+    const id = E[this.props.design] ? this.props.design : 'obsidian';
+    const e = E[id];
+    const rows = [
+      { k: 'Printed texture (artwork)', v: e.printed },
+      { k: 'Physical finish (process)', v: e.physical },
+      { k: 'Surface', v: e.surface },
+      { k: 'Spot UV', v: e.spot },
+      { k: 'Emboss / deboss', v: e.emboss },
+      { k: 'Foil', v: e.foil },
+      { k: 'Edge', v: e.edge },
+      { k: 'Standard digital print', v: e.digital },
+      { k: 'Simplify to Tier A', v: e.simplify },
+      { k: 'NFC', v: e.nfc }
+    ];
+    const chips = [
+      { k: 'TIER', v: e.tier },
+      { k: 'COMPLEXITY', v: e.cx },
+      { k: 'SMALL FIRST BATCH', v: e.batch.split(' — ')[0].split('.')[0] },
+      { k: 'DIGITAL PRINT', v: e.digital.split(' — ')[0].split(',')[0] }
+    ];
+    const chipsColor = e.colors.map((h) => ({ h, s: 'display: block; width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(243,239,230,0.2); background: ' + h }));
+    return { id, e, rows, chips, chipsColor };
+  }
+}
+</script>
+</body>
+</html>

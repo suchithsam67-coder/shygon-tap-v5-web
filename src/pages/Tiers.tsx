@@ -31,7 +31,8 @@ import { useAsync } from '../hooks/useAsync';
 const EXPERIENCE_COPY: Record<Experience, { blurb: string; features: string[] }> = {
   essential: {
     blurb: 'Clean, simple and fast. Included with every SHYGON Tap.',
-    features: ['Name, photo and bio', 'Call, WhatsApp and email', 'Opens instantly — no animation'],
+    // WhatsApp is a paid add-on on every experience, not part of Essential.
+    features: ['Name, photo and bio', 'Call and email', 'Opens instantly — no animation'],
   },
   business: {
     blurb: 'A professional profile built around your role and company.',

@@ -39,10 +39,9 @@ VALUES
   ('addon-gallery', 'Photo Gallery Section', 'customization', 24900, 'customization', 'Show a gallery of your work on your Tap.', false, 84),
   ('addon-location', 'Location & Directions', 'customization', 14900, 'customization', 'Add a map pin and one-tap directions.', true, 85);
 
--- Physical cards (001, 016, 018): product x finish x material, 100 in stock.
--- The V6 release candidate does not sell them (DEC-2026-035, D-10); they stay
--- in the catalogue so the store can show them as coming soon and the tests
--- can prove checkout refuses them.
+-- SHYGON TAP V5 cards (001, 016, 018): product x finish x material, 100 in
+-- stock, listed. Card checkout stays closed until card sales open
+-- (CARD_SALES_ENABLED, DEC-2026-037). The AAROH cards come from migration 027.
 WITH designs(category, label, sort_base, standard, premium) AS (
   VALUES
     ('business', 'Business', 10, ARRAY[39900, 59900, 49900], ARRAY[69900, 89900, 79900]),

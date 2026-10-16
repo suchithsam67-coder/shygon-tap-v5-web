@@ -36,6 +36,7 @@ const ShygonTap = lazy(() => import('./pages/ShygonTap'));
 const Auth = lazy(() => import('./pages/Auth'));
 const Store = lazy(() => import('./pages/shygontap/Store'));
 const ProductDetail = lazy(() => import('./pages/shygontap/ProductDetail'));
+const AarohProduct = lazy(() => import('./pages/shygontap/AarohProduct'));
 
 const Account = lazy(() => import('./pages/Account'));
 const TapEditor = lazy(() => import('./pages/TapEditor'));
@@ -98,6 +99,9 @@ export default function AccountApp() {
               <Route path="/shygontap" element={<ShygonTap />} />
               <Route path="/shygontap/auth" element={<Auth />} />
               <Route path="/shygontap/store" element={<Store />} />
+              {/* One product, AAROH (DEC-2026-036); old card and design addresses redirect. */}
+              <Route path="/shygontap/store/aaroh" element={<AarohProduct />} />
+              <Route path="/shygontap/store/aaroh/:edition" element={<ProductDetail />} />
               <Route path="/shygontap/store/:productId" element={<ProductDetail />} />
 
               <Route path="/shygontap/privacy-policy" element={<PrivacyPolicy />} />

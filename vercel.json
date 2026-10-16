@@ -20,6 +20,11 @@
       ],
       "destination": "https://shygontech.com/:path*",
       "permanent": true
+    },
+    {
+      "source": "/shygontap/store/aaroh/:edition",
+      "destination": "/shygontap/store/aaroh?design=:edition",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -30,6 +35,10 @@
     {
       "source": "/shygontap/store",
       "destination": "/shygontap/store.html"
+    },
+    {
+      "source": "/shygontap/store/aaroh",
+      "destination": "/shygontap/store/aaroh.html"
     },
     {
       "source": "/shygontap/store/business",

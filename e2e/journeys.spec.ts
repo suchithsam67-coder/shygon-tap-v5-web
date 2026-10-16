@@ -163,9 +163,64 @@ test('cards are not for sale in the release candidate: the store says so and off
   await dismissCookieNotice(page);
   await expect(page.getByText('SHYGON cards are coming soon')).toBeVisible();
   await expect(page.getByRole('button', { name: /Cart/ })).toHaveCount(0);
-  await page.goto('/shygontap/store/business');
+  await page.goto('/shygontap/store/aaroh');
   await expect(page.getByText('SHYGON cards are coming soon')).toBeVisible();
+  await expect(page.getByText('The price is announced when card sales open.')).toBeVisible();
   await expect(page.getByRole('button', { name: /Buy Now|Add to Cart/i })).toHaveCount(0);
   await page.getByRole('button', { name: 'Choose your Tap experience' }).click();
   await page.waitForURL('**/shygontap/auth');
+});
+
+test('AAROH (DEC-2026-036): one product in three designs, explained before purchase; old card pages redirect', async ({ page }) => {
+  // The store answers the four questions first and links only to AAROH.
+  await page.goto('/shygontap/store');
+  await dismissCookieNotice(page);
+  await expect(page.getByRole('heading', { level: 1, name: 'AAROH' })).toBeVisible();
+  for (const question of ['What is AAROH?', 'How does the card work?', 'What software comes with it?', 'What do I receive?']) {
+    await expect(page.getByText(question, { exact: true })).toBeVisible();
+  }
+  await expect(page.locator('a[href^="/shygontap/store/"]:not([href^="/shygontap/store/aaroh"])')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Explore AAROH' }).click();
+  await page.waitForURL('**/shygontap/store/aaroh');
+
+  // One product page; choosing a design changes the variation and is kept in the URL.
+  await expect(page.getByRole('heading', { level: 1, name: 'AAROH' })).toBeVisible();
+  const designs = page.getByRole('radiogroup', { name: 'Design' }).getByRole('radio');
+  await expect(designs).toHaveCount(3);
+  await page.getByRole('radio', { name: 'Ivory Atelier' }).click();
+  await expect(page.getByRole('radio', { name: 'Ivory Atelier' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page).toHaveURL(/\?design=ivory-atelier$/);
+  await expect(page.getByRole('img', { name: 'AAROH Ivory Atelier, front, concept render' })).toBeVisible();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'AAROH Ivory Atelier, back, concept render' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('radio', { name: 'Ivory Atelier' })).toHaveAttribute('aria-checked', 'true');
+
+  // Every section the brief asks for, and nothing unbuilt presented as available.
+  for (const heading of [
+    'A card you hold. Software that works for you.',
+    'Four steps, from choosing to tapping.',
+    'More Than a Card. A Connected Digital Experience.',
+    'You hold the card. They see your profile.',
+    'One platform, many possibilities.',
+    'Three designs of the same card.',
+    'Know what you get before you pay.',
+    'Frequently asked questions',
+  ]) {
+    await expect(page.getByRole('heading', { level: 2, name: heading })).toBeVisible();
+  }
+  const badges = (section: string, label: string) => page.locator(`${section} .aaroh-status`).getByText(label, { exact: true });
+  await expect(badges('#software', 'With the card release')).toHaveCount(1);
+  await expect(badges('#possibilities', 'Not available yet')).toHaveCount(2);
+  await expect(page.locator('#faq details')).toHaveCount(14);
+
+  // Old card pages move to AAROH: 301 from the host, and the design addresses inside the app.
+  for (const from of ['/shygontap/store/business', '/shygontap/store/rose-marble', '/shygontap/store/aurora-glass']) {
+    const response = await page.request.get(from, { maxRedirects: 0 });
+    expect(response.status(), from).toBe(301);
+    expect(new URL(response.headers().location, 'http://host').pathname, from).toBe('/shygontap/store/aaroh');
+  }
+  await page.goto('/shygontap/store/aaroh/midnight-titanium');
+  await page.waitForURL('**/shygontap/store/aaroh?design=midnight-titanium');
+  await expect(page.getByRole('radio', { name: 'Midnight Titanium' })).toHaveAttribute('aria-checked', 'true');
 });

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { sendOrderConfirmation } from './orderMessages.mjs';
 import { requestLog } from './log.mjs';
 
@@ -245,24 +246,96 @@ async function grantEntitlement(admin, userId, type, key, sourceOrderId) {
 }
 
 /**
- * One card record per purchased card. The unique index on (order_id, sku) means
- * a replayed webhook cannot mint extra cards, so this is safe to re-run.
+ * One card record per physical card: the live slot model (DEC-2026-037, I-4).
+ * An order line of n cards becomes slots 1..n of (order_id, sku), each with its
+ * own card_id, activation code (trigger) and edition number.
+ *
+ * Re-running is safe: only missing slots are inserted, and the unique index on
+ * (order_id, sku, card_slot) refuses a duplicate. That index is partial, so
+ * PostgREST cannot name it in an upsert; the slots are checked first instead.
+ *
+ * Edition numbers: the database numbers a whole order line on its first card
+ * (cards_assign_edition reserves a block of n serials). Each later card then
+ * takes the next serial of that block, so every card carries its own number.
+ *
+ * A card that cannot be issued fails the fulfilment, which stays retryable:
+ * the customer paid for the card, and without its record it can never be
+ * activated.
  */
 async function issueCards(admin, order, item, log) {
-  const { error } = await admin.from('cards').upsert(
-    {
-      user_id: order.user_id,
-      order_id: order.id,
-      sku: item.sku,
-      status: 'pending',
-      is_replacement: /replacement/i.test(item.name ?? ''),
-    },
-    { onConflict: 'order_id,sku', ignoreDuplicates: true },
-  );
+  const quantity = Math.max(1, item.quantity ?? 1);
+  const cardsOfLine = async () => {
+    const { data, error } = await admin
+      .from('cards')
+      .select('id, card_slot, edition_design, edition_serial, edition_count, edition_chapter_size')
+      .eq('order_id', order.id)
+      .eq('sku', item.sku);
+    if (error) throw new Error(`Card lookup failed for ${item.sku}: ${error.message}`);
+    return new Map((data ?? []).map((row) => [row.card_slot, row]));
+  };
+  const base = {
+    user_id: order.user_id,
+    order_id: order.id,
+    sku: item.sku,
+    status: 'pending',
+    is_replacement: /replacement/i.test(item.name ?? ''),
+  };
+  const insert = async (rows) => {
+    const { error } = await admin.from('cards').insert(rows);
+    // 23505: a concurrent run issued the same slot first; the re-read below sees it.
+    if (error && error.code !== '23505') throw new Error(`Card issue failed for ${item.sku}: ${error.message}`);
+  };
 
-  // A missing card record is an operational problem, not a reason to fail the
-  // customer's whole fulfilment — the entitlement is what unlocks their Tap.
-  if (error) log.error('fulfilment.card-issue-failed', { orderId: order.order_id, sku: item.sku, message: error.message });
+  let slots = await cardsOfLine();
+  if (!slots.has(1)) {
+    await insert([{ ...base, card_id: cardIdFor(order, item.sku, 1), card_slot: 1, activation_code: activationCode() }]);
+    slots = await cardsOfLine();
+  }
+  const first = slots.get(1);
+  if (!first) throw new Error(`Card issue failed for ${item.sku}: slot 1 missing after insert`);
+
+  if (first.edition_serial && (first.edition_count ?? 1) > 1) {
+    const { error } = await admin.from('cards').update({ edition_count: 1 }).eq('id', first.id);
+    if (error) throw new Error(`Card numbering failed for ${item.sku}: ${error.message}`);
+  }
+
+  const missing = [];
+  for (let slot = 2; slot <= quantity; slot++) {
+    if (slots.has(slot)) continue;
+    const edition = first.edition_serial
+      ? {
+          edition_design: first.edition_design,
+          edition_serial: first.edition_serial + slot - 1,
+          edition_count: 1,
+          edition_chapter_size: first.edition_chapter_size,
+        }
+      : {};
+    missing.push({ ...base, ...edition, card_id: cardIdFor(order, item.sku, slot), card_slot: slot, activation_code: activationCode() });
+  }
+  if (missing.length > 0) await insert(missing);
+
+  const issued = await cardsOfLine();
+  for (let slot = 1; slot <= quantity; slot++) {
+    if (!issued.has(slot)) throw new Error(`Card issue failed for ${item.sku}: slot ${slot} missing`);
+  }
+  log.info('fulfilment.cards-issued', { orderId: order.order_id, sku: item.sku, cards: quantity });
+}
+
+/**
+ * The code a customer types to activate a card: SHY-XXXX-XXXX, 32 random bits,
+ * the format the database trigger uses. Generated here so issuing does not
+ * depend on where pgcrypto lives (I-5): the trigger calls gen_random_bytes
+ * unqualified, which fails when pgcrypto is in the `extensions` schema. The
+ * trigger only fills a code that is missing.
+ */
+function activationCode() {
+  const hex = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `SHY-${hex.slice(0, 4)}-${hex.slice(4)}`;
+}
+
+/** A card's stable identifier: the order number, the SKU and the slot. */
+function cardIdFor(order, sku, slot) {
+  return `${order.order_id}-${sku}-${slot}`;
 }
 
 async function decrementStock(admin, orderItemId, sku, quantity) {

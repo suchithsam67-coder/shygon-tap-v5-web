@@ -101,7 +101,8 @@ export type PurchaseIntent =
   | {
       orderType: 'physical';
       productId: string;
-      material: string;
+      /** SHYGON TAP V5 cards only; an AAROH card is an edition and a finish. */
+      material?: string;
       tier: string;
       planId?: string;
       quantity?: number;

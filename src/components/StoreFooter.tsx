@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import BrandMark from './brand/BrandMark';
 import { products, siteContent, WHATSAPP_NUMBER } from '../data/shygonTapData';
 import { LEGAL_PAGES, productPath } from '../seo/meta';
+import { AAROH, AAROH_EDITIONS, AAROH_PRODUCT_PATH, designPath } from '../data/aaroh';
 import { LEGAL } from '../data/legal';
 
 /**
@@ -22,6 +23,20 @@ export default function StoreFooter() {
           </Link>
           <p>Premium NFC business cards with a digital profile that opens in one tap. No app needed.</p>
         </div>
+
+        <nav aria-label="AAROH">
+          <p className="store-footer-label">AAROH</p>
+          <ul>
+            <li>
+              <Link to={AAROH_PRODUCT_PATH}>{AAROH.name}</Link>
+            </li>
+            {AAROH_EDITIONS.map((edition) => (
+              <li key={edition.id}>
+                <Link to={designPath(edition)}>AAROH {edition.title}</Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
         <nav aria-label="Cards">
           <p className="store-footer-label">Cards</p>

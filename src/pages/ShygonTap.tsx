@@ -57,7 +57,9 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { SITE_URL } from "../lib/site";
-import { cardPriceIndex, fetchCatalog } from "../services/catalog";
+import { aarohVariant, cardPriceIndex, fetchCatalog, rupees } from "../services/catalog";
+import { useCatalog } from '../hooks/useCatalog'
+import { AAROH_EDITIONS, AAROH_FINISHES, AAROH_IMAGE_SIZE_SMALL, AAROH_PRODUCT_PATH, aarohImages, designPath } from '../data/aaroh'
 import { homeMeta, LEGAL_PAGES, productPath } from "../seo/meta";
 import { usePageMeta } from "../seo/usePageMeta";
 import { editionAvailability, useEditions } from "../lib/editions";
@@ -169,7 +171,7 @@ function Header() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
   const links = [
-    ['Cards', 'cards'], ['Designs', 'design-collection'], ['Digital Experience', 'digital-experience'],
+    ['Cards', 'cards'], ['Designs', 'design-collection'], ['AAROH', 'aaroh'], ['Digital Experience', 'digital-experience'],
     ['How It Works', 'how-it-works'], ['About', 'about'],
   ]
 
@@ -193,7 +195,9 @@ function Header() {
     setSearchOpen(false)
     if (!q) return scrollToId('cards')
     const match = products.find((item) => `${item.name} ${item.description}`.toLowerCase().includes(q))
+    const edition = match ? undefined : AAROH_EDITIONS.find((item) => `aaroh ${item.title} ${item.character} ${item.description}`.toLowerCase().includes(q))
     setSearch('')
+    if (edition) return navigate(designPath(edition))
     if (match) { scrollToId('cards'); window.setTimeout(() => document.getElementById(`product-${match.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250) }
     else scrollToId('cards')
   }
@@ -409,6 +413,51 @@ function DesignCollection({ onChoose, prices }: { onChoose: (id: ProductId) => v
               </div>
             </li>
           ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * SHYGON Version 1 — AAROH (DEC-2026-037): the premium card, sold beside the
+ * SHYGON TAP V5 cards. Each tile shows the Standard print and, on hover, the
+ * Premium Finish of the same edition. Prices come from the catalogue
+ * (migration 027), with the display fallback until it answers.
+ */
+function AarohCollection() {
+  const catalog = useCatalog()
+  const [standard] = AAROH_FINISHES
+  return (
+    <section className="section design-collection" id="aaroh">
+      <div className="container">
+        <div className="section-heading split-heading">
+          <div><p className="eyebrow">SHYGON VERSION 1 · AAROH</p><h2>The premium card. Ten editions.</h2></div>
+          <p>The same SHYGON profile on a card made to be kept: ten editions from the AAROH design system, each in a printed Standard or a Premium Finish with relief and foil. <Link to={AAROH_PRODUCT_PATH} className="text-button">Explore AAROH <ArrowRight size={15} /></Link></p>
+        </div>
+        <ul className="design-grid">
+          {AAROH_EDITIONS.map((edition) => {
+            const listed = aarohVariant(catalog, edition.id, standard!.id)
+            return (
+              <li key={edition.id} className="design-tile">
+                <Link to={designPath(edition)} className="design-tile-art" aria-label={`AAROH ${edition.title}, see details`}>
+                  <img src={aarohImages(edition, 'standard').frontSmall} alt="" loading="lazy" {...AAROH_IMAGE_SIZE_SMALL} />
+                  <img className="design-tile-alt" src={aarohImages(edition, 'premium').frontSmall} alt="" loading="lazy" {...AAROH_IMAGE_SIZE_SMALL} />
+                </Link>
+                <div className="design-tile-copy">
+                  <p className="edition-note">Edition {edition.number} · numbered in chapters of 100</p>
+                  <h3>AAROH {edition.title}</h3>
+                  <p>{edition.character}</p>
+                  <div className="design-tile-foot">
+                    <span>from {listed ? rupees(listed.priceInPaise) : currency(standard!.price)}</span>
+                    <Link className="text-button" to={designPath(edition)}>
+                      View edition <ArrowRight size={15} />
+                    </Link>
+                  </div>
+                </div>
+              </li>
+            )
+          })}
         </ul>
       </div>
     </section>
@@ -1396,7 +1445,7 @@ function Footer() {
     <footer id="contact">
       <div className="container footer-top">
         <div className="footer-lead"><Logo /><h2>Ready to make your first tap unforgettable?</h2><button className="button" onClick={() => scrollToId('builder')}>Build your Tap <ArrowRight /></button></div>
-        <div className="footer-links"><div><small>EXPLORE</small><Link to="/shygontap/store">Shop all cards</Link><a href="#digital-experience">Digital Experience</a><a href="#how-it-works">How It Works</a></div><div><small>CARDS</small>{products.map((item) => <Link key={item.id} to={productPath(item)}>{item.name}</Link>)}</div><div><small>CONTACT</small><a href={`mailto:${siteContent.contact.email}`}>{siteContent.contact.email}</a><a
+        <div className="footer-links"><div><small>EXPLORE</small><Link to="/shygontap/store">Shop all cards</Link><Link to={AAROH_PRODUCT_PATH}>AAROH</Link><a href="#digital-experience">Digital Experience</a><a href="#how-it-works">How It Works</a></div><div><small>CARDS</small>{products.map((item) => <Link key={item.id} to={productPath(item)}>{item.name}</Link>)}</div><div><small>CONTACT</small><a href={`mailto:${siteContent.contact.email}`}>{siteContent.contact.email}</a><a
   href={`https://wa.me/${WHATSAPP_NUMBER}`}
   target="_blank"
   rel="noreferrer"
@@ -1496,6 +1545,7 @@ export default function ShygonApp() {
         <StoreBenefits />
         <ProductCollection onChoose={setProductId} onDetails={setDetailProduct} prices={prices} />
         <DesignCollection onChoose={setProductId} prices={prices} />
+        <AarohCollection />
         <Configurator productId={productId} onProduct={setProductId} material={material} onMaterial={setMaterial} tier={tier} onTier={setTier} planId={planId} onPlan={setPlanId} onDemo={setDemoPlan} />
         <DigitalPlans selectedId={planId} onSelect={setPlanId} onDemo={setDemoPlan} />
         <HowItWorks />

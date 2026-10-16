@@ -1,5 +1,7 @@
 import { digitalPlans, faqsFor, products } from '../data/shygonTapData';
+import { AAROH, AAROH_BULK_MINIMUM, AAROH_EDITIONS, AAROH_FINISHES, AAROH_PRODUCT_PATH, AAROH_STORE_PATH } from '../data/aaroh';
 import {
+  aarohProductMeta,
   BRAND,
   COMPANY,
   DEFAULT_SHARE_IMAGE,
@@ -31,7 +33,9 @@ export interface PrerenderedPage {
 export function prerenderedPages(site: string, sales: SalesOptions = {}): PrerenderedPage[] {
   return [
     { file: 'shygontap.html', meta: homeMeta(site, sales) },
-    { file: 'shygontap/store.html', meta: storeMeta(site, sales) },
+    { file: `${AAROH_STORE_PATH.slice(1)}.html`, meta: storeMeta(site, sales) },
+    // Both card families (DEC-2026-037): the AAROH page and every SHYGON TAP V5 card page.
+    { file: `${AAROH_PRODUCT_PATH.slice(1)}.html`, meta: aarohProductMeta(site, sales) },
     ...products.map((product) => ({ file: `shygontap/store/${product.id}.html`, meta: productMeta(site, product, sales) })),
     ...(Object.keys(LEGAL_PAGES) as LegalPageId[]).map((id) => ({
       file: `${LEGAL_PAGES[id].path.slice(1)}.html`,
@@ -101,7 +105,8 @@ export function injectHead(template: string, head: string): string {
 export function sitemapXml(site: string, lastmod: string): string {
   const urls = [
     ['/shygontap', '1.0'],
-    ['/shygontap/store', '0.9'],
+    [AAROH_STORE_PATH, '0.9'],
+    [AAROH_PRODUCT_PATH, '0.9'],
     ...products.map((p) => [productPath(p), '0.8']),
     ...Object.values(LEGAL_PAGES).map((p) => [p.path, '0.3']),
   ];
@@ -148,19 +153,22 @@ export function llmsTxt(site: string, { cardSales = false }: SalesOptions = {}):
     `# ${BRAND}`,
     '',
     cardSales
-      ? `> ${BRAND} is a premium NFC business card from ${COMPANY}, Bengaluru, India. Tapping the card on a phone opens the owner's digital profile in the browser — no app required. Cards come in PVC, metal and transparent finishes and are delivered across India.`
-      : `> ${BRAND}, from ${COMPANY}, Bengaluru, India, is a digital profile that opens in the browser in one tap, with no app required. It is sold today as a digital Tap; the NFC cards in PVC, metal and transparent finishes are coming soon.`,
+      ? `> ${BRAND}, from ${COMPANY}, Bengaluru, India, is a digital profile that opens in the browser in one tap, with no app required, and the NFC cards that open it: SHYGON TAP V5, the simple card, and ${AAROH.name}, the premium card. Cards are delivered across India.`
+      : `> ${BRAND}, from ${COMPANY}, Bengaluru, India, is a digital profile that opens in the browser in one tap, with no app required. Its NFC cards, SHYGON TAP V5 and ${AAROH.name}, are coming soon; the digital profile is available today.`,
     '',
     '## Pages',
     '',
-    cardSales
-      ? `- [Home](${site}/shygontap): how the card and its digital experience work, the configurator and answers to common questions.`
-      : `- [Home](${site}/shygontap): how a digital Tap works, its experiences, live demos and answers to common questions.`,
-    cardSales
-      ? `- [Store](${site}/shygontap/store): every card, with filters for card type, material, finish and price.`
-      : `- [Store](${site}/shygontap/store): every card design, with filters for card type and material. Cards are coming soon.`,
+    `- [Home](${site}/shygontap): how a SHYGON profile works, its experiences, live demos and answers to common questions.`,
+    `- [Store](${site}${AAROH_STORE_PATH}): both cards, SHYGON TAP V5 and AAROH, compared, with every V5 design.`,
+    `- [AAROH](${site}${AAROH_PRODUCT_PATH}): what the card and its software do, who sees what, what each purchase includes, orders for teams, and answers to common questions.`,
     '',
-    '## Cards',
+    `## Card: ${AAROH.name}`,
+    '',
+    `${AAROH.lede} One product in three editions and two finishes (${AAROH_FINISHES.map((f) => `${f.title}${cardSales ? `, ${rupees(f.price)}` : ''}`).join('; ')}). Organisations can order ${AAROH_BULK_MINIMUM} or more through a bulk enquiry, priced by quotation.`,
+    '',
+    ...AAROH_EDITIONS.map((e) => `- AAROH ${e.title}: ${e.description}${cardSales ? '' : ' Coming soon.'}`),
+    '',
+    '## Cards: SHYGON TAP V5',
     '',
     ...products.map((p) => `- [${p.name}](${site}${productPath(p)}): ${p.description} ${cardSales ? `From ${rupees(lowestPrice(p))}.` : 'Coming soon.'}`),
     '',
