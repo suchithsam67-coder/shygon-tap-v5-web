@@ -10,7 +10,6 @@ import {
   type TierId,
 } from '../../data/shygonTapData';
 import {
-  AAROH,
   AAROH_BULK_MINIMUM,
   AAROH_DEFAULT_FINISH,
   AAROH_EDITIONS,
@@ -18,6 +17,7 @@ import {
   AAROH_IMAGE_SIZE_SMALL,
   AAROH_PRODUCT_PATH,
   aarohImages,
+  designPath,
 } from '../../data/aaroh';
 import { aarohPrice, cardPriceIndex, fetchCatalog } from '../../services/catalog';
 import { useCatalog } from '../../hooks/useCatalog';
@@ -114,12 +114,49 @@ export default function Store() {
             <p className="aaroh-kicker">The SHYGON store</p>
             <h1 id="store-title">Two cards. One SHYGON profile.</h1>
             <p className="aaroh-promise">
-              Tap either card with a compatible phone and your SHYGON profile opens in the browser, with no app. Choose
-              the simple card, or the premium one.
+              Tap either card with a compatible phone and your SHYGON profile opens in the browser, with no app. Preview
+              SHYGON AAROH, the premium card{CARD_SALES_OPEN ? '' : ' coming soon'}, or browse SHYGON TAP V5, the simple card.
             </p>
           </header>
 
           <div className="store-choice">
+            {/* SHYGON AAROH, the store's flagship preview (owner, 2026-10-16): no price, no purchase. */}
+            <article className="store-choice-card store-choice-aaroh store-flagship" aria-labelledby="choice-aaroh">
+              <div className="store-choice-art store-choice-fan" aria-hidden="true">
+                {AAROH_EDITIONS.slice(0, 3).map((edition, index) => (
+                  <img
+                    key={edition.id}
+                    className={`store-choice-fan-card store-choice-fan-${index + 1}`}
+                    src={aarohImages(edition, AAROH_DEFAULT_FINISH).frontSmall}
+                    alt=""
+                    {...AAROH_IMAGE_SIZE_SMALL}
+                  />
+                ))}
+              </div>
+              {!CARD_SALES_OPEN && <p className="aaroh-preview-badge">Coming soon</p>}
+              <h2 id="choice-aaroh">SHYGON AAROH</h2>
+              <p className="aaroh-kicker">VERSION 01 · ONE CARD. MORE POSSIBILITIES.</p>
+              <p>A physical card, connected to a digital experience powered by SHYGON OS.</p>
+              <p className="store-choice-price">
+                {CARD_SALES_OPEN ? (
+                  <>
+                    <strong>{inr(standardPrice)}</strong> Standard · <strong>{inr(premiumPrice)}</strong> Premium Finish
+                  </>
+                ) : (
+                  <strong>Pricing announced when card sales open.</strong>
+                )}
+              </p>
+              <p>Explore the collection, discover the planned capabilities, and preview the AAROH experience.</p>
+              <div className="store-flagship-actions">
+                <Link to={AAROH_PRODUCT_PATH} className="btn btn-blue">
+                  Explore the collection <ArrowRight size={16} aria-hidden="true" />
+                </Link>
+                <Link to={designPath(AAROH_EDITIONS[0]!)} className="btn btn-ghost">
+                  Preview the experience
+                </Link>
+              </div>
+            </article>
+
             <article className="store-choice-card" aria-labelledby="choice-v5">
               <div className="store-choice-art">
                 <img src={products[0]!.images.pvc} alt="" loading="eager" />
@@ -136,39 +173,6 @@ export default function Store() {
               <a href="#v5" className="btn btn-ghost">
                 Browse V5 cards <ArrowRight size={16} aria-hidden="true" />
               </a>
-            </article>
-
-            <article className="store-choice-card store-choice-aaroh" aria-labelledby="choice-aaroh">
-              <div className="store-choice-art store-choice-fan" aria-hidden="true">
-                {AAROH_EDITIONS.slice(0, 3).map((edition, index) => (
-                  <img
-                    key={edition.id}
-                    className={`store-choice-fan-card store-choice-fan-${index + 1}`}
-                    src={aarohImages(edition, AAROH_DEFAULT_FINISH).frontSmall}
-                    alt=""
-                    {...AAROH_IMAGE_SIZE_SMALL}
-                  />
-                ))}
-              </div>
-              <p className="aaroh-kicker">SHYGON {AAROH.version} · AAROH</p>
-              <h2 id="choice-aaroh">The premium card, in ten editions</h2>
-              <p>
-                Ten editions from the AAROH design system, from {AAROH_EDITIONS[0]!.title} to{' '}
-                {AAROH_EDITIONS[AAROH_EDITIONS.length - 1]!.title}, each in a printed Standard or a Premium Finish with
-                relief and foil.
-              </p>
-              <p className="store-choice-price">
-                {CARD_SALES_OPEN ? (
-                  <>
-                    <strong>{inr(standardPrice)}</strong> Standard · <strong>{inr(premiumPrice)}</strong> Premium Finish
-                  </>
-                ) : (
-                  <strong>Pricing announced when card sales open.</strong>
-                )}
-              </p>
-              <Link to={AAROH_PRODUCT_PATH} className="btn btn-blue">
-                Explore AAROH <ArrowRight size={16} aria-hidden="true" />
-              </Link>
             </article>
           </div>
         </section>

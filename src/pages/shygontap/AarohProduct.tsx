@@ -162,10 +162,12 @@ export default function AarohProduct() {
 
         {/* ------------------------------------------------ collection */}
         <section className="aaroh-collection" aria-labelledby="aaroh-product-title">
-          {/* The owner's hero copy (2026-10-16). No AAROH price is shown before card sales open. */}
+          {/* The owner's premium-preview copy (2026-10-16). No AAROH price before card sales open. */}
           <header className="aaroh-collection-head">
+            {!CARD_SALES_OPEN && <p className="aaroh-preview-badge">Coming soon</p>}
             <h1 id="aaroh-product-title" className="aaroh-product-title">SHYGON AAROH</h1>
-            <p className="aaroh-collection-headline">A new way to carry your digital identity.</p>
+            <p className="aaroh-kicker aaroh-collection-tagline">VERSION 01 · ONE CARD. MORE POSSIBILITIES.</p>
+            <p className="aaroh-collection-headline">A physical card, connected to a digital experience powered by SHYGON OS.</p>
             <p className="aaroh-collection-price">
               {CARD_SALES_OPEN ? (
                 <>From <strong>{inr(from)}</strong> per card, paid once.</>
@@ -173,7 +175,7 @@ export default function AarohProduct() {
                 <strong>Pricing announced when card sales open.</strong>
               )}
             </p>
-            <p className="aaroh-buy-lede">Discover the AAROH collection and explore the SHYGON OS experience ahead of launch.</p>
+            <p className="aaroh-buy-lede">Explore the collection, discover the planned capabilities, and preview the AAROH experience.</p>
           </header>
           <EditionCollection ref={collectionRef} onOpen={openEdition} current={open?.id} finish={finish.id} />
           <p className="aaroh-muted aaroh-collection-note">The editions are shown as concept renders while the cards are validated with our manufacturer.</p>

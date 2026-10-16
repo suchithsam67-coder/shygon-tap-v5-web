@@ -432,8 +432,8 @@ function AarohCollection() {
     <section className="section design-collection" id="aaroh">
       <div className="container">
         <div className="section-heading split-heading">
-          <div><p className="eyebrow">SHYGON VERSION 1 · AAROH</p><h2>The premium card. Ten editions.</h2></div>
-          <p>The same SHYGON profile on a card made to be kept: ten editions from the AAROH design system, each in a printed Standard or a Premium Finish with relief and foil. <Link to={AAROH_PRODUCT_PATH} className="text-button">Explore AAROH <ArrowRight size={15} /></Link></p>
+          <div><p className="eyebrow">SHYGON AAROH · VERSION 01{CARD_SALES_OPEN ? '' : ' · COMING SOON'}</p><h2>One card. More possibilities.</h2></div>
+          <p>A physical card, connected to a digital experience powered by SHYGON OS, in ten editions.{CARD_SALES_OPEN ? '' : ' Pricing announced when card sales open.'} <Link to={AAROH_PRODUCT_PATH} className="text-button">Explore the collection <ArrowRight size={15} /></Link></p>
         </div>
         <ul className="design-grid">
           {AAROH_EDITIONS.map((edition) => {

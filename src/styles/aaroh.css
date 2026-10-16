@@ -350,7 +350,7 @@
   line-height: 1.02;
 }
 
-.store-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(16px, 2.4vw, 28px); }
+.store-choice { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: clamp(16px, 2.4vw, 28px); }
 .store-choice-card {
   display: flex;
   flex-direction: column;
@@ -361,6 +361,27 @@
   border-radius: var(--aaroh-radius);
 }
 .store-choice-aaroh { border-color: var(--aaroh-gold-soft); }
+/* The flagship preview: a taller display case and two actions, neither of them a purchase. */
+.store-flagship .store-choice-art { height: clamp(240px, 30vw, 360px); }
+.store-flagship-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; padding-top: 6px; }
+.store-flagship-actions .btn { margin-top: 0; }
+/* "Coming soon": a quiet metal-edged label, on the store and the AAROH page. */
+.aaroh-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  width: fit-content;
+  margin: 0 0 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--aaroh-gold);
+  border-radius: 999px;
+  color: var(--ds-text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.store-choice-card .aaroh-preview-badge { margin: 6px 0 0; }
 .store-choice-card h2 {
   margin: 0;
   font-family: var(--ds-font-family-display);
@@ -569,6 +590,7 @@
 /* "SHYGON AAROH", sized from its own column so the wide tracking never overflows; it may wrap between the words. */
 .aaroh-collection-head .aaroh-product-title { font-size: clamp(2rem, 8.5cqi, 4.4rem); letter-spacing: 0.22em; }
 .aaroh-collection-note { margin: 18px 0 0; }
+.aaroh-collection-tagline { margin: 14px 0 0; }
 .aaroh-collection-headline {
   margin: 10px 0 0;
   font-family: var(--ds-font-family-display);

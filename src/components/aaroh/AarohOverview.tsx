@@ -256,7 +256,7 @@ export default function AarohOverview({
                 <p className="ao-lede">{edition.description}</p>
                 <div className="ao-actions">
                   <button type="button" className="ao-button ao-button-primary" onClick={() => scrollTo('ao-choose')}>
-                    Choose {edition.title}
+                    {CARD_SALES_OPEN ? `Choose ${edition.title}` : 'See the finishes'}
                   </button>
                   <button type="button" className="ao-button" onClick={() => scrollTo('ao-features')}>
                     Explore the features
@@ -421,7 +421,7 @@ export default function AarohOverview({
         <section id="ao-choose" className="ao-section ao-choose" aria-labelledby="ao-choose-title" tabIndex={-1}>
           <header className="ao-head">
             <p className="ao-kicker">Your edition</p>
-            <h2 id="ao-choose-title">Choose AAROH {edition.title}</h2>
+            <h2 id="ao-choose-title">{CARD_SALES_OPEN ? `Choose AAROH ${edition.title}` : `AAROH ${edition.title}, coming soon`}</h2>
           </header>
           <div className="ao-choose-grid">
             <AarohCard edition={edition} finish={finish.id} side="front" sizes="(max-width: 720px) 88vw, 420px" className="ac-still" />

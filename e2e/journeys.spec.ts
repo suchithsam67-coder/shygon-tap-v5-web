@@ -173,6 +173,7 @@ test('cards are not for sale in the release candidate: the store says so and off
   await choose.scrollIntoViewIfNeeded();
   await expect(choose.getByText('SHYGON cards are coming soon')).toBeVisible();
   await expect(choose.getByRole('button', { name: 'Choose Obsidian' })).toHaveCount(0);
+  await expect(choose.getByRole('heading', { name: 'AAROH Obsidian, coming soon' })).toBeVisible();
   await expect(choose.getByText('Pricing announced when card sales open.')).toBeVisible();
   await expect(choose).not.toContainText('₹');
   await choose.getByRole('button', { name: 'Choose your Tap experience' }).click();
@@ -186,6 +187,9 @@ test('AAROH (DEC-2026-037): ten editions beside V5; one themed overview explains
   await expect(page.getByRole('heading', { level: 1, name: 'Two cards. One SHYGON profile.' })).toBeVisible();
   // No AAROH price before card sales open (owner, 2026-10-16).
   await expect(page.locator('.store-choice-aaroh')).toContainText('Pricing announced when card sales open.');
+  await expect(page.locator('.store-choice-aaroh').getByRole('heading', { name: 'SHYGON AAROH' })).toBeVisible();
+  await expect(page.locator('.store-choice-aaroh').getByText('Coming soon', { exact: true })).toBeVisible();
+  await expect(page.locator('.store-choice-aaroh').getByRole('link', { name: 'Preview the experience' })).toHaveAttribute('href', '/shygontap/store/aaroh?design=obsidian');
   await expect(page.locator('.store-choice-aaroh')).not.toContainText('₹');
   await expect(page.locator('#compare')).toContainText('Announced when card sales open');
   const v5 = await page.request.get('/shygontap/store/business', { maxRedirects: 0 });
@@ -194,7 +198,10 @@ test('AAROH (DEC-2026-037): ten editions beside V5; one themed overview explains
   // The collection: the design system's ten editions, in order.
   await page.goto('/shygontap/store/aaroh');
   await expect(page.getByRole('heading', { level: 1, name: 'SHYGON AAROH' })).toBeVisible();
-  await expect(page.getByText('A new way to carry your digital identity.')).toBeVisible();
+  await expect(page.getByText('Coming soon', { exact: true })).toBeVisible();
+  await expect(page.getByText('VERSION 01 · ONE CARD. MORE POSSIBILITIES.')).toBeVisible();
+  await expect(page.getByText('A physical card, connected to a digital experience powered by SHYGON OS.')).toBeVisible();
+  await expect(page.getByText('Explore the collection, discover the planned capabilities, and preview the AAROH experience.')).toBeVisible();
   await expect(page.getByText('Pricing announced when card sales open.')).toBeVisible();
   await expect(page.locator('.aaroh-collection')).not.toContainText('₹');
   const collection = page.getByRole('list', { name: 'The ten AAROH editions' });
