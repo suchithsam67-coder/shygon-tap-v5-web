@@ -16,7 +16,8 @@ import {
  * mirrored. With reduced motion the faces cross-fade instead (aaroh.css).
  * `sweepKey` replays the light sweep, which sits on each face and so turns
  * with the card. Both faces are real images; if one fails to load, a plain
- * label stands in.
+ * label stands in. With `priority` both load eagerly, the hidden face at low
+ * fetch priority so it never competes with the face on show.
  */
 export default function AarohCard({
   edition,
@@ -58,6 +59,7 @@ export default function AarohCard({
             {...AAROH_IMAGE_SIZE}
             decoding="async"
             loading={priority ? 'eager' : 'lazy'}
+            fetchPriority={priority && side !== which ? 'low' : undefined}
             onError={() => setFailed((current) => ({ ...current, [key]: true }))}
           />
         )}

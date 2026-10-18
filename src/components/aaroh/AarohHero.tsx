@@ -140,7 +140,7 @@ export default function AarohHero({
               side={reduced ? 'front' : side}
               sweepKey={`${edition.id}-${beat}`}
               priority
-              sizes={compact ? '(max-width: 860px) 80vw, 420px' : '(max-width: 960px) 88vw, 620px'}
+              sizes={compact ? '(max-width: 640px) 66vw, 420px' : '(max-width: 660px) calc(100vw - 60px), 600px'}
             />
           </button>
           {!compact && current.kind === 'meaning' && (
