@@ -63,3 +63,8 @@ On the QR back, also check that the QR opens the same `/d/<card_code>` as a tap.
 - edition serials are given out when an order is fulfilled.
 
 Pre-numbered stock needs an inventory state, a `card_code`, and a serial fixed at manufacture. That registry has to be designed around the existing card lifecycle and approved before any schema change.
+
+**Rules for the registry design** (2026-10-18, with the clean back):
+- **`card_code` alone authorises nothing.** Anyone who has seen or held the card may know it. It must never be enough to claim, transfer or change a page, or for any other ownership action. A visit to `/d/<card_code>` is unauthenticated; a tap is not authentication (B6).
+- **A printed QR is static.** If the QR back is ever used, its QR can carry only the static `/d/<card_code>`. It cannot carry the chip's per-tap SUN/CMAC signature (NTAG 424 DNA), so the server treats a QR visit as unauthenticated.
+- **Keep `serial_number` as a registry column.** On the clean back `card_code` is never printed, so the printed serial is how support finds a card.
