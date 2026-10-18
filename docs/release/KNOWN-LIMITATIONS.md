@@ -15,7 +15,7 @@ What the release candidate does not do, or does only partly, and why. Each item 
 
 ## Operations
 
-- **Production has never been deployed from V6.** Migrations 020–026 are applied only locally, and the credentials are not rotated yet (B-1, B-2).
+- **Production has never been deployed from V6.** Migrations 020–026 and 028 are applied only locally, and the credentials are not rotated yet (B-1, B-2).
 - **Live payments are off** (B-3). Everything is verified with Razorpay test keys and the local Razorpay stand-in.
 - **CI has never run on a remote** (B-4: no GitHub repository yet). The full gate set runs locally (`npm run ci`, clean install), and the workflow is ready in `.github/workflows/ci.yml`.
 - **No error-tracking provider, log drain or alerting.** The hooks and events exist (`docs/v6/observability.md`).

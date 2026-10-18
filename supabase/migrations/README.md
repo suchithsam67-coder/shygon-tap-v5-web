@@ -16,6 +16,7 @@
 | `npm run db:verify`, `node supabase/tests/rls-adversarial.mjs` | the same, plus `020+` | behaviour and adversarial RLS checks |
 | `npm run test:rls-matrix` | the same, plus `020+` | every table × every caller (anon, two customers, three admin roles, service) against the expected access model; extra access fails as a P0 |
 | `npm run test:identity`, `test:admin-notes`, `test:golden`, `test:admin-contract` | the same, plus `020+` | the identity contract (021), F2 (022), the public Tap golden output and the frozen-function contract |
+| `npm run test:suspension` | the live baseline, the baseline plus `020–026`, the baseline plus `020+`, and the local stack | F1 (020, 028): every owner attack on the suspension columns, with the live baseline as the negative control; the two admin RPCs; the guard's mechanism and trigger order; the attacks over HTTP with forged tokens |
 | `npm run test:rollbacks` | the baseline plus `020..k` | each migration's header rollback restores the schema before it (functions, policies, grants, relations, triggers and constraints); the whole chain rolls back to the baseline and re-applies identically |
 | `npm run test:account-deletion` | the same, plus `020+` | the deletion procedure in `docs/runbooks/account-deletion.sql`, as written: what it deletes and keeps, every refusal, and 026 (with the live baseline's cascade as the negative control) |
 | `npm run db:bundle` / `db:bundle:check` | the baseline | writes / checks `supabase/APPLY_ALL.sql` (`020+` only) and proves it applies twice |

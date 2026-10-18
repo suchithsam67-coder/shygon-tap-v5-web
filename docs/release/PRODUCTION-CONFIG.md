@@ -45,7 +45,7 @@ Check after deploy: `GET /api/health?deep=1` answers `200 {"status":"ok"}`. A mi
 
 | Area | Setting |
 |---|---|
-| Database | Live baseline + migrations **020–026** applied (`DEPLOYMENT.md` §3), after each one's VERIFY ON LIVE queries and the DEC-2026-018 cool-off |
+| Database | Live baseline + migrations **020–026 and 028** applied (`DEPLOYMENT.md` §3), after each one's VERIFY ON LIVE queries and the DEC-2026-018 cool-off |
 | Auth | Site URL `https://shygontech.com`, and the domain on the Redirect URLs allow-list (`PRODUCTION.md` §4.1 step 3). The only `redirectTo` the app sends is `https://shygontech.com/shygontap/settings` (password reset, `Auth.tsx` and `Settings.tsx`); Supabase refuses one that is not on the list. Email confirmation and password policy are project settings (V6-036: align the client's 6-character minimum with the project's) |
 | Storage | Bucket `profile-images`: public; image types only; a size limit; writes only to the caller's own `<user id>/` folder. **VERIFY ON LIVE (V6-095):** queries in `PRODUCTION.md` §7 |
 | Edge functions | `admin-refund`, `admin-push`. Secrets `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` (Supabase injects the URL and service key) |
