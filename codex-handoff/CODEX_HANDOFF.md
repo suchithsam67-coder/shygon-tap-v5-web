@@ -15,7 +15,7 @@ Companion documents in this folder:
 2. **The fresh production baseline has not been supplied.** `000_live_baseline_2026-10-18.sql` does not exist in any checked-out worktree. (VERIFIED IN CURRENT CHECKOUT)
 3. **The baseline intake script described in the request does not exist** in any checked-out worktree. Its described fixes cannot be verified. (VERIFIED IN CURRENT CHECKOUT, absence)
 4. **Production has not been inspected.** All production-drift facts come from a local evidence CSV and reports. They are not re-verified. (REPORTED INVESTIGATION FINDING)
-5. **No tests were run in this pass.** Historical results are labelled as such. (see TESTING_GUIDE)
+5. **Tests were run on 2026-10-18 on the rebaseline branch** (Node 20.18.0, below the Node 22 engine). Lint, build, DB chain, and 12 feature suites pass; `test:secrets` fails (gitleaks not installed); `test:e2e` not run. The DB apply used the 2026-09-30 baseline, not a fresh dump. See TESTING_GUIDE §8.
 
 ---
 
@@ -179,7 +179,7 @@ Require explicit owner approval before: running anything against production; app
 
 ## 16. Limits of this audit
 
-- No production access. No live website request. No dependency install. No test execution.
+- No production access. No live website request. No dependency install. Local test execution on the rebaseline branch only (TESTING_GUIDE §8); Node 20 used, so the Node 22 payments check is blocked.
 - Several sibling worktrees were only inspected for `git status` / `git log`, not by content (see CURRENT_STATE §3).
 - Decision-record bodies were read at the header and index level, not in full.
 - The request's historical results (23/23, 48/48, 16/16, lint, audit) are **not** re-observed.

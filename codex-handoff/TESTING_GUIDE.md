@@ -99,8 +99,47 @@ Failures must be reported with output. **Do not weaken tests or regenerate expec
 - `test:*` scripts that use `deny-network` (`--import ./scripts/ci/deny-network.mjs`) are the safe default: they block outbound network. VERIFIED IN CURRENT CHECKOUT (script text).
 - Read each script before running it. This guide does not authorize execution.
 
+## 8. Observed results — 2026-10-18 (VERIFIED BY CURRENT TEST)
+
+Environment: `shygon-tap-v5-web-rebaseline`, branch `v6/rebaseline-2026-10-18`, HEAD `4d730c4`, working tree has 7 uncommitted entries (unchanged by this run). **Node v20.18.0** — below the engine floor `>=22.12.0`; `npm ci` was not re-run (`node_modules` existed). The DB apply loaded `supabase/baseline/000_live_baseline.sql` (the 2026-09-30 dump). The fresh 2026-10-18 dump does not exist, so none of these results reflect it.
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run lint` | 0 | clean |
+| `npm run build` | 0 | built in 8.19 s |
+| `npm audit --audit-level=high` | 0 | 1 low (esbuild, GHSA-g7r4-m6w7-qqqr, dev-server file read on Windows); no high |
+| `npm run db:apply` | 0 | all migrations 020–026, 028 applied; re-run idempotent |
+| `npm run db:verify` | 0 | **21 passed, 0 failed** (historical note said 23/23 — not reproduced; count differs) |
+| `npm run test:db` | 0 | sub-suite counts, in order: 21, 64, 946 (32 tables, 7 callers), 69, 12, 10, 15, 9, 9, 2 — all 0 failed. Which file produced each count was not mapped line-by-line. |
+| `npm run test:suspension` | 0 | 46 passed, 0 failed |
+| `npm run test:public-tap` | 0 | 25 passed, 0 failed |
+| `npm run test:admin-edge` | 0 | 11 passed, 0 failed |
+| `npm run test:payments:ci` | 0 | 13 passed, 0 failed, **1 blocked** (`verify-payment refuses an unauthenticated caller`: needs Node ≥ 22; this machine is Node 20) |
+| `npm run test:payment-chain` | 0 | 30 passed, 0 failed (includes a logged `webhook.error` line from a negative test; the test passed) |
+| `npm run test:security` | 0 | 11 passed, 0 failed |
+| `npm run test:observability` | 0 | 10 passed, 0 failed |
+| `npm run test:components` | 0 | 23 tests in 4 files passed |
+| `npm run test:seo` | 0 | PASS |
+| `npm run test:bundle-secrets` | 0 | 207 files in dist, no secret, no source map |
+| `npm run test:bundle` | 0 | PASS (public Tap entry JS within budget) |
+| `npm run test:push-guard` | 0 | 18 passed |
+| `npm run test:admin-notes` | 0 | 12 passed |
+| `npm run test:golden` | 0 | 10 passed |
+| `npm run test:admin-contract` | 0 | 15 passed |
+| `npm run test:rls-matrix` | 0 | 946 passed |
+| `npm run test:identity` | 0 | 69 passed |
+| `npm run test:rollbacks` | 0 | 9 passed |
+| `npm run test:account-deletion` | 0 | 9 passed |
+| `npm run test:secrets` | **1** | **FAIL**: gitleaks not runnable (needs gitleaks 8.30.1 or `GITLEAKS_BIN`). Fail-closed by design. Not installed in this pass. |
+| `npm run test:e2e` | — | **Not run** (Playwright config not inspected) |
+
+Not run by design: `db:push` (remote), `supabase/tests/live-auth-rls.mjs` (live), any production command.
+
+Not run and not wired to a script: `supabase/tests/schema-drift.mjs` (exists; no `package.json` entry), `supabase/tests/verify-011-admin-notes.mjs` (exists; no entry), and a migration-025 pre-apply check (no file found by that name). Their status is unknown until each is read and run.
+
 ## 7. Known gaps
 
-- No test was executed in this pass.
+- Tests were executed on 2026-10-18 (§8). Not run: `test:e2e`, `db:push`, live-auth tests.
+- `test:secrets` needs gitleaks 8.30.1 (not installed here).
 - `test:e2e` requires a Playwright config (not checked).
 - The V5 worktree (`8becea3`) has **no** `package.json` test scripts for the V6 suites; those live only on V6 branches.

@@ -66,9 +66,13 @@ The owner-supplied fresh dump is therefore a **pending input**. See [PRODUCTION_
 - Local migration files on `v6/rebaseline-2026-10-18` (`4d730c4`): `001`–`026`, `028`, plus `README.md`. Migration `027` is **not** on this branch; it exists on `v6/aaroh-store` / `v6/aaroh-stabilise` as `027_aaroh_catalog.sql`. VERIFIED IN CURRENT CHECKOUT.
 - Recorded production-migration evidence file: `docs/governance/evidence/2026-10-18_production-schema-migrations.csv` (rebaseline worktree, untracked). Contains the **seven** migrations named in the request. VERIFIED IN CURRENT CHECKOUT.
 
-## 6. Tests
+## 6. Tests — observed 2026-10-18 (addendum)
 
-**No tests were run in this pass.** No `npm` install, no database, no `npm run` command. Every results-type statement in the handoff is a historical or reported result, not a current observation.
+Run in `shygon-tap-v5-web-rebaseline` at `4d730c4` on `v6/rebaseline-2026-10-18`, Node **v20.18.0** (below the `>=22.12.0` engine), `node_modules` already present (not reinstalled). Full detail: [TESTING_GUIDE.md](TESTING_GUIDE.md) §8.
+
+Summary: lint, build, DB apply/verify, the full `test:db` chain, and 12 feature suites pass. `test:secrets` fails (gitleaks not installed). `test:payments:ci` has one blocked check (Node 20). `test:e2e` was not run. The DB apply loaded the **2026-09-30** baseline, not the fresh 2026-10-18 dump, which does not exist.
+
+Earlier wording in this file — "no tests were run in this pass" — refers to the original read-only audit and is superseded by this section.
 
 ## 7. Unresolved questions
 
