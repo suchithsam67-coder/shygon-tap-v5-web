@@ -394,7 +394,13 @@ const FRONT = {
   version: { size: 1.79, tracking: 0.32 / 1.79, y: n(ty(74.6)) },
   calm: { cx: IX, cy: 27 },
 };
-/** Back: the QR plate on the right, the official lockup and the card data on the left. */
+/**
+ * Back. Clean by default (owner, 2026-10-18): the official lockup and the card
+ * data on the left, the edition's art on the right, and a quiet tap cue on the
+ * last line. NFC is the experience, so no QR is printed. The QR back (a plate on
+ * the right and TAP OR SCAN) is kept as an alternative, for use only if testing
+ * shows customers need it; its QR opens the card's own permanent /d/<code>.
+ */
 const BACK = {
   plate: { x: 56.5, y: 9.5, size: 22.97 },
   qr: 18,
@@ -406,6 +412,8 @@ const BACK = {
   legal: { size: 1.65, tracking: 0.33 / 1.65, y: 43.6 },
   edition: { size: 1.5, tracking: 0.3 / 1.5, y: 47.3 },
   tap: { size: 2.06, tracking: 0.62 / 2.06, y: 41.15 },
+  // The clean back's cue: set like the edition line, on its baseline, to the right margin.
+  cue: { size: 1.5, tracking: 0.3 / 1.5, y: 47.3, right: W - 8 },
 };
 const PLATE_CX = BACK.plate.x + BACK.plate.size / 2;
 const PLATE_CY = BACK.plate.y + BACK.plate.size / 2;
@@ -420,13 +428,14 @@ const FINDERS = (() => {
 })();
 
 /** Tap glyph: a point and three arcs, deliberately not the licensed NFC or contactless marks. */
-const tapGlyph = (cx, cy) => {
+const tapGlyph = (cx, cy, s = 1) => {
   let arcs = '';
-  for (const r of [1.1, 1.9, 2.7]) {
+  for (const r0 of [1.1, 1.9, 2.7]) {
     const a = 0.9;
+    const r = n(r0 * s);
     arcs += 'M' + n(cx + r * Math.cos(-a)) + ' ' + n(cy + r * Math.sin(-a)) + 'A' + r + ' ' + r + ' 0 0 1 ' + n(cx + r * Math.cos(a)) + ' ' + n(cy + r * Math.sin(a));
   }
-  return { arcs, dot: circ(cx, cy, 0.38) };
+  return { arcs, dot: circ(cx, cy, n(0.38 * s)) };
 };
 
 /** A rounded rectangle as a path (for clips, dies and plates). */
@@ -437,12 +446,13 @@ export const ellipse = (cx, cy, rx, ry) =>
   'M' + n(cx - rx) + ' ' + n(cy) + 'A' + n(rx) + ' ' + n(ry) + ' 0 1 0 ' + n(cx + rx) + ' ' + n(cy) + 'A' + n(rx) + ' ' + n(ry) + ' 0 1 0 ' + n(cx - rx) + ' ' + n(cy) + 'Z';
 
 /**
- * The fixed vector elements of one face: the official logo, the words, the tap
- * glyph and the QR plate. Each item: { d, fill?, stroke?, sw?, rule?, role }
- * where role is 'brand' (foiled on Tier B where the edition foils its
- * identity), 'ink' (always printed) or 'variable' (per card: a placeholder).
+ * The fixed vector elements of one face: the official logo, the words and the
+ * tap glyph, plus the QR plate on the QR back (`qr`). Each item:
+ * { d, fill?, stroke?, sw?, rule?, role } where role is 'brand' (foiled on
+ * Tier B where the edition foils its identity), 'ink' (always printed) or
+ * 'variable' (per card: a placeholder).
  */
-export function faceElements(storeId, side) {
+export function faceElements(storeId, side, { qr = false } = {}) {
   const c = editionRecord(storeId);
   const items = [];
   if (side === 'front') {
@@ -455,25 +465,38 @@ export function faceElements(storeId, side) {
     items.push({ d: text('VERSION 01', { font: 'inter500', size: FRONT.version.size, tracking: FRONT.version.tracking, x: OX, y: FRONT.version.y, anchor: 'middle' }).d, role: 'brand' });
     return items;
   }
-  const p = BACK.plate;
-  items.push({ d: roundRect(p.x - 0.9, p.y - 0.9, p.size + 1.8, p.size + 1.8, 0.6), stroke: 'metal', sw: 0.16, role: 'ink' });
-  items.push({ d: roundRect(p.x, p.y, p.size, p.size, 0.3), fill: c.plate, role: 'ink' });
+  if (qr) {
+    const p = BACK.plate;
+    items.push({ d: roundRect(p.x - 0.9, p.y - 0.9, p.size + 1.8, p.size + 1.8, 0.6), stroke: 'metal', sw: 0.16, role: 'ink' });
+    items.push({ d: roundRect(p.x, p.y, p.size, p.size, 0.3), fill: c.plate, role: 'ink' });
+  }
   const ls = BACK.lockup.h / LOCKUP.height;
   items.push({ d: LOCKUP.mark + LOCKUP.word, transform: [ls, BACK.lockup.x, BACK.lockup.y], rule: 'evenodd', role: 'brand' });
-  const tapText = text('TAP OR SCAN', { font: 'inter500', size: BACK.tap.size, tracking: BACK.tap.tracking, x: 0, y: 0 });
-  const groupW = 3.1 + 1.3 + tapText.width;
-  const gx = PLATE_CX - groupW / 2;
-  const glyph = tapGlyph(gx + 0.38, BACK.tap.y - 0.75);
-  items.push({ d: glyph.arcs, stroke: 'metal', sw: 0.3, role: 'brand' });
-  items.push({ d: glyph.dot, role: 'brand' });
-  items.push({ d: text('TAP OR SCAN', { font: 'inter500', size: BACK.tap.size, tracking: BACK.tap.tracking, x: gx + 4.4, y: BACK.tap.y }).d, role: 'brand' });
+  if (qr) {
+    const tapText = text('TAP OR SCAN', { font: 'inter500', size: BACK.tap.size, tracking: BACK.tap.tracking, x: 0, y: 0 });
+    const groupW = 3.1 + 1.3 + tapText.width;
+    const gx = PLATE_CX - groupW / 2;
+    const glyph = tapGlyph(gx + 0.38, BACK.tap.y - 0.75);
+    items.push({ d: glyph.arcs, stroke: 'metal', sw: 0.3, role: 'brand' });
+    items.push({ d: glyph.dot, role: 'brand' });
+    items.push({ d: text('TAP OR SCAN', { font: 'inter500', size: BACK.tap.size, tracking: BACK.tap.tracking, x: gx + 4.4, y: BACK.tap.y }).d, role: 'brand' });
+  } else {
+    // The quiet cue: TAP TO OPEN in the edition line's ink, the glyph scaled to the type.
+    const q = BACK.cue;
+    const s = q.size / BACK.tap.size;
+    const cue = text('TAP TO OPEN', { font: 'inter500', size: q.size, tracking: q.tracking, x: q.right, y: q.y, anchor: 'end' });
+    const glyph = tapGlyph(q.right - cue.width - 4.02 * s, q.y - 0.75 * s, s);
+    items.push({ d: glyph.arcs, stroke: c.bMuted, sw: n(Math.max(0.3 * s, 0.2)), role: 'ink' });
+    items.push({ d: glyph.dot, fill: c.bMuted, role: 'ink' });
+    items.push({ d: cue.d, fill: c.bMuted, role: 'ink' });
+  }
   const L0 = BACK.left;
   items.push({ d: text('SHYGON TECHNOLOGIES PVT. LTD.', { size: BACK.legal.size, tracking: BACK.legal.tracking, x: L0, y: BACK.legal.y }).d, fill: c.bInk, role: 'ink' });
   items.push({ d: text('EDITION ' + c.no + ' · ' + c.name.toUpperCase(), { size: BACK.edition.size, tracking: BACK.edition.tracking, x: L0, y: BACK.edition.y }).d, fill: c.bMuted, role: 'ink' });
-  // Per card, from the data file: serial, chapter and the QR. These are examples.
+  // Per card, from the data file: serial, chapter and, on the QR back, the QR. These are examples.
   items.push({ d: text('AR1-' + c.code + '-000042', { size: BACK.serial.size, tracking: BACK.serial.tracking, x: L0, y: BACK.serial.y }).d, fill: 'metal', role: 'variable' });
   items.push({ d: text('CHAPTER I · Nº 042 / 100', { size: BACK.chapter.size, tracking: BACK.chapter.tracking, x: L0, y: BACK.chapter.y }).d, fill: c.bMuted, role: 'variable' });
-  items.push({ d: FINDERS, fill: c.qr, rule: 'evenodd', role: 'variable' });
+  if (qr) items.push({ d: FINDERS, fill: c.qr, rule: 'evenodd', role: 'variable' });
   return items;
 }
 
@@ -481,14 +504,17 @@ export function faceElements(storeId, side) {
 export const VARIABLE_FIELDS = {
   serial: { x: BACK.left, baseline: BACK.serial.y, font: 'Inter 500', size: BACK.serial.size, tracking: n(BACK.serial.tracking), example: 'AR1-OB-000042', format: 'AR1-<edition code>-<six-digit serial>' },
   chapter: { x: BACK.left, baseline: BACK.chapter.y, font: 'Inter 500', size: BACK.chapter.size, tracking: n(BACK.chapter.tracking), example: 'CHAPTER I · Nº 042 / 100', format: 'CHAPTER <roman> · Nº <three digits> / 100' },
-  qr: { x: n(QR_X), y: n(QR_Y), size: BACK.qr, quietZone: '4 modules (inside the plate)', content: 'the card’s verified https URL', note: 'never foil' },
 };
+/** The QR back only: where its per-card QR goes. */
+export const QR_FIELD = { x: n(QR_X), y: n(QR_Y), size: BACK.qr, quietZone: '4 modules (inside the plate)', content: 'the card’s own permanent https URL', note: 'never foil' };
 
 /** The calm zones: art fades out behind the identity (front) and the data (back). */
 export const CALM = {
   front: (storeId) => { const c = editionRecord(storeId); const cm = c.calm || [23, 21]; return { cx: FRONT.calm.cx, cy: FRONT.calm.cy, rx: cm[0], ry: cm[1] }; },
   back: { cx: 20, cy: 27, rx: 19, ry: 27 },
   qr: { x: BACK.plate.x - 1.9, y: BACK.plate.y - 1.9, w: BACK.plate.size + 3.8, h: BACK.plate.size + 3.8, r: 1.2 },
+  // The clean back's tap cue (about 60–77.6 mm across): the art thins out behind it.
+  cue: { cx: 69, cy: 46.6, rx: 16, ry: 6.5 },
 };
 
 /**
@@ -530,17 +556,19 @@ const elementSvg = (e, fill, stroke) => {
  *     lighting, no relief and none of the logo, words or variable data (those
  *     are vector in the print PDF, see print.mjs). Tier B leaves out what
  *     its foil plate carries.
+ * `qr` draws the alternative QR back; the default back is clean.
  * @param {string} storeId  an id from STORE_EDITIONS
- * @param {{side?: 'front'|'back', finish?: 'standard'|'premium', px?: number, mode?: 'mockup'|'print'}} options
+ * @param {{side?: 'front'|'back', finish?: 'standard'|'premium', px?: number, mode?: 'mockup'|'print', qr?: boolean}} options
  */
-export function cardSvg(storeId, { side = 'front', finish = 'premium', px = 16, mode = 'mockup' } = {}) {
+export function cardSvg(storeId, { side = 'front', finish = 'premium', px = 16, mode = 'mockup', qr = false } = {}) {
   const c = editionRecord(storeId);
   const id = c.key;
   const back = side === 'back';
+  const qrBack = back && qr;
   const B = finish !== 'standard';
   const print = mode === 'print';
   const fin = c.finishB;
-  const key = id + (back ? '-b' : '-f') + (B ? 'p' : 's') + (print ? 'x' : '');
+  const key = id + (back ? '-b' : '-f') + (B ? 'p' : 's') + (print ? 'x' : '') + (qrBack ? 'q' : '');
   const ids = {};
   const u = {};
   for (const k of ['clip', 'base', 'metal', 'metalId', 'artA', 'artB', 'light', 'vig', 'sheen', 'calm', 'tex', 'rel', 'deb', 'foil', 'mask']) {
@@ -581,7 +609,10 @@ export function cardSvg(storeId, { side = 'front', finish = 'premium', px = 16, 
   const area = `x="${X0}" y="${Y0}" width="${n(VW)}" height="${n(VH)}"`;
 
   const maskBody = back
-    ? `<ellipse cx="${CALM.back.cx}" cy="${CALM.back.cy}" rx="${CALM.back.rx}" ry="${CALM.back.ry}" fill="${u.calm}"/><rect x="${n(CALM.qr.x)}" y="${n(CALM.qr.y)}" width="${n(CALM.qr.w)}" height="${n(CALM.qr.h)}" rx="${CALM.qr.r}" fill="#000000"/>`
+    ? `<ellipse cx="${CALM.back.cx}" cy="${CALM.back.cy}" rx="${CALM.back.rx}" ry="${CALM.back.ry}" fill="${u.calm}"/>` +
+      (qrBack
+        ? `<rect x="${n(CALM.qr.x)}" y="${n(CALM.qr.y)}" width="${n(CALM.qr.w)}" height="${n(CALM.qr.h)}" rx="${CALM.qr.r}" fill="#000000"/>`
+        : `<ellipse cx="${CALM.cue.cx}" cy="${CALM.cue.cy}" rx="${CALM.cue.rx}" ry="${CALM.cue.ry}" fill="${u.calm}"/>`)
     : `<ellipse cx="${calm.cx}" cy="${calm.cy}" rx="${calm.rx}" ry="${calm.ry}" fill="${u.calm}"/>`;
 
   const defs =
@@ -607,13 +638,13 @@ export function cardSvg(storeId, { side = 'front', finish = 'premium', px = 16, 
   if (!print) {
     const idMetal = B && fin.idFoil ? u.metalId : c.flat;
     const brandFilter = B && fin.idFoil ? u.foil : 'none';
-    const els = faceElements(storeId, side);
+    const els = faceElements(storeId, side, { qr });
     const brand = els.filter((e) => e.role === 'brand');
     const rest = els.filter((e) => e.role !== 'brand');
     const colour = (v) => (v === 'metal' ? idMetal : v);
     identity =
       rest.map((e) => elementSvg(e, colour(e.fill ?? idMetal), colour(e.stroke))).join('') +
-      (back
+      (qrBack
         ? `<rect x="${n(QR_X)}" y="${n(QR_Y)}" width="18" height="18" fill="none" stroke="${c.qr}" stroke-width="0.08" stroke-dasharray="0.5 0.5" opacity="0.45"/>` +
           `<path d="${text('QR ZONE', { font: 'inter600', size: 1.3, tracking: 0.2 / 1.3, x: PLATE_CX, y: PLATE_CY + 0.4, anchor: 'middle' }).d}" fill="${c.qr}" opacity="0.7"/>` +
           `<path d="${text('18 mm · per card', { size: 1, x: PLATE_CX, y: PLATE_CY + 2.4, anchor: 'middle' }).d}" fill="${c.qr}" opacity="0.55"/>`
@@ -623,10 +654,11 @@ export function cardSvg(storeId, { side = 'front', finish = 'premium', px = 16, 
       `</g>`;
   }
 
-  const label = 'SHYGON AAROH ' + c.name + ' card, ' + (back ? 'back' : 'front') + ', ' + (B ? 'Premium Finish (Tier B)' : 'Standard (Tier A)');
+  const face = back ? (qrBack ? 'back (QR alternative)' : 'back') : 'front';
+  const label = 'SHYGON AAROH ' + c.name + ' card, ' + face + ', ' + (B ? 'Premium Finish (Tier B)' : 'Standard (Tier A)');
   const desc = print
-    ? 'Printed CMYK artwork for the AAROH ' + c.name + ' ' + (back ? 'back' : 'front') + ', ' + (B ? 'Tier B' : 'Tier A') + ', to the 3 mm bleed. No lighting; the logo, words, variable data and spot plates are vector layers in the print PDF.'
-    : 'Concept render from the AAROH design system, landscape. PROPOSED — REQUIRES VALIDATION. Not a photograph. The QR is a placeholder; the serial and chapter are examples.';
+    ? 'Printed CMYK artwork for the AAROH ' + c.name + ' ' + face + ', ' + (B ? 'Tier B' : 'Tier A') + ', to the 3 mm bleed. No lighting; the logo, words, variable data and spot plates are vector layers in the print PDF.'
+    : 'Concept render from the AAROH design system, landscape. PROPOSED — REQUIRES VALIDATION. Not a photograph. ' + (qrBack ? 'The QR is a placeholder; the' : 'The') + ' serial and chapter are examples.';
   const edgeFinish = B && fin.edge;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${X0} ${Y0} ${n(VW)} ${n(VH)}" width="${n(VW * px)}" height="${n(VH * px)}" role="img" aria-label="${label}">` +
@@ -657,6 +689,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         fs.writeFileSync(path.join(OUT, `${storeId}-${finish}-${side}.svg`), cardSvg(storeId, { side, finish }));
         count++;
       }
+      // The QR back, for review only: the store and the print package use the clean back.
+      fs.writeFileSync(path.join(OUT, `${storeId}-${finish}-back-qr.svg`), cardSvg(storeId, { side: 'back', finish, qr: true }));
+      count++;
     }
   }
   console.log(`wrote ${count} edition SVGs to design-assets/editions/`);

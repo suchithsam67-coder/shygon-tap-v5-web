@@ -399,8 +399,8 @@ export default function AarohOverview({
             </dl>
           </div>
           <p className="ao-note">
-            Concept renders of the card as it will be printed, in landscape with the official SHYGON logo. On the back, the
-            QR code is a placeholder and the serial and chapter are examples. Materials, finishes and the NFC construction
+            Concept renders of the card as it will be printed, in landscape with the official SHYGON logo. The back is clean,
+            with no printed QR; its serial and chapter are examples. Materials, finishes and the NFC construction
             are being validated with our card manufacturer.
           </p>
         </section>

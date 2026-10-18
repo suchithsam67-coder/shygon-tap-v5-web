@@ -7,22 +7,25 @@
 //     bleed (media 91.60 x 59.98), 4 mm safe area; TrimBox and BleedBox set;
 //   - the printed artwork in CMYK: the background (base, printed grain,
 //     tone-on-tone art) as a 600 ppi CMYK image, and everything that must stay
-//     sharp (the official SHYGON logo, AAROH, every word, the QR plate) as
-//     vector, with text converted to outlines;
+//     sharp (the official SHYGON logo, AAROH, every word) as vector, with
+//     text converted to outlines;
 //   - one named spot plate per finish on Tier B (FOIL_<METAL>, RAISED_UV,
 //     SPOT_UV, EMBOSS, DEBOSS, TACTILE_VARNISH), 100% tint and overprint,
 //     never mixed into CMYK; relief stops 1 mm inside the die line;
 //   - the die line as a spot colour DIELINE, and the variable data (serial,
-//     chapter, QR) as a non-printing guide: they come from the data file;
+//     chapter) as a non-printing guide: they come from the data file;
 //   - no lighting: highlights, sheen and shadows exist only in mockups.
+// The back is the clean back (owner, 2026-10-18): no QR; NFC is the
+// experience. --qr-back also writes the alternative QR back to alt-qr-back/,
+// for use only if testing shows customers need it.
 // Every Tier B plate is also written alone, in 100% black, for printers who
 // want separate masks. CMYK values: the design system's starting values for
 // the edition's own colours (SPEC), and a conversion anchored on them for the
 // rest. A hard proof sets the final values; no ICC output intent is embedded,
 // so the printer's profile applies (PDF/X-4 compliance is not claimed).
 //
-//   node design-assets/src/print.mjs [edition-id ...]
-//     writes design-assets/print/AAROH-V01-E01-Obsidian/... and a README.
+//   node design-assets/src/print.mjs [--qr-back] [edition-id ...]
+//     writes design-assets/print/AAROH-V01-E01-Obsidian/... and manifest.json.
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -34,6 +37,7 @@ import {
   CALM,
   FINISHES,
   STORE_EDITIONS,
+  QR_FIELD,
   VARIABLE_FIELDS,
   artLayers,
   cardSvg,
@@ -317,7 +321,7 @@ function cmykImage({ width, height, rgba }, toCmyk) {
 // ------------------------------------------------------------ the plates ---
 
 /** The finish plates a Tier B face carries: name -> { items, clip, alt } . */
-function platesFor(storeId, side) {
+function platesFor(storeId, side, qr = false) {
   const c = editionRecord(storeId);
   const fin = c.finishB;
   const plates = new Map();
@@ -341,7 +345,7 @@ function platesFor(storeId, side) {
     if (fin.field) plate(fin.field, altOf(fin.field)).art.push({ d: roundRect(-B, -B, MEDIA.w, MEDIA.h, 0) });
   }
   if (fin.idFoil) {
-    for (const e of faceElements(storeId, side)) {
+    for (const e of faceElements(storeId, side, { qr })) {
       if (e.role !== 'brand') continue;
       plate(fin.foil, altOf(fin.foil)).identity.push(e.stroke ? { ...e, stroke: true, sw: Math.max(e.sw, MIN.foil) } : e);
     }
@@ -359,8 +363,8 @@ function plateClip(storeId) {
 
 // ------------------------------------------------------------ one face ---
 
-async function renderRaster(page, storeId, side, finish) {
-  let svg = cardSvg(storeId, { side, finish, mode: 'print', px: 1 });
+async function renderRaster(page, storeId, side, finish, qr = false) {
+  let svg = cardSvg(storeId, { side, finish, mode: 'print', px: 1, qr });
   svg = svg.replace(/ width="[\d.]+" height="[\d.]+"/, ` width="${PX.w}" height="${PX.h}" preserveAspectRatio="none"`);
   await page.setViewportSize({ width: PX.w, height: PX.h });
   await page.setContent(`<!doctype html><html><body style="margin:0;background:#fff">${svg}</body></html>`);
@@ -368,7 +372,7 @@ async function renderRaster(page, storeId, side, finish) {
   return decodePng(await page.screenshot({ clip: { x: 0, y: 0, width: PX.w, height: PX.h }, omitBackground: false }));
 }
 
-function facePdf({ storeId, side, finish, raster, toCmyk, maskOf }) {
+function facePdf({ storeId, side, finish, raster, toCmyk, maskOf, qr = false }) {
   const c = editionRecord(storeId);
   const tierB = finish === 'premium';
   const fin = c.finishB;
@@ -406,7 +410,7 @@ function facePdf({ storeId, side, finish, raster, toCmyk, maskOf }) {
     );
     content.push(`/OC /${ocg('CMYK artwork')} BDC\nq ${fmt(MEDIA.w)} 0 0 ${fmt(-MEDIA.h)} ${fmt(-B)} ${fmt(CARD.height + B)} cm /Im0 Do Q`);
     const ink = [];
-    for (const e of faceElements(storeId, side)) {
+    for (const e of faceElements(storeId, side, { qr })) {
       if (e.role === 'variable') continue;
       if (e.role === 'brand' && tierB && fin.idFoil) continue;
       const colour = e.stroke ? (e.stroke === 'metal' ? c.flat : e.stroke) : e.fill === undefined || e.fill === 'metal' ? c.flat : e.fill;
@@ -418,7 +422,7 @@ function facePdf({ storeId, side, finish, raster, toCmyk, maskOf }) {
   }
 
   // The finish plates (Tier B), each a named spot colour, overprinting.
-  const plates = tierB ? platesFor(storeId, side) : [];
+  const plates = tierB ? platesFor(storeId, side, qr) : [];
   for (const p of plates) {
     if (maskOf && p.name !== maskOf) continue;
     const paint = maskOf ? { fill: '0 g', stroke: '0 G' } : (() => { const cs = separation(p.name, p.alt); return { fill: `/${cs} cs 1 scn`, stroke: `/${cs} CS 1 SCN` }; })();
@@ -434,11 +438,12 @@ function facePdf({ storeId, side, finish, raster, toCmyk, maskOf }) {
   let vdpOps = '';
   if (side === 'back' && !maskOf) {
     const vdp = separation('VDP_GUIDE', [1, 0, 0, 0]);
-    const guide = faceElements(storeId, side).filter((e) => e.role === 'variable');
-    const q = VARIABLE_FIELDS.qr;
-    vdpOps = `/OC /${ocg('Variable data guide (serial, chapter, QR: from the data file; do not print)', false)} BDC\n/GS0 gs /${vdp} cs 1 scn /${vdp} CS 1 SCN 0.08 w\n` +
+    const guide = faceElements(storeId, side, { qr }).filter((e) => e.role === 'variable');
+    const q = QR_FIELD;
+    vdpOps = `/OC /${ocg(`Variable data guide (serial, chapter${qr ? ', QR' : ''}: from the data file; do not print)`, false)} BDC\n/GS0 gs /${vdp} cs 1 scn /${vdp} CS 1 SCN 0.08 w\n` +
       `${guide.map((e) => drawOps(e, { fill: `/${vdp} cs 1 scn`, stroke: `/${vdp} CS 1 SCN` })).join('\n')}\n` +
-      `${fmt(q.x)} ${fmt(q.y)} ${fmt(q.size)} ${fmt(q.size)} re S\nEMC`;
+      (qr ? `${fmt(q.x)} ${fmt(q.y)} ${fmt(q.size)} ${fmt(q.size)} re S\n` : '') +
+      'EMC';
   }
   const stream = zlib.deflateSync(Buffer.from(`q\n${ctm}\n${(maskOf ? mask : content).join('\n')}\n${dieOps}\n${vdpOps}\nQ\n`, 'latin1'));
   const contentsId = pdf.add('<< /Filter /FlateDecode >>', stream);
@@ -454,17 +459,18 @@ function facePdf({ storeId, side, finish, raster, toCmyk, maskOf }) {
   const refs = ocgs.map((o) => `${o.id} 0 R`).join(' ');
   const noPrint = ocgs.filter((o) => !o.print).map((o) => `${o.id} 0 R`).join(' ');
   pdf.set(catalogId, `<< /Type /Catalog /Pages ${pagesId} 0 R /OCProperties << /OCGs [${refs}] /D << /Order [${refs}] /ON [${refs}] /AS [<< /Event /Print /OCGs [${noPrint}] /Category [/Print] >>] >> >> >>`);
-  const title = `SHYGON AAROH Version 01, E${c.no} ${c.name}, ${side}, ${tierB ? 'Tier B Premium Finish' : 'Tier A Standard'}${maskOf ? `, ${maskOf} mask` : ''}`;
+  const title = `SHYGON AAROH Version 01, E${c.no} ${c.name}, ${side}${qr ? ' (QR back, alternative)' : ''}, ${tierB ? 'Tier B Premium Finish' : 'Tier A Standard'}${maskOf ? `, ${maskOf} mask` : ''}`;
   const infoId = pdf.add(`<< /Title ${pdfString(title)} /Author (SHYGON Technologies Pvt. Ltd.) /Creator (design-assets/src/print.mjs) /Producer (SHYGON print generator) /Trapped /False >>`);
   return { buffer: pdf.build(catalogId, infoId), plates: plates.map((p) => p.name) };
 }
 
 // -------------------------------------------------------------- job sheet ---
 
-function jobSheet(storeId, files, plates) {
+function jobSheet(storeId, files, plates, qrFiles) {
   const c = editionRecord(storeId);
   const fin = c.finishB;
   const v = VARIABLE_FIELDS;
+  const q = QR_FIELD;
   const swatches = c.spec.map(([role, hex, cc, m, y, k]) => `| ${role} | ${hex} | C${cc} M${m} Y${y} K${k} |`).join('\n');
   return `# SHYGON AAROH Version 01 · E${c.no} ${c.name} · print job sheet
 
@@ -506,25 +512,31 @@ Large blacks: rich black as specified; small black text K100 only. Other colours
 |---|---|---|
 | serial_number | x ${v.serial.x}, baseline ${v.serial.baseline} | ${v.serial.font} ${v.serial.size} mm, tracking ${v.serial.tracking} em; format ${v.serial.format}; printed, human-readable, **not a secret** |
 | chapter | x ${v.chapter.x}, baseline ${v.chapter.baseline} | ${v.chapter.font} ${v.chapter.size} mm; format ${v.chapter.format} |
-| QR | x ${v.qr.x}, y ${v.qr.y}, ${v.qr.size} × ${v.qr.size} mm | encodes \`${SITE}/d/<card_code>\`; quiet zone ${v.qr.quietZone}; ${v.qr.note} |
 
-- \`card_code\` is the opaque code in the QR and on the chip (\`/d/<code>\`); it is never printed as text.
+- The back is clean: **no QR is printed**. NFC is the experience; a tap opens \`${SITE}/d/<card_code>\`.
+- \`card_code\` is the opaque code on the chip (\`/d/<code>\`); it is never printed as text.
 - \`chip_uid\` is recorded at controlled provisioning, never printed.
 - One row per physical card: \`serial_number, chapter, card_code\`. The serial and the code must be unique, and a card is assigned to an order only by the backend.
 
 ## Quality control before dispatch
 1. The printed serial matches the card's record.
-2. The QR opens \`${SITE}/d/<card_code>\` for that card.
-3. A tap opens the same \`/d/<card_code>\`, read on at least ten phones for the first batch.
-4. The card is assigned to the right order, and only that order, in the backend.
-5. Foil, relief and UV are in register and off the chip; edges are clean; thickness is in tolerance.
+2. A tap opens \`${SITE}/d/<card_code>\` for that card, read on at least ten phones for the first batch.
+3. The card is assigned to the right order, and only that order, in the backend.
+4. Foil, relief and UV are in register and off the chip; edges are clean; thickness is in tolerance.
+
+## Alternative: the QR back (not the default)
+Used only if testing shows customers need a QR. ${qrFiles.length ? `Files: ${qrFiles.map((f) => `\`${f}\``).join(', ')}.` : 'Not generated in this package: run `node design-assets/src/print.mjs --qr-back` to add it.'}
+- The QR sits on a smooth light plate at x ${q.x}, y ${q.y}, ${q.size} × ${q.size} mm, quiet zone ${q.quietZone}; ${q.note}. The back reads TAP OR SCAN.
+- It encodes \`${SITE}/d/<card_code>\`: the card's own permanent link, the same one the chip opens. Never a temporary or campaign URL, and never anything about the owner.
+- Extra check before dispatch: the QR and a tap open the same \`/d/<card_code>\`.
 `;
 }
 
 // ------------------------------------------------------------------- main ---
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const only = process.argv.slice(2);
+  const withQrBack = process.argv.includes('--qr-back');
+  const only = process.argv.slice(2).filter((a) => !a.startsWith('--'));
   const editions = STORE_EDITIONS.map(([id]) => id).filter((id) => !only.length || only.includes(id));
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({ channel: process.env.E2E_BROWSER_CHANNEL ?? 'msedge' });
@@ -561,7 +573,28 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         console.log(`${folder}/${name} ${(buffer.length / 1e6).toFixed(1)} MB ${plates.length ? `plates ${plates.join(', ')}` : ''}`);
       }
     }
-    fs.writeFileSync(path.join(dir, 'JOB-SHEET.md'), jobSheet(id, files, platesBySide));
+    // The alternative QR back, only on request: the package's back is the clean one.
+    const qrFiles = [];
+    if (withQrBack) {
+      fs.mkdirSync(path.join(dir, 'alt-qr-back'), { recursive: true });
+      for (const [finish, tier] of Object.entries(FINISHES)) {
+        const raster = await renderRaster(page, id, 'back', finish, true);
+        const { buffer, plates } = facePdf({ storeId: id, side: 'back', finish, raster, toCmyk, qr: true });
+        const name = `alt-qr-back/AAROH-E${c.no}-back-qr-${tier}.pdf`;
+        fs.writeFileSync(path.join(dir, name), buffer);
+        qrFiles.push(name);
+        manifest.push({ edition: id, side: 'back', tier, file: `${folder}/${name}`, bytes: buffer.length, plates, variant: 'qr-back' });
+        for (const plate of tier === 'B' ? plates : []) {
+          const m = facePdf({ storeId: id, side: 'back', finish, raster: null, toCmyk, maskOf: plate, qr: true });
+          const maskName = `alt-qr-back/AAROH-E${c.no}-back-qr-B-${plate}.pdf`;
+          fs.writeFileSync(path.join(dir, maskName), m.buffer);
+          qrFiles.push(maskName);
+          manifest.push({ edition: id, side: 'back', tier: 'B', file: `${folder}/${maskName}`, bytes: m.buffer.length, plates: [plate], mask: true, variant: 'qr-back' });
+        }
+        console.log(`${folder}/${name} ${(buffer.length / 1e6).toFixed(1)} MB (alternative)`);
+      }
+    }
+    fs.writeFileSync(path.join(dir, 'JOB-SHEET.md'), jobSheet(id, files, platesBySide, qrFiles));
   }
   await browser.close();
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({ generated: new Date().toISOString(), media_mm: MEDIA, trim_mm: [CARD.width, CARD.height], bleed_mm: B, ppi: PPI, files: manifest }, null, 2) + '\n');

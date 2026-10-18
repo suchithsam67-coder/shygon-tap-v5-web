@@ -197,7 +197,7 @@ export default function AarohProduct() {
             <p className="aaroh-kicker">The collection</p>
             <h2 id="aaroh-editions-title" className="aaroh-collection-title">Ten editions of the same card.</h2>
             <p className="aaroh-buy-lede">
-              Every edition carries the same chip, QR code and SHYGON profile. Choose one to see it up close.
+              Every edition carries the same NFC chip and SHYGON profile. Choose one to see it up close.
             </p>
           </header>
           <EditionCollection ref={collectionRef} onOpen={openEdition} current={open?.id} finish={finish.id} />
@@ -221,7 +221,7 @@ export default function AarohProduct() {
               <ul className="aaroh-ticks">
                 <li>A physical smart card, in one of ten editions and two finishes</li>
                 <li>An NFC chip: someone taps it with a compatible phone</li>
-                <li>A QR code on the back, for phones without NFC</li>
+                <li>A clean back: the SHYGON logo, the card’s number and a quiet tap cue, with no printed QR</li>
                 <li>It carries a link, not your details. Change your profile and every tap shows the new version, with no new card</li>
               </ul>
             </div>
@@ -397,7 +397,7 @@ function Included({ catalog, selected }: { catalog: Catalog | null; selected: Aa
           <h3>With an AAROH card</h3>
           <ul className="aaroh-ticks">
             <li>One AAROH card in the edition and finish you choose</li>
-            <li>Its NFC chip and QR code, linked to your profile</li>
+            <li>Its NFC chip, linked to your profile</li>
             <li>The Essential experience, included with the card</li>
           </ul>
           <ul className="aaroh-price-list">

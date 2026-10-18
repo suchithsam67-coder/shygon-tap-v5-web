@@ -115,7 +115,7 @@ function localBusiness(site: string, cardSales: boolean): JsonLd {
     '@id': `${site}/#store`,
     name: BRAND,
     description:
-      'NFC cards with a QR code and a digital profile that opens in one tap, no app needed: SHYGON TAP V5 and the AAROH premium card.',
+      'NFC cards and a digital profile that opens in one tap, no app needed: SHYGON TAP V5 and the AAROH premium card.',
     url: `${site}/shygontap`,
     image: abs(site, DEFAULT_SHARE_IMAGE),
     logo: abs(site, '/icons/icon-512.png'),

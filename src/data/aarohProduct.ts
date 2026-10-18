@@ -39,11 +39,11 @@ export const STATUS_LABEL: Record<FeatureStatus, string> = {
 export const AT_A_GLANCE: readonly (readonly [question: string, answer: string])[] = [
   [
     'What is AAROH?',
-    `SHYGON’s premium smart card: a physical card with an NFC chip and a QR code, linked to your SHYGON digital profile. One product, in ${AAROH_EDITION_COUNT} editions and two finishes.`,
+    `SHYGON’s premium smart card: a physical card with an NFC chip, linked to your SHYGON digital profile. One product, in ${AAROH_EDITION_COUNT} editions and two finishes.`,
   ],
   [
     'How does the card work?',
-    'Someone taps it with an NFC-enabled phone, or scans its QR code. Your profile opens in their browser. No app, no account.',
+    'Someone taps it with an NFC-enabled phone, and your profile opens in their browser. No app, no account.',
   ],
   [
     'What software comes with it?',
@@ -72,8 +72,8 @@ export const STEPS: readonly { title: string; body: string; note?: string }[] = 
     note: 'Linking a physical card to your account opens with the card release.',
   },
   {
-    title: 'Tap or scan',
-    body: 'The person you meet taps the card with an NFC-enabled phone, or scans the QR code. Your profile opens in their browser: no app, no account, no fee.',
+    title: 'Tap',
+    body: 'The person you meet taps the card with an NFC-enabled phone. Your profile opens in their browser: no app, no account, no fee. For a phone without NFC, share your link or show your profile’s QR code from your account.',
   },
 ]
 
@@ -133,7 +133,7 @@ export const ROLES = {
     'Sees visits, scans and clicks in analytics',
   ],
   recipient: [
-    'Taps the card with an NFC-enabled phone, or scans the QR code',
+    'Taps the card with an NFC-enabled phone',
     'Sees your profile in their browser: no app, no account, no fee',
     'Calls, emails or messages you with the buttons you have switched on',
     'Can share your profile with someone else',
@@ -189,7 +189,7 @@ export const BULK_ORDER = {
 export const aarohFaqs = (cardSales: boolean): readonly (readonly [question: string, answer: string])[] => [
   [
     'What is an AAROH card?',
-    `AAROH is SHYGON’s premium smart card: a physical card with an NFC chip and a QR code, linked to your SHYGON digital profile. It comes in ${AAROH_EDITION_COUNT} editions (${editionNames}) and two finishes, and every one works the same way.`,
+    `AAROH is SHYGON’s premium smart card: a physical card with an NFC chip, linked to your SHYGON digital profile. It comes in ${AAROH_EDITION_COUNT} editions (${editionNames}) and two finishes, and every one works the same way.`,
   ],
   [
     'How does NFC tapping work?',
@@ -197,7 +197,11 @@ export const aarohFaqs = (cardSales: boolean): readonly (readonly [question: str
   ],
   [
     'What if a phone does not support NFC?',
-    'They scan the QR code on the back of the card with the phone’s camera. It opens the same profile.',
+    'Share your profile’s link, or open your profile’s QR code in your account and let them scan it from your screen. It opens the same profile. The card itself carries no printed QR, so its back stays clean.',
+  ],
+  [
+    'Is there a QR code on the card?',
+    'Not by default. AAROH is tap-first: the back is kept clean, with the SHYGON logo, the card’s number and a quiet tap cue. Your profile’s QR code is always in your account, to share from your screen or print. If testing shows customers need one, a version with a QR on the back may be offered; it would open the card’s own permanent link, the same one a tap opens.',
   ],
   [
     'Does the recipient need to install an app?',
@@ -223,7 +227,7 @@ export const aarohFaqs = (cardSales: boolean): readonly (readonly [question: str
   ],
   [
     'What is the difference between SHYGON TAP V5 and AAROH?',
-    `Both are NFC cards with a QR code that open the same SHYGON digital profile, with the same experiences and add-ons. SHYGON TAP V5 is the simpler card, in Business, Restaurant, Event, Google Review and Design Collection designs, in PVC, metal or transparent. AAROH is the premium family: ${AAROH_EDITION_COUNT} landscape editions, each numbered in chapters of 100, in a printed or a Premium Finish.`,
+    `Both are NFC cards that open the same SHYGON digital profile, with the same experiences and add-ons. SHYGON TAP V5 is the simpler card, in Business, Restaurant, Event, Google Review and Design Collection designs, in PVC, metal or transparent. AAROH is the premium family: ${AAROH_EDITION_COUNT} landscape editions, each numbered in chapters of 100, in a printed or a Premium Finish, with a clean back and no printed QR.`,
   ],
   [
     'Can my company order AAROH cards for employees?',
@@ -235,7 +239,7 @@ export const aarohFaqs = (cardSales: boolean): readonly (readonly [question: str
   ],
   [
     'Does the card work on iPhone and Android?',
-    'It is designed to. iPhone XS or newer and most NFC-enabled Android phones read NFC cards without an app, and any phone with a camera can scan the QR code. Tested phone compatibility will be published before card sales open.',
+    'It is designed to. iPhone XS or newer and most NFC-enabled Android phones read NFC cards without an app; a phone without NFC opens your profile from its link or its QR code, shown from your account. Tested phone compatibility will be published before card sales open.',
   ],
   [
     'What happens if I lose my card?',
@@ -380,7 +384,7 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     benefit: 'For every phone, with or without NFC.',
     icon: 'share',
     status: 'available',
-    useCase: 'A phone without NFC scans the QR code on the back of the card and opens the same profile.',
+    useCase: 'A phone without NFC scans your profile’s QR code from your screen, or opens your link, and lands on the same profile.',
     ownerControls: 'Copy or share your link and QR code from your account.',
     privacy: 'The link opens the same public profile a tap does, and nothing more.',
     configurable: true,

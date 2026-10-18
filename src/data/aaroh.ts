@@ -7,11 +7,11 @@ import { products, type ProductId } from './shygonTapData'
  * tap-to-open card (src/data/shygonTapData.ts), and AAROH, the premium card
  * family described here.
  *
- * AAROH is one product: a physical NFC card, a QR fallback and the SHYGON
+ * AAROH is one product: a physical NFC card (clean back, no printed QR) and the SHYGON
  * digital profile the card opens. It comes in the ten editions of the AAROH
  * design system ("SHYGON AAROH Design System", E01–E10) and two finishes,
  * which are variations of the same card, not separate products: the same
- * chip, QR, layout and platform, a different surface. Individuals buy it; an
+ * chip, layout and platform, a different surface. Individuals buy it; an
  * organisation can order the same card in bulk through an enquiry.
  *
  * Every edition's words are the design system's own: the one-line description,
@@ -139,7 +139,7 @@ export const AAROH = {
   name: 'SHYGON AAROH, Version 01',
   headline: 'One card. Ten editions.',
   lede:
-    'AAROH by SHYGON brings a physical smart card and your SHYGON digital profile together. Someone taps the card with a compatible phone, or scans its QR code, and your profile opens in their browser.',
+    'AAROH by SHYGON brings a physical smart card and your SHYGON digital profile together. Someone taps the card with a compatible phone, and your profile opens in their browser.',
   /** The collection moodboard's introduction. */
   collection:
     'Landscape, lit like an object on a table: real texture, relief you can feel and one metal per edition. The official SHYGON logo and the wide-set AAROH stay the same on every card.',

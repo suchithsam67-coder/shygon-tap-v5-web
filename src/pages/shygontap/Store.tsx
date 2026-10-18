@@ -179,7 +179,7 @@ export default function Store() {
             <p className="aaroh-kicker">AAROH</p>
             <h2 id="aaroh-editions-title">Ten editions of the same card.</h2>
             <p>
-              Every edition carries the same chip, QR code and SHYGON profile. Open one to see it up close, then choose
+              Every edition carries the same NFC chip and SHYGON profile. Open one to see it up close, then choose
               its finish. {CARD_SALES_OPEN ? `From ${inr(standardPrice)} per card.` : 'Pricing is announced when card sales open.'} Ordering{' '}
               {AAROH_BULK_MINIMUM} or more for a team?{' '}
               <Link to={`${AAROH_PRODUCT_PATH}#teams`} className="aaroh-link">Request a quotation</Link>
@@ -208,7 +208,7 @@ function Comparison({ v5From, standardPrice, premiumPrice }: { v5From: number; s
   const rows: Array<[label: string, v5: string, aaroh: string]> = [
     ['What it is', 'The simple tap-to-open NFC card', 'The premium NFC card, one product in ten editions'],
     ['Tap', 'NFC: a compatible phone opens your profile in its browser', 'The same'],
-    ['QR code', 'Your Tap’s QR code, from your account, to print or share', 'Printed on the back of the card, and your Tap’s QR code in your account'],
+    ['QR code', 'Your Tap’s QR code, from your account, to print or share', 'Not printed: the back stays clean. Your Tap’s QR code is in your account, to share or print'],
     ['Designs', 'Business, Restaurant, Event, Google Review, and six Design Collection cards', EDITION_NAMES],
     ['Materials and finish', 'PVC, metal or transparent; standard or premium finish', 'Standard print, or a Premium Finish with each edition’s relief and foil. Materials are being validated with our manufacturer'],
     ['Numbered editions', 'Every design, in chapters of 100', 'Every edition, in chapters of 100'],
@@ -414,10 +414,10 @@ function V5Catalogue() {
 /** How it works, compatibility, ordering, delivery, returns, privacy and support: the published pages, linked. */
 function StoreInformation() {
   const items: Array<[title: string, body: string, to: string, link: string]> = [
-    ['How it works', 'Choose a card and a digital experience, set up your profile, and tap or scan.', `${AAROH_PRODUCT_PATH}#how-it-works`, 'How AAROH works'],
+    ['How it works', 'Choose a card and a digital experience, set up your profile, and tap.', `${AAROH_PRODUCT_PATH}#how-it-works`, 'How AAROH works'],
     [
       'Compatibility',
-      'iPhone XS or newer and most NFC-enabled Android phones open a card without an app, and any camera phone can scan a QR code. Tested phone compatibility is published before card sales open.',
+      'iPhone XS or newer and most NFC-enabled Android phones open a card without an app, and any phone can open a profile from its link or QR code. Tested phone compatibility is published before card sales open.',
       `${AAROH_PRODUCT_PATH}#faq`,
       'Questions and answers',
     ],
