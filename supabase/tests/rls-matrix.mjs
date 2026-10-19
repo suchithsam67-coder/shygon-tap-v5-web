@@ -114,6 +114,13 @@ for (const [u, n] of [[A, 1], [B, 2]]) {
     VALUES ('1${n}000000-0000-4000-8000-0000000000b${n}', 1, 'accepted');
     INSERT INTO public.emergency_audit (user_id, event_id, actor, action)
     VALUES ('${u}', '1${n}000000-0000-4000-8000-0000000000a${n}', 'owner', 'matrix.test');
+    INSERT INTO public.rescue_settings (user_id, enabled) VALUES ('${u}', true);
+    INSERT INTO public.rescue_threads (id, owner_user_id, finder_token_hash, finder_digest, idempotency_key)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000c${n}', '${u}', 'matrix-token-${n}', 'matrix-digest-${n}', 'matrix-rescue-key-${n}');
+    INSERT INTO public.rescue_messages (thread_id, sender, body)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000c${n}', 'finder', 'Matrix finder message ${n}');
+    INSERT INTO public.rescue_blocks (owner_user_id, finder_digest, expires_at) VALUES ('${u}', 'blocked-${n}', now() + interval '1 day');
+    INSERT INTO public.rescue_audit (user_id, actor, action) VALUES ('${u}', 'owner', 'matrix.test');
   `);
 }
 
@@ -180,6 +187,12 @@ const MODEL = {
     select: sel(NONE, NONE),
   },
   emergency_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  // The Return-to-Owner relay (031, DEC-2026-038 PROPOSED): closed the same way.
+  rescue_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  rescue_threads: { owner: OWN('owner_user_id'), select: sel(NONE, NONE) },
+  rescue_messages: { owner: `thread_id IN (SELECT id FROM public.rescue_threads WHERE owner_user_id = auth.uid())`, select: sel(NONE, NONE) },
+  rescue_blocks: { owner: OWN('owner_user_id'), select: sel(NONE, NONE) },
+  rescue_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };

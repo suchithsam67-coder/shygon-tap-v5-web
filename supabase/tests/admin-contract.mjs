@@ -129,6 +129,7 @@ const APPROVED_NEW_RELATIONS = {
 // state 'PROPOSED' passes the check but is reported as not approved.
 const NEW_ADMIN_FUNCTIONS = {
   'admin_list_emergency_events(text,integer,integer)': { decision: 'DEC-2026-038 (migration 029)', state: 'PROPOSED' },
+  'admin_list_rescue_reports(integer,integer)': { decision: 'DEC-2026-038 Q12 (migration 031)', state: 'PROPOSED' },
 };
 
 // Relations a PROPOSED decision adds. Held to the same rule (closed, RLS on),
@@ -137,7 +138,9 @@ const NEW_ADMIN_FUNCTIONS = {
 const PROPOSED_NEW_RELATIONS = Object.fromEntries([
   'emergency_settings', 'emergency_contacts', 'emergency_contact_challenges', 'emergency_events',
   'emergency_event_recipients', 'emergency_delivery_attempts', 'emergency_audit',
-].map((t) => [t, 'DEC-2026-038 PROPOSED (migration 029)']));
+].map((t) => [t, 'DEC-2026-038 PROPOSED (migration 029)']).concat(
+  ['rescue_settings', 'rescue_threads', 'rescue_messages', 'rescue_blocks', 'rescue_audit']
+    .map((t) => [t, 'DEC-2026-038 Q12 PROPOSED (migration 031)'])));
 
 const aclItems = (acl) => (acl ? acl.replace(/^\{|\}$/g, '').split(',').filter(Boolean) : []);
 const grantee = (item) => item.slice(0, item.indexOf('='));

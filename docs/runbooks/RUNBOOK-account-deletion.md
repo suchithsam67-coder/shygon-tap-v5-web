@@ -51,7 +51,7 @@ When it succeeds it reports what it did, for example: `deleted 1 Tap(s), 1 profi
 
 | Deleted | Kept |
 |---|---|
-| the Tap and its visit statistics (`tap_profiles`, `tap_events`), the profile, the customer record and its customisations, entitlements, notifications, card one-time codes, account events, support conversations (this request included); where migration 029 is applied, the emergency contacts, settings, verification codes, alerts with their recipients and delivery attempts, and the emergency audit trail | orders, order items, payments, order status history, Razorpay webhook records. A card is kept as a hardware record, unlinked from the account and retired, so it opens nothing |
+| the Tap and its visit statistics (`tap_profiles`, `tap_events`), the profile, the customer record and its customisations, entitlements, notifications, card one-time codes, account events, support conversations (this request included); where migration 029 is applied, the emergency contacts, settings, verification codes, alerts with their recipients and delivery attempts, and the emergency audit trail; where 031 is applied, the Return-to-Owner settings, conversations and messages, blocks and audit trail | orders, order items, payments, order status history, Razorpay webhook records. A card is kept as a hardware record, unlinked from the account and retired, so it opens nothing |
 
 ## 5. The sign-in (auth.users)
 

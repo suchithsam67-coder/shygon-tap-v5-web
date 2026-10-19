@@ -80,6 +80,10 @@ Priority: P0 release blocker · P1 must complete · P2 should complete · P3 def
 | V6-114 | Emergency | MSG91 delivery reports are not handled: with MSG91 an alert never shows "delivered" (it stays "sent", unconfirmed) | P2 | after DEC-2026-038 Q3 | new |
 | V6-115 | Emergency | The retry and retention sweep (`/api/emergency-dispatch`, `CRON_SECRET`) has no schedule: until one exists, retries happen only when the owner presses retry and retention does not run | P1 (before live alerts) | with V6-043 | new |
 | V6-116 | Privacy | **Gap closed with 029:** the account-deletion procedure deleted public-schema data table by table, so an account with orders (anonymised, not deleted, in step 5) would have kept its emergency contacts. The procedure now deletes them where 029 exists; negative control: the old procedure fails the new check | P1 | AAROH backend | **fixed locally:** `docs/runbooks/account-deletion.sql`; `test:account-deletion` 9/9 |
+| V6-117 | Rescue | AAROH Return-to-Owner relay (owner master requirements 2026-10-19): migration 031, `/api/rescue`, contract §10a | P1 | AAROH backend | **done locally**, PROPOSED (DEC-2026-038 Q12); off behind `RESCUE_RELAY`; `test:rescue` 18/18 |
+| V6-118 | Rescue | Lost or found item lifecycle and device-bound rescue items (doc 08 lost mode) | P2 | after the card registry (DEC-2026-028, card release) | blocked |
+| V6-119 | Abuse | No bot check on the public relays (`public.alert`, `public.start`): limits only. Doc 05 specifies Turnstile | P2 | owner (provider/key) | new |
+| V6-120 | Emergency | Emergency Profile / information view is undefined (doc 04 vs showroom) | P2 | DEC-2026-038 Q11 | new |
 
 ## Deferred to the card release (D-2, card decision)
 V6-003 (I-4 card records), V6-011 (O-7 owner undoes card suspension), V6-019 (I-5 pgcrypto), V6-034 (F3 card state vs Tap), V6-035 (F4 + O-3 card OTP).

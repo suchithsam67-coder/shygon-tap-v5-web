@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Decision ID | DEC-2026-038 |
-| Title | Emergency contacts and alerts (migration 029); Tap column guard (030); provider, visitor alerts, modes, Privé |
+| Title | Emergency contacts and alerts (029); Tap column guard (030); Return-to-Owner relay (031); provider, visitor alerts, Emergency Profile, modes, Privé, Connect/Verify order |
 | Date opened | 2026-10-19 |
 | Domain | Product / Security / Data |
 | Level | L3 (new tables holding third-party personal data; privileged functions; an authorization trigger) |
@@ -118,9 +118,50 @@ Options:
 - **A (recommended):** the owner approves the new copy.
 - B: keep the feature hidden in the store.
 
+### Added 2026-10-19, after the owner's master requirements and backend brief (same day)
+
+**Q11. Emergency Profile / Emergency Tap: what is it?** The sources disagree, and the master requirement says "do not silently invent emergency behaviour":
+- doc 04 §4.1: a responder deliberately triggers a purpose-bound **release** of an owner-approved emergency payload, default off, rate-limited, with owner notification and audit;
+- doc 07 T18: relay a callback rather than reveal numbers; no medical data;
+- showroom: "emergency details that you approve, shown only in an emergency flow".
+
+Built so far: 1a (owner SOS) and 1b (a visitor alert relay, off). **No information view exists.**
+
+Options:
+- A: none beyond 1b.
+- **B (recommended):** a view showing only owner-approved, non-contact fields (for example a first name and "has emergency contacts on SHYGON — alert them"), with alerting through the 1b relay. No number ever shown.
+- C: specify other fields.
+
+A public page that shows contact numbers to anyone who taps is excluded by every source.
+
+**Q12. Return-to-Owner relay as built** (migration 031, `/api/rescue`, `test:rescue` 18/18). It follows doc 03/05/07 (T6):
+- owner opt-in;
+- the finder token is stored as a hash;
+- links are stripped;
+- the limits are doc 05's;
+- auto-quiesce after 3 unanswered messages;
+- block and report; no message text in notifications;
+- 90-day retention;
+- host switch `RESCUE_RELAY` (off).
+
+Options:
+- **A (recommended):** approve, and turn the switch on with the first production release that includes it.
+- B: approve with changes.
+- C: hold.
+
+Not built: the lost or found item lifecycle (card registry), a bot check (no Turnstile key), and a text to the owner (unverified phone, F4).
+
+**Q13. Order for Connect and Verify.** The master requirements list "real consent and connection flows" and "real verification" as required behaviour. The architecture designs them (doc 03 `connections`, `consent_grants`, `credentials`, `verification_records`). They depend on organisations (DEC-2026-025), and DEC-037 says an AAROH card is not a credential. The owner's 2026-10-16 order puts them after Return-to-Owner.
+
+Options:
+- **A (recommended):** next stage = the consent ledger (`consent_grants`) plus Connect requests, decisions and revocations. Verify waits for issuers.
+- B: another order.
+
+**Q6 update.** Three briefs on 2026-10-19 ask for a demo-only Privé, against the 2026-10-16 "outside the launch scope". **The recommendation changes to A (demo-only) if the owner confirms.** Session A will not build it until then.
+
 ## Decision
 
-Q1 ____ Q2 ____ Q3 ____ Q4 ____ Q5 ____ Q6 ____ Q7 ____ Q8 ____ Q9 ____ Q10 ____
+Q1 ____ Q2 ____ Q3 ____ Q4 ____ Q5 ____ Q6 ____ Q7 ____ Q8 ____ Q9 ____ Q10 ____ Q11 ____ Q12 ____ Q13 ____
 
 **Approved by:** ________ **Date:** ________
 

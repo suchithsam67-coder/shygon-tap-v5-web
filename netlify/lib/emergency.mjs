@@ -24,15 +24,16 @@ export function config() {
   return { url: url.replace(/\/+$/, ''), serviceKey, secret: env('OTP_SECRET') ?? serviceKey };
 }
 
-/** A refusal from the database ("emergency:<code>") or a failed request. */
+/** A refusal from the database ("emergency:<code>", "rescue:<code>") or a failed request. */
 export class DbError extends Error {
   constructor(status, body) {
     super(body?.message ?? `Database request failed (${status})`);
     this.status = status;
     this.code = body?.code ?? null;
     this.details = body?.details ?? null;
-    const match = /^emergency:([a-z_]+)$/.exec(this.message);
-    this.emergencyCode = match ? match[1] : null;
+    const match = /^(emergency|rescue):([a-z_]+)$/.exec(this.message);
+    this.appCode = match ? match[2] : null;
+    this.emergencyCode = match?.[1] === 'emergency' ? match[2] : null;
   }
 }
 

@@ -1,11 +1,12 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.1
+# SHYGON AAROH backend API contract — AAROH-API v0.2
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.1** (2026-10-19). First published version. |
+| Contract version | **AAROH-API v0.2** (2026-10-19). v0.1 was `c8b869d`; changes in §13. |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030** (both PROPOSED, DEC-2026-038). 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (all PROPOSED, DEC-2026-038). 027 is held aside (DEC-2026-037). |
+| Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
 ## Status labels (used for every operation)
@@ -43,7 +44,11 @@ No operation is labelled LIVE: nothing is deployed.
 6. **Rate-limit responses (429)** carry `error.retryAfter` (seconds) and a `Retry-After` header. Show the wait; do not auto-retry in a loop.
 7. **Destructive or safety settings need `acknowledge: true`.** Send it only after the user has seen the consequence copy (§10.2 `settings.set`).
 8. **Status values for every feature** in the showroom must come from §12, not from page rendering.
-9. **The in-app notification for a visitor alert links to `/shygontap/emergency`.** Build that route, or tell Session A the route you use and it changes in v0.2.
+9. **In-app notification links:**
+   - a visitor emergency alert links to `/shygontap/emergency`;
+   - a Return-to-Owner message links to `/shygontap/return-to-owner` (v0.2).
+
+   Build those routes, or tell Session A the routes you use and they change in the next version.
 10. **A contract change you need:** message Session A. It ships as v0.2 with a CHANGELOG entry. Do not work around a missing field.
 
 ---
@@ -155,6 +160,8 @@ The schema has no mode entity. What exists:
 
 The owner ordered modes as "Business and Info first, then Return-to-Owner" (2026-10-16). Neither "Info" nor a mode table is defined anywhere in the repository. Designing one is an owner decision: DEC-2026-038 Q7.
 
+Since v0.2, Return-to-Owner and Emergency exist as **per-account capabilities with their own owner switches** (§10a, §10.2), not as entries in a mode model. Show each one by its own `available` answer.
+
 ---
 
 ## 7. Cards (signed in)
@@ -192,7 +199,9 @@ Totals only; no visitor identity. The counts can be inflated by a client varying
 | N-1 | `from('notifications').select(…).eq('user_id', uid)`; unread count `…is('read_at', null)` | LIVE-LOCAL |
 | N-2 | `from('notifications').update({ read_at }).eq('id', id).is('read_at', null)`: mark read (only `read_at` is writable, trigger) | LIVE-LOCAL |
 
-New category in v0.1: **`security`**, e.g. "Your emergency contacts were alerted", `link: '/shygontap/emergency'`, `metadata.emergencyEventId`.
+New categories:
+- **`security`** (v0.1), e.g. "Your emergency contacts were alerted", `link: '/shygontap/emergency'`, `metadata.emergencyEventId`;
+- **`rescue`** (v0.2): "Someone sent you a message through SHYGON", `link: '/shygontap/return-to-owner'`, `metadata.rescueThreadId`. **Never contains the message text.**
 
 ---
 
@@ -350,11 +359,85 @@ These are all migration 029, closed to every API client:
 
 ---
 
+## 10a. Return-to-Owner relay — `POST /api/rescue` (v0.2)
+
+A finder sends a protected message to a Tap's owner and they talk through SHYGON.
+- **The finder never receives any owner detail.** No account id, no name beyond what the public Tap already shows, no number, no email.
+- **The owner sees only what the finder writes.**
+- **Links are removed from every message,** on both sides. An email address or a number the writer types is kept: it is the writer's choice.
+
+**Availability.**
+- **Host switch.** Finder operations run only where the host sets `RESCUE_RELAY=on`. It is unset everywhere: `public.status` returns `available:false`, and the other finder operations return `404 unavailable`.
+- **Owner opt-in.** The owner must also turn it on (default off).
+- **Tap state.** The Tap must be published, and neither the Tap nor the account may be suspended.
+- Production use needs DEC-2026-038 Q12.
+
+### Finder operations (no sign-in)
+
+| op | Request | Success | Errors |
+|---|---|---|---|
+| `public.status` | `{ op, slug }` | 200 `{ available: boolean, hint: string \| null }` (`hint` = the owner's cleaned public note, ≤ 140) | none |
+| `public.start` | `{ op, slug, idempotencyKey, message: string(1–500 after cleaning) }` | **201** `{ finderToken, replayed: false, thread: FinderThread }`; same key again → **200** with the **same** `finderToken`, `replayed: true` | 400 `invalid_message` `invalid_idempotency_key`; 404 `unavailable` (indistinguishable causes, including a blocked finder); 429 `rate_limited` (+`retryAfter`) |
+| `finder.view` | `{ op, finderToken }` | 200 `{ thread: FinderThread }` | 400 `invalid_token`; 404 `thread_not_found` (also blocked or reported); 410 `thread_expired`; 429 `rate_limited` |
+| `finder.post` | `{ op, finderToken, clientKey, message }` | 200 `{ replayed, thread: FinderThread }` | 400 `invalid_token` `invalid_message` `invalid_idempotency_key`; 404; 409 `thread_closed`, `awaiting_owner` (3 finder messages in a row with no reply); 410; 429 |
+
+`FinderThread = { status: 'open' | 'owner_replied' | 'closed', canWrite: boolean, expiresAt, messages: [{ from: 'finder' | 'owner' | 'system', body, at }] }`
+
+**The finder token** is a 43-character secret and the only key to the conversation. It stops working 14 days after the thread's last activity.
+- Keep it **only** in `sessionStorage` or the URL **fragment** (`#…`). Never put it in a path, a query string, analytics or logs.
+- Offer the finder a "save this link" option that uses the fragment.
+
+### Owner operations (signed in)
+
+| op | Request | Success | Errors |
+|---|---|---|---|
+| `settings.get` | `{ op }` | 200 `{ settings: { enabled, publicHint, changedAt, publicTapPublished, openThreads, unread, relayAllowed } }` | 401 |
+| `settings.set` | `{ op, enabled: boolean, publicHint?: string \| null }` | 200 `{ settings }` (hint cleaned: links removed, ≤ 140) | 400 `invalid_setting` `invalid_request`; 401 |
+| `threads.list` | `{ op, limit?: 1–100 }` | 200 `{ threads: [{ id, status, createdAt, lastActivityAt, closedAt, reportedAt, unread, messages, preview }] }` (`preview` = first 80 characters of the latest finder message) | 401 |
+| `threads.get` | `{ op, threadId }` | 200 `{ thread: { id, status, createdAt, lastActivityAt, closedAt, reportedAt, finderCanWrite, messages: [{ id, from, body, at }] } }`; marks the thread read | 400 `invalid_thread`; 404 `thread_not_found`; 401 |
+| `threads.reply` | `{ op, threadId, clientKey, message }` | 200 `{ thread, replayed }` | 400; 404; 409 `thread_closed`; 401 |
+| `threads.close` | `{ op, threadId }` | 200 `{ thread }`: the finder can read but not write | 404; 409 `thread_closed`; 401 |
+| `threads.block` | `{ op, threadId }` | 200 `{ thread }`: status `blocked`; the finder loses access; that finder cannot open a new thread to this owner for 90 days | 404; 409 `already_blocked`; 401 |
+| `threads.report` | `{ op, threadId, reason?: string(≤300) }` | 200 `{ thread }`: status `spam`, blocked as above; SHYGON is notified | as block |
+
+**Thread states:**
+- `open` → `owner_replied` (owner reply) → `open` (finder follow-up) → … ;
+- `closed` (by the owner, or after 30 days idle);
+- `blocked`; `spam`.
+
+**Limits:**
+- 3 new threads per hour and 10 per day per finder (an HMAC of the host-reported client address);
+- 5 new threads per owner per day;
+- 10 finder follow-ups per thread per hour, and at most 3 in a row without a reply;
+- 60 `finder.view` calls per thread per hour.
+
+**Idempotency:** `public.start` per `(owner, idempotencyKey)`, returning the same token; messages per `(thread, clientKey)`.
+
+**Notifications:** an in-app `rescue` notice on a new thread, without the message text.
+- **No text message or push to the owner:** the account phone is unverified (F4) and no provider is configured. This is BLOCKED.
+
+**Not built:**
+- **Lost or found item lifecycle and device-bound items: BLOCKED.** They need the card registry and the card lifecycle decision (DEC-2026-028); card sales are deferred by DEC-2026-035.
+- **Bot check:** no Turnstile key exists.
+
+**Entities (migration 031):** `rescue_settings`, `rescue_threads` (finder token stored as SHA-256 only), `rescue_messages`, `rescue_blocks`, `rescue_audit`. All are closed to every API client.
+
+**Retention:** threads and their messages are deleted 90 days after closing; blocks expire after 90 days.
+
+**Tests:** `npm run test:rescue`, 18 checks. They cover closure, the cleaner, the host switch, opt-in, start, duplicate start, owner inbox and read state, cross-account refusals on every owner operation, direct REST, auto-quiesce and duplicates, replies, finder and owner limits, poll cap, expiry, block, report and admin review, close, paused/suspended/disabled Taps, retention, and no leak.
+
+**Status:** LIVE-LOCAL, off (switch). Production BLOCKED on DEC-2026-038 Q12 and the 031 review.
+
+**Admin** (§12a): `admin_list_rescue_reports(p_limit, p_offset)` returns reported threads with their messages (moderation needs the text). It requires `support.read`, and every read is in `admin_audit_log`.
+
+---
+
 ## 11. Operations that do not exist (NOT IMPLEMENTED unless stated)
 
 | Feature | Status | Why |
 |---|---|---|
-| Return-to-owner relay (finder → owner messages) | NOT IMPLEMENTED | Owner's order: after Business/Info. Its privacy rules are not decided (showroom: "would be decided and published before any launch"). The §10 dispatch layer is reusable. |
+| Return-to-owner relay | **Moved to §10a in v0.2** (LIVE-LOCAL, off) | Lost or found item lifecycle is still BLOCKED (card registry) |
+| Emergency Profile / Emergency Tap information view (a responder sees approved emergency details) | NOT IMPLEMENTED | Ambiguous in the sources: doc 04 "purpose-bound release", the showroom "details you approve, shown only in an emergency flow". DEC-2026-038 Q11. Never reveal contact details because a page was opened |
 | Connect requests | NOT IMPLEMENTED | Phase 2 (doc 10); needs `connections` and `consent_grants`; DEC-2026-025 |
 | Credential verification (`/v/<code>`) | NOT IMPLEMENTED | No schema. DEC-037: an AAROH card is not an access or authentication credential |
 | SHYGON Privé (demo hotels, guest requests) | **BLOCKED** (decision conflict) | 2026-10-16: the owner removed Privé from the launch. 2026-10-19 brief: Privé as demo-only. DEC-2026-038 Q6. No real hotel, PMS, booking or access-control integration in any case |
@@ -381,7 +464,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | What visitors see (publish/pause, per field) | LIVE-LOCAL | §5 |
 | Card activation and lost cards | BLOCKED | §7 |
 | Emergency information / alerts | LIVE-LOCAL logic; **BLOCKED** for real delivery | §10.7. Showroom copy must change from "nothing like it is stored today" only when the owner approves DEC-2026-038 |
-| Return to owner | NOT IMPLEMENTED | §11 |
+| Return to owner | LIVE-LOCAL, off (`RESCUE_RELAY`) | §10a; customer-facing status stays "Coming soon" until DEC-2026-038 Q12 |
 | Connect | NOT IMPLEMENTED | §11 |
 | Verify | NOT IMPLEMENTED | §11 |
 | Privé | BLOCKED (decision) | §11 |
@@ -392,6 +475,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Operation | Status |
 |---|---|
 | `rpc('admin_list_emergency_events', { p_status?: text \| 'reported', p_limit?: 1–200, p_offset? })` → events with `userId`, statuses, `reportReason`, and per recipient `last4, status, attempts, provider, providerMessageId, providerStatus, lastError, attemptLog[]`. **No contact names, no full numbers.** Needs `support.read`; every call writes `admin_audit_log` `emergency.events.read` | LIVE-LOCAL; PROPOSED (DEC-2026-038; listed as PROPOSED in `test:admin-contract`) |
+| `rpc('admin_list_rescue_reports', { p_limit?: 1–200, p_offset? })`: reported Return-to-Owner threads with `ownerUserId`, `reportReason` and messages. Needs `support.read`; audited `rescue.reports.read` | LIVE-LOCAL; PROPOSED (DEC-2026-038 Q12) |
 | Every other `admin_*` RPC | Unchanged; frozen admin contract (doc 12 §2) |
 
 ---
@@ -401,3 +485,4 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.2 | 2026-10-19 | New: §10a `/api/rescue` (Return-to-Owner relay, migration 031); `rescue` notifications (§9); `admin_list_rescue_reports` (§12a); the capability matrix. §11 now lists Emergency Profile as NOT IMPLEMENTED (Q11). No v0.1 operation changed. | New routes: `/shygontap/return-to-owner` (owner inbox) and a finder flow on `/t/:slug`. The finder token goes in `sessionStorage` or the URL fragment only. Show the relay control only when `public.status` says `available`. |

@@ -68,14 +68,22 @@ const OWNED = {
   emergency_event_recipients: (id) => `SELECT count(*)::int AS n FROM public.emergency_event_recipients r JOIN public.emergency_events e ON e.id = r.event_id WHERE e.user_id = '${id}'`,
   emergency_delivery_attempts: (id) => `SELECT count(*)::int AS n FROM public.emergency_delivery_attempts a JOIN public.emergency_event_recipients r ON r.id = a.recipient_id JOIN public.emergency_events e ON e.id = r.event_id WHERE e.user_id = '${id}'`,
   emergency_audit: (id) => `SELECT count(*)::int AS n FROM public.emergency_audit WHERE user_id = '${id}'`,
+  // Migration 031 (counted only where it exists).
+  rescue_settings: (id) => `SELECT count(*)::int AS n FROM public.rescue_settings WHERE user_id = '${id}'`,
+  rescue_threads: (id) => `SELECT count(*)::int AS n FROM public.rescue_threads WHERE owner_user_id = '${id}'`,
+  rescue_messages: (id) => `SELECT count(*)::int AS n FROM public.rescue_messages m JOIN public.rescue_threads t ON t.id = m.thread_id WHERE t.owner_user_id = '${id}'`,
+  rescue_blocks: (id) => `SELECT count(*)::int AS n FROM public.rescue_blocks WHERE owner_user_id = '${id}'`,
+  rescue_audit: (id) => `SELECT count(*)::int AS n FROM public.rescue_audit WHERE user_id = '${id}'`,
 };
 const KEPT = ['orders', 'order_items', 'payments'];
+const has031 = async (db) => (await db.query(`SELECT to_regclass('public.rescue_threads') IS NOT NULL AS x`)).rows[0].x;
 const has029 = async (db) => (await db.query(`SELECT to_regclass('public.emergency_contacts') IS NOT NULL AS x`)).rows[0].x;
 
 async function owned(db, id) {
   const out = {};
   for (const [table, sql] of Object.entries(OWNED)) {
     if (table.startsWith('emergency_') && !(await has029(db))) continue;
+    if (table.startsWith('rescue_') && !(await has031(db))) continue;
     out[table] = (await db.query(sql(id))).rows[0].n;
   }
   return out;
@@ -126,6 +134,17 @@ async function customer(db, id, slug, { request = null, fulfilment = 'fulfilled'
         SELECT r.id, 1, 'accepted' FROM public.emergency_event_recipients r JOIN public.emergency_events e ON e.id = r.event_id
          WHERE e.user_id = '${id}';
       INSERT INTO public.emergency_audit (user_id, actor, action) VALUES ('${id}', 'owner', 'contact.added');
+    `);
+  }
+  if (await has031(db)) {
+    await db.exec(`
+      INSERT INTO public.rescue_settings (user_id, enabled) VALUES ('${id}', true);
+      INSERT INTO public.rescue_threads (owner_user_id, finder_token_hash, finder_digest, idempotency_key)
+        VALUES ('${id}', 'token-${slug}', 'digest-${slug}', 'deletion-rescue-${slug.slice(0, 6)}');
+      INSERT INTO public.rescue_messages (thread_id, sender, body)
+        SELECT id, 'finder', 'I found your card' FROM public.rescue_threads WHERE owner_user_id = '${id}';
+      INSERT INTO public.rescue_blocks (owner_user_id, finder_digest, expires_at) VALUES ('${id}', 'blocked-${slug}', now() + interval '1 day');
+      INSERT INTO public.rescue_audit (user_id, actor, action) VALUES ('${id}', 'owner', 'settings.enabled');
     `);
   }
   if (request) {

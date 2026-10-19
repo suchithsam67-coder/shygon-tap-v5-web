@@ -22,7 +22,9 @@
 --   events, and the support conversations, the deletion request included;
 --   where migration 029 is applied, the emergency contacts (third-party
 --   numbers), settings, verification codes, alerts with their recipients and
---   delivery attempts, and the emergency audit trail.
+--   delivery attempts, and the emergency audit trail; where 031 is applied,
+--   the Return-to-Owner settings, conversations (with their messages), blocks
+--   and audit trail.
 -- Kept ("orders, invoices and payment records ... up to 8 years"):
 --   orders, their items, payments and status history. A card stays as a
 --   hardware record, unlinked from the account and retired, so it opens nothing.
@@ -74,6 +76,13 @@ BEGIN
     GET DIAGNOSTICS n_contacts = ROW_COUNT;
     DELETE FROM public.emergency_settings WHERE user_id = target;
     DELETE FROM public.emergency_audit WHERE user_id = target;
+  END IF;
+  -- Return-to-Owner conversations (migration 031), only where they exist.
+  IF to_regclass('public.rescue_threads') IS NOT NULL THEN
+    DELETE FROM public.rescue_threads WHERE owner_user_id = target;
+    DELETE FROM public.rescue_blocks WHERE owner_user_id = target;
+    DELETE FROM public.rescue_settings WHERE user_id = target;
+    DELETE FROM public.rescue_audit WHERE user_id = target;
   END IF;
 
   -- The Tap; its visit statistics (tap_events) go with it.

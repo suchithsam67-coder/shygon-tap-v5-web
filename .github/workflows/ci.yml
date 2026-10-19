@@ -172,6 +172,13 @@ jobs:
       - name: emergency contacts and alerts, Tap column guard (local stack)
         run: npm run test:emergency
 
+      # AAROH Return-to-Owner relay (migration 031): closed tables; the anonymous
+      # finder and the signed-in owner over HTTP; cross-account refusals; limits,
+      # duplicates, expiry, block, report, close, retention; no owner detail or
+      # message text leaks. Outbound network denied.
+      - name: Return-to-Owner relay (local stack)
+        run: npm run test:rescue
+
       # V6-051 (Stage 4): the admin edge functions' role checks against the
       # real admin tables; a customer cannot reach admin by editing their
       # token or metadata. Outbound network denied.

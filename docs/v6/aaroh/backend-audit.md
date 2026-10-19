@@ -1,6 +1,6 @@
 # SHYGON AAROH backend audit and phase-gate report (Session A, 2026-10-19)
 
-**Scope.** The owner's two briefs of 2026-10-19:
+**Scope.** The owner's briefs of 2026-10-19 (two in the morning; the master requirements and the backend-engineering brief later, which added Return-to-Owner and the capability matrix, `capability-matrix.md`):
 - "real backend, real emergency contacts and production functionality";
 - "Session A: backend owner".
 
@@ -100,7 +100,7 @@ No critical exposure was found, so the security incident process (doc 13) was no
 | Digital profile ("Business") | Public identity page | `/t/:slug`, editor `/shygontap/tap` | P-1…P-3, T-1…T-6 | `tap_profiles`, `entitlements` | owner RLS + guard triggers | field allowlist; paused or suspended = dark | none | public-tap, golden, identity, matrix | LIVE-LOCAL |
 | Info mode | Owner: "Business and Info first" | — | none | none | — | — | definition | — | **NOT IMPLEMENTED** (undefined; DEC-038 Q7) |
 | Emergency | Alert trusted contacts | `/shygontap/emergency` (Session B), visitor control on `/t/:slug` | `/api/emergency` (§10 of the contract) | 029 tables | server function + definer functions; owner from a verified token | relay only; masked numbers; no location; no medical data | SMS provider, DLT, schedule | `test:emergency` 44, matrix | LIVE-LOCAL logic; **BLOCKED** live delivery and visitor alerts |
-| Return to owner | Finder reaches owner | — | none (dispatch layer reusable) | — | — | undecided | SMS | — | NOT IMPLEMENTED |
+| Return to owner | Finder reaches owner through SHYGON | owner inbox `/shygontap/return-to-owner` (Session B), finder flow on `/t/:slug` | `/api/rescue` (contract §10a) | 031 tables | server function + definer functions; finder = a hashed token; owner = a verified token | relay only; links stripped; no message text in notices; 90-day retention | none (in-app notice) | `test:rescue` 18 | LIVE-LOCAL, **off** (`RESCUE_RELAY`); lost/found lifecycle BLOCKED (card registry) |
 | Connect | Consent-based exchange | — | none | `connections`, `consent_grants` (not built) | — | doc 04 §4 | — | — | NOT IMPLEMENTED |
 | Verify | Credential verification | — | none | — | — | — | — | — | NOT IMPLEMENTED (DEC-037: not a credential) |
 | Profile management | Account details | `/shygontap/settings` | O-1…O-5 | `profiles`, `support_tickets` | owner RLS, 020/021 | phone is unverified (F4) | — | identity, matrix | LIVE-LOCAL |
@@ -148,6 +148,7 @@ The rules enforced by this design:
 |---|---|
 | Migration 029 (PROPOSED) | `supabase/migrations/029_emergency_contacts_and_alerts.sql` (header: purpose, VERIFY ON LIVE, tested rollback) |
 | Migration 030 (PROPOSED) | `supabase/migrations/030_guard_tap_server_columns.sql` |
+| Migration 031 (PROPOSED), v0.2 | `supabase/migrations/031_return_to_owner_relay.sql`; `netlify/functions/rescue.mjs`, `api/rescue.mjs`; `supabase/tests/rescue.mjs` (18); matrix, contract and deletion updated; the sweep runs `rescue_purge` |
 | Bundle | `supabase/APPLY_ALL.sql` regenerated (020–030, applies twice on the baseline). **Do not apply as is**: 025 must be re-based for production drift (V6-106 F-4), and 027 is held aside |
 | Server | `netlify/functions/{emergency,sms-status,emergency-dispatch}.mjs`, `netlify/lib/emergency.mjs`, `api/*.mjs` adapters; `netlify/lib/sms.mjs` extended (message ids, timeouts, Twilio callbacks and signature, classified failures; existing callers unchanged); `vite.config.ts` dev allowlist |
 | Local stack | `supabase/local/sms-sim.mjs`; `stack.mjs` routes the SMS hosts and adds `useSms()` |
@@ -156,22 +157,24 @@ The rules enforced by this design:
 | CI | `package.json` `test:emergency` in `ci`; `.github/workflows/ci.yml` step |
 | Docs | `docs/v6/aaroh/api-contract.md` (AAROH-API v0.1), `provider-requirements.md`, this file; DEC-2026-038; backlog V6-109…V6-116; migrations README |
 
-## 10. Security tests and actual results (2026-10-19, Node 20.18.0, this worktree)
+## 10. Security tests and actual results (2026-10-19, Node 20.18.0, this worktree, v0.2 tree)
 
 | Suite | Result |
 |---|---|
 | `npm run test:emergency` | **44 passed, 0 failed** |
-| `npm run test:db` | PASS: apply ×2 (020–030); verify 21; adversarial 64; **rls-matrix 1137**; identity 69; admin-notes 12; golden 12; **admin-contract 15** (with "PROPOSED, NOT APPROVED: admin_list_emergency_events" and the 7 tables); rollbacks 11 (every 020–030 rollback, plus the chain); **account-deletion 9**; bundle check; history 2 |
+| `npm run test:rescue` | **18 passed, 0 failed** |
+| `npm run test:db` | PASS: apply ×2 (020–031); verify 21; adversarial 64; **rls-matrix 1274 (44 tables × 7 callers)**; identity 69; admin-notes 12; golden 13 (one per migration prefix); **admin-contract 15** (new: admin_list_emergency_events, admin_list_rescue_reports and the 12 new tables reported "PROPOSED, NOT APPROVED"); rollbacks 12 (every 020–031 rollback, plus the chain); **account-deletion 9**; bundle check; history 2 |
 | `test:payments:ci` | payments 15; functions-security 13 + **1 BLOCKED** (needs Node 22; known) |
 | `test:payment-chain` 30 · `test:public-tap` 25 · `test:suspension` 46 · `test:admin-edge` 11 · `test:observability` 10 · `test:security` 11 · `test:push-guard` 18 | all PASS |
 | `lint` · `build` · `test:bundle` · `test:bundle-secrets` (207 files) · `test:seo` · `test:components` 23 | all PASS |
 | `npm audit --audit-level=high` | PASS (1 low, known) |
 | `test:secrets` (gitleaks 8.30.1) | **FAIL, known:** the single D-7 finding at `9c8caa7` (`ProjectConsultation.tsx:75`, the Web3Forms public key, DEC-2026-020). No new finding |
-| `test:e2e` (Playwright) | **not run** in this pass: no UI change by Session A |
+| `test:e2e` (Playwright) | **not run**: no UI change by Session A |
 
-Two problems found during the run were real and are fixed, not worked around:
+Three problems found during the runs were real and are fixed, not worked around:
 - `functions-security` flagged a log line naming the service-role variable;
-- `account-deletion` (V6-116) was missing the emergency data.
+- `account-deletion` (V6-116) was missing the emergency and rescue data;
+- the relay's link cleaner swallowed a sentence's full stop.
 
 ## 11. Known defects and blockers
 
@@ -210,9 +213,10 @@ Two problems found during the run were real and are fixed, not worked around:
 | Owner profile operations (step 6) | PASS (existing) + 030 |
 | Emergency data model and permissions (step 7) | PASS locally; PROPOSED |
 | Emergency events and status (step 8) | PASS locally; PROPOSED |
+| Return-to-Owner relay (master requirement 6) | PASS locally (`test:rescue` 18), off; PROPOSED (Q12); lost/found lifecycle BLOCKED |
 | Real notification delivery (step 9) | **BLOCKED**: provider and approval |
 | Owner and card management (step 10) | Existing; AAROH cards BLOCKED |
-| Other modes (step 11) | NOT IMPLEMENTED (no approved definitions) |
+| Other modes (step 11) | NOT IMPLEMENTED (no approved definitions); process definitions for all 12 capabilities in `capability-matrix.md` |
 | Privé (step 12) | BLOCKED (conflict) |
 | Tests (step 13) | PASS except the known secret-scan finding and the Node 22 check |
 | **Gate** | **STOPPED for owner review.** Production: NOT AUTHORIZED |
