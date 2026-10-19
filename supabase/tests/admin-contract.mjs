@@ -125,6 +125,20 @@ const APPROVED_NEW_RELATIONS = {
   tap_visitor_salts: 'DEC-2026-035 V6-073 (migration 025)',
 };
 
+// New admin_* functions (new names, not overloads), with their decision.
+// state 'PROPOSED' passes the check but is reported as not approved.
+const NEW_ADMIN_FUNCTIONS = {
+  'admin_list_emergency_events(text,integer,integer)': { decision: 'DEC-2026-038 (migration 029)', state: 'PROPOSED' },
+};
+
+// Relations a PROPOSED decision adds. Held to the same rule (closed, RLS on),
+// but NOT approved: the check names them as pending so the gate output says so.
+// Move an entry to APPROVED_NEW_RELATIONS only when the owner approves it.
+const PROPOSED_NEW_RELATIONS = Object.fromEntries([
+  'emergency_settings', 'emergency_contacts', 'emergency_contact_challenges', 'emergency_events',
+  'emergency_event_recipients', 'emergency_delivery_attempts', 'emergency_audit',
+].map((t) => [t, 'DEC-2026-038 PROPOSED (migration 029)']));
+
 const aclItems = (acl) => (acl ? acl.replace(/^\{|\}$/g, '').split(',').filter(Boolean) : []);
 const grantee = (item) => item.slice(0, item.indexOf('='));
 
@@ -250,10 +264,19 @@ await check('every frozen function keeps its signature, return type, security, s
     ...diffRows(frozenBase.filter((f) => APPROVED_ACL_CHANGES[f.signature]), frozenMig, (f) => f.signature,
       SIGNATURE_FIELDS.filter((x) => x !== 'acl')),
   ];
-  const added = frozenMig.filter((f) => !frozenBase.some((b) => b.signature === f.signature)).map((f) => f.signature);
+  const added = frozenMig.filter((f) => !frozenBase.some((b) => b.signature === f.signature));
+  // A new signature under a name that already exists is an overload: it can
+  // change which function an existing caller reaches. Never allowed.
+  const overloads = added.filter((f) => frozenBase.some((b) => b.name === f.name)).map((f) => f.signature);
+  // A brand-new admin_* name breaks no existing caller, but it is still part of
+  // the admin contract, so it must be listed with its decision.
+  const unlisted = added.filter((f) => !overloads.includes(f.signature) && !NEW_ADMIN_FUNCTIONS[f.signature]).map((f) => f.signature);
   assert(problems.length === 0, problems.join('; '));
-  assert(added.length === 0, `new overloads of frozen names: ${added.join(', ')}`);
-  return `${frozenBase.length} unchanged (grants of ${Object.keys(APPROVED_ACL_CHANGES).join(', ')} checked below)`;
+  assert(overloads.length === 0, `new overloads of frozen names: ${overloads.join(', ')}`);
+  assert(unlisted.length === 0, `new admin functions without a decision: ${unlisted.join(', ')}`);
+  const pending = added.filter((f) => NEW_ADMIN_FUNCTIONS[f.signature]?.state === 'PROPOSED').map((f) => f.signature);
+  return `${frozenBase.length} unchanged (grants of ${Object.keys(APPROVED_ACL_CHANGES).join(', ')} checked below)` +
+    (pending.length ? `; new, PROPOSED, NOT APPROVED: ${pending.join(', ')}` : '');
 });
 
 for (const [signature, { decision, remove }] of Object.entries(APPROVED_ACL_CHANGES)) {
@@ -334,14 +357,20 @@ await check('no table grant or RLS switch changed on existing relations; new one
   const problems = diffRows(base.tableGrants, mig.tableGrants, (r) => r.relname, ['acl', 'relrowsecurity', 'relforcerowsecurity']);
   const added = mig.tableGrants.filter((r) => !base.tableGrants.some((b) => b.relname === r.relname));
   for (const r of added) {
-    if (!APPROVED_NEW_RELATIONS[r.relname]) { problems.push(`${r.relname}: new relation without a decision`); continue; }
+    if (!APPROVED_NEW_RELATIONS[r.relname] && !PROPOSED_NEW_RELATIONS[r.relname]) {
+      problems.push(`${r.relname}: new relation without a decision`);
+      continue;
+    }
     const open = aclItems(r.acl).filter((i) => ['', 'anon', 'authenticated'].includes(grantee(i)));
     if (open.length) problems.push(`${r.relname}: reachable by ${open.join(', ')}`);
     if (!r.relrowsecurity) problems.push(`${r.relname}: row level security is off`);
   }
   assert(problems.length === 0, problems.join('; '));
   assert(m.size === base.tableGrants.length + added.length, 'a relation disappeared');
-  return `${base.tableGrants.length} existing identical; new: ${added.map((r) => r.relname).join(', ') || 'none'} (closed, RLS on)`;
+  const pending = added.filter((r) => PROPOSED_NEW_RELATIONS[r.relname]).map((r) => r.relname);
+  const approved = added.filter((r) => APPROVED_NEW_RELATIONS[r.relname]).map((r) => r.relname);
+  return `${base.tableGrants.length} existing identical; new: ${approved.join(', ') || 'none'} (closed, RLS on)` +
+    (pending.length ? `; PROPOSED, NOT APPROVED: ${pending.join(', ')} (closed, RLS on; DEC-2026-038)` : '');
 });
 
 await check('every pre-existing trigger is unchanged (new ones listed)', () => {

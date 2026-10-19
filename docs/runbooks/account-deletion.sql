@@ -19,7 +19,10 @@
 -- data; visit statistics; support conversations):
 --   the Tap and its visit statistics, the profile, the customer record and its
 --   customisations, entitlements, notifications, card one-time codes, account
---   events, and the support conversations, the deletion request included.
+--   events, and the support conversations, the deletion request included;
+--   where migration 029 is applied, the emergency contacts (third-party
+--   numbers), settings, verification codes, alerts with their recipients and
+--   delivery attempts, and the emergency audit trail.
 -- Kept ("orders, invoices and payment records ... up to 8 years"):
 --   orders, their items, payments and status history. A card stays as a
 --   hardware record, unlinked from the account and retired, so it opens nothing.
@@ -34,7 +37,7 @@ DECLARE
   request text := '<REQUEST REFERENCE>';  -- the privacy ticket's reference, e.g. ST-1A2B3C4D
   busy    text;
   n_taps int; n_profiles int; n_customers int; n_entitlements int; n_notifications int;
-  n_codes int; n_events int; n_tickets int; n_cards int;
+  n_codes int; n_events int; n_tickets int; n_cards int; n_contacts int := 0; n_alerts int := 0;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = target) THEN
     RAISE EXCEPTION 'no account %', target;
@@ -59,6 +62,20 @@ BEGIN
    WHERE user_id = target OR customer_id IN (SELECT id FROM public.customers WHERE user_id = target);
   GET DIAGNOSTICS n_cards = ROW_COUNT;
 
+  -- Emergency data (migration 029), only where it exists. Deleting the sign-in
+  -- (step 5) would cascade to it, but an account with orders is anonymised,
+  -- not deleted, so it is removed here. Alerts take their recipients and
+  -- delivery attempts with them.
+  IF to_regclass('public.emergency_contacts') IS NOT NULL THEN
+    DELETE FROM public.emergency_events WHERE user_id = target;
+    GET DIAGNOSTICS n_alerts = ROW_COUNT;
+    DELETE FROM public.emergency_contact_challenges WHERE user_id = target;
+    DELETE FROM public.emergency_contacts WHERE user_id = target;
+    GET DIAGNOSTICS n_contacts = ROW_COUNT;
+    DELETE FROM public.emergency_settings WHERE user_id = target;
+    DELETE FROM public.emergency_audit WHERE user_id = target;
+  END IF;
+
   -- The Tap; its visit statistics (tap_events) go with it.
   DELETE FROM public.tap_profiles
    WHERE user_id = target OR customer_id IN (SELECT id FROM public.customers WHERE user_id = target);
@@ -82,6 +99,6 @@ BEGIN
   DELETE FROM public.customers WHERE user_id = target;
   GET DIAGNOSTICS n_customers = ROW_COUNT;
 
-  RAISE NOTICE 'account %: deleted % Tap(s), % profile(s), % customer record(s), % entitlement(s), % notification(s), % card code(s), % account event(s), % support conversation(s); retired % card(s); orders and payments kept',
-    target, n_taps, n_profiles, n_customers, n_entitlements, n_notifications, n_codes, n_events, n_tickets, n_cards;
+  RAISE NOTICE 'account %: deleted % Tap(s), % profile(s), % customer record(s), % entitlement(s), % notification(s), % card code(s), % account event(s), % support conversation(s), % emergency contact(s), % emergency alert(s); retired % card(s); orders and payments kept',
+    target, n_taps, n_profiles, n_customers, n_entitlements, n_notifications, n_codes, n_events, n_tickets, n_contacts, n_alerts, n_cards;
 END $$;

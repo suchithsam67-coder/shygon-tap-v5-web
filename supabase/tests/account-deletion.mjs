@@ -60,12 +60,24 @@ const OWNED = {
   orders: (id) => `SELECT count(*)::int AS n FROM public.orders WHERE user_id = '${id}'`,
   order_items: (id) => `SELECT count(*)::int AS n FROM public.order_items i JOIN public.orders o ON o.id = i.order_id WHERE o.user_id = '${id}'`,
   payments: (id) => `SELECT count(*)::int AS n FROM public.payments p JOIN public.orders o ON o.id = p.order_id WHERE o.user_id = '${id}'`,
+  // Migration 029 (counted only where it exists).
+  emergency_settings: (id) => `SELECT count(*)::int AS n FROM public.emergency_settings WHERE user_id = '${id}'`,
+  emergency_contacts: (id) => `SELECT count(*)::int AS n FROM public.emergency_contacts WHERE user_id = '${id}'`,
+  emergency_contact_challenges: (id) => `SELECT count(*)::int AS n FROM public.emergency_contact_challenges WHERE user_id = '${id}'`,
+  emergency_events: (id) => `SELECT count(*)::int AS n FROM public.emergency_events WHERE user_id = '${id}'`,
+  emergency_event_recipients: (id) => `SELECT count(*)::int AS n FROM public.emergency_event_recipients r JOIN public.emergency_events e ON e.id = r.event_id WHERE e.user_id = '${id}'`,
+  emergency_delivery_attempts: (id) => `SELECT count(*)::int AS n FROM public.emergency_delivery_attempts a JOIN public.emergency_event_recipients r ON r.id = a.recipient_id JOIN public.emergency_events e ON e.id = r.event_id WHERE e.user_id = '${id}'`,
+  emergency_audit: (id) => `SELECT count(*)::int AS n FROM public.emergency_audit WHERE user_id = '${id}'`,
 };
 const KEPT = ['orders', 'order_items', 'payments'];
+const has029 = async (db) => (await db.query(`SELECT to_regclass('public.emergency_contacts') IS NOT NULL AS x`)).rows[0].x;
 
 async function owned(db, id) {
   const out = {};
-  for (const [table, sql] of Object.entries(OWNED)) out[table] = (await db.query(sql(id))).rows[0].n;
+  for (const [table, sql] of Object.entries(OWNED)) {
+    if (table.startsWith('emergency_') && !(await has029(db))) continue;
+    out[table] = (await db.query(sql(id))).rows[0].n;
+  }
   return out;
 }
 
@@ -99,6 +111,23 @@ async function customer(db, id, slug, { request = null, fulfilment = 'fulfilled'
     INSERT INTO public.support_tickets (user_id, subject, category${request ? ', reference' : ''})
       VALUES ('${id}', 'Where is my invoice?', 'order'${request ? `, 'ST-Q${slug.slice(0, 7).toUpperCase()}'` : ''});
   `);
+  if (await has029(db)) {
+    await db.exec(`
+      INSERT INTO public.emergency_settings (user_id, public_alerts_enabled) VALUES ('${id}', true);
+      INSERT INTO public.emergency_contacts (user_id, name, phone_e164, verified_at) VALUES ('${id}', 'Contact', '+919800000077', now());
+      INSERT INTO public.emergency_contact_challenges (user_id, contact_id, phone_digest, code_hash, expires_at)
+        SELECT '${id}', id, 'digest', 'hash', now() + interval '10 minutes' FROM public.emergency_contacts WHERE user_id = '${id}';
+      INSERT INTO public.emergency_events (user_id, initiator, idempotency_key, recipient_count)
+        VALUES ('${id}', 'owner', 'deletion-test-key-${slug.slice(0, 6)}', 1);
+      INSERT INTO public.emergency_event_recipients (event_id, contact_id, contact_name, phone_last4, phone_e164)
+        SELECT e.id, c.id, c.name, '0077', c.phone_e164 FROM public.emergency_events e, public.emergency_contacts c
+         WHERE e.user_id = '${id}' AND c.user_id = '${id}';
+      INSERT INTO public.emergency_delivery_attempts (recipient_id, attempt_no, outcome)
+        SELECT r.id, 1, 'accepted' FROM public.emergency_event_recipients r JOIN public.emergency_events e ON e.id = r.event_id
+         WHERE e.user_id = '${id}';
+      INSERT INTO public.emergency_audit (user_id, actor, action) VALUES ('${id}', 'owner', 'contact.added');
+    `);
+  }
   if (request) {
     await db.exec(`
       INSERT INTO public.support_tickets (user_id, subject, category, reference)

@@ -98,6 +98,23 @@ for (const [u, n] of [[A, 1], [B, 2]]) {
     VALUES ((SELECT id FROM public.customers WHERE user_id = '${u}'), '0${n}000000-0000-4000-8000-0000000000c${n}',
             'ca000000-0000-4000-8000-000000000001');
   `);
+  // The emergency module (029): one row in each table, owned by this customer.
+  await db.exec(`
+    INSERT INTO public.emergency_settings (user_id, public_alerts_enabled) VALUES ('${u}', true);
+    INSERT INTO public.emergency_contacts (id, user_id, name, phone_e164, verified_at)
+    VALUES ('0${n}000000-0000-4000-8000-0000000000f${n}', '${u}', 'Matrix contact ${n}', '+9198000000${n}${n}', now());
+    INSERT INTO public.emergency_contact_challenges (user_id, contact_id, phone_digest, code_hash, expires_at)
+    VALUES ('${u}', '0${n}000000-0000-4000-8000-0000000000f${n}', 'digest', 'hash', now() + interval '10 minutes');
+    INSERT INTO public.emergency_events (id, user_id, initiator, idempotency_key, recipient_count)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000a${n}'::uuid, '${u}', 'owner', 'matrix-key-000000${n}', 1);
+    INSERT INTO public.emergency_event_recipients (id, event_id, contact_id, contact_name, phone_last4, phone_e164)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000b${n}'::uuid, '1${n}000000-0000-4000-8000-0000000000a${n}', '0${n}000000-0000-4000-8000-0000000000f${n}',
+            'Matrix contact ${n}', '00${n}${n}', '+9198000000${n}${n}');
+    INSERT INTO public.emergency_delivery_attempts (recipient_id, attempt_no, outcome)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000b${n}', 1, 'accepted');
+    INSERT INTO public.emergency_audit (user_id, event_id, actor, action)
+    VALUES ('${u}', '1${n}000000-0000-4000-8000-0000000000a${n}', 'owner', 'matrix.test');
+  `);
 }
 
 // --- the expected access model -----------------------------------------------
@@ -150,6 +167,19 @@ const MODEL = {
   // D-6 / O-14 (023): no insert, not even of the caller's own Tap.
   tap_profiles: { owner: OWN('user_id'), select: sel(NONE, OWN('user_id'), ALL), update: OWN('user_id') },
   tap_visitor_salts: { owner: NONE, select: sel(NONE, NONE) }, // V6-073 (025): record_tap_event only
+  // The emergency module (029, DEC-2026-038 PROPOSED): no API client reaches
+  // any of it, not even the owner or an administrator; only the server
+  // function (service_role) through the definer functions.
+  emergency_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  emergency_contacts: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  emergency_contact_challenges: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  emergency_events: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  emergency_event_recipients: { owner: `event_id IN (SELECT id FROM public.emergency_events WHERE user_id = auth.uid())`, select: sel(NONE, NONE) },
+  emergency_delivery_attempts: {
+    owner: `recipient_id IN (SELECT r.id FROM public.emergency_event_recipients r JOIN public.emergency_events e ON e.id = r.event_id WHERE e.user_id = auth.uid())`,
+    select: sel(NONE, NONE),
+  },
+  emergency_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };

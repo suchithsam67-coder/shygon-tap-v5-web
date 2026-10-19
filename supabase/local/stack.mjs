@@ -5,6 +5,8 @@
 //   gateway    Supabase-compatible REST + Auth + Realtime handshake (gateway.mjs)
 //   app host   the built site and the real server functions (app-host.mjs)
 //   Razorpay   a stand-in reached in place of api.razorpay.com (razorpay-sim.mjs)
+//   SMS        a stand-in for api.twilio.com and control.msg91.com (sms-sim.mjs);
+//              off until a suite calls useSms()
 //
 // Fidelity, stated plainly: the database, its RLS, grants, triggers and
 // functions are real Postgres running the production schema. The HTTP layers
@@ -19,6 +21,7 @@ import { createStackDb } from './db.mjs';
 import { createGateway } from './gateway.mjs';
 import { projectKeys } from './jwt.mjs';
 import { createRazorpaySim } from './razorpay-sim.mjs';
+import { createSmsSim } from './sms-sim.mjs';
 import { createAppHost } from './app-host.mjs';
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -33,8 +36,14 @@ export function stackSecrets(seed) {
     razorpayKeyId: `rzp_test_${derive('rzp-key-id', 14)}`,
     razorpayKeySecret: derive('rzp-key-secret', 40),
     razorpayWebhookSecret: derive('rzp-webhook-secret', 40),
+    twilioAccountSid: `AC${derive('twilio-sid', 32)}`,
+    twilioAuthToken: derive('twilio-token', 32),
+    msg91AuthKey: derive('msg91-key', 24),
+    cronSecret: derive('cron-secret', 40),
   };
 }
+
+const SMS_HOSTS = new Set(['api.twilio.com', 'control.msg91.com']);
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -54,13 +63,14 @@ const listen = (server, port) =>
     server.listen(port, '127.0.0.1', resolve);
   });
 
-/** Routes api.razorpay.com to the stand-in and refuses every other non-loopback host. */
-function installFetchRouter(sim) {
+/** Routes Razorpay and the SMS providers to their stand-ins and refuses every other non-loopback host. */
+function installFetchRouter(sim, sms) {
   const realFetch = globalThis.fetch;
   globalThis.fetch = async function localStackFetch(input, init) {
     const request = input instanceof Request ? input : new Request(input, init);
     const { hostname } = new URL(request.url);
     if (hostname === 'api.razorpay.com') return sim.api(request);
+    if (SMS_HOSTS.has(hostname)) return sms.api(request);
     if (LOOPBACK.has(hostname)) return realFetch(input, init);
     throw new TypeError(`fetch failed: the local stack does not reach ${hostname}`);
   };
@@ -73,7 +83,9 @@ function installFetchRouter(sim) {
 const PROVIDER_SETTINGS = [
   'SMS_PROVIDER', 'MSG91_AUTH_KEY', 'MSG91_TEMPLATE_ID', 'MSG91_ORDER_TEMPLATE_ID', 'TWILIO_ACCOUNT_SID',
   'TWILIO_AUTH_TOKEN', 'TWILIO_FROM', 'TWILIO_MESSAGING_SERVICE_SID', 'SHIPROCKET_EMAIL', 'SHIPROCKET_PASSWORD',
-  'OTP_DEV_MODE', 'ALLOW_LIVE_PAYMENTS_LOCALLY', 'VITE_SUPABASE_URL',
+  'OTP_DEV_MODE', 'ALLOW_LIVE_PAYMENTS_LOCALLY', 'VITE_SUPABASE_URL', 'SMS_STATUS_CALLBACK_URL', 'CRON_SECRET',
+  'MSG91_EMERGENCY_VERIFY_TEMPLATE_ID', 'MSG91_EMERGENCY_OWNER_TEMPLATE_ID', 'MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID',
+  'EMERGENCY_PUBLIC_ALERTS',
 ];
 
 /**
@@ -119,14 +131,47 @@ export async function startStack({
     webhookUrl: () => `${appUrl}/api/razorpay-webhook`,
     log,
   });
-  const restoreFetch = installFetchRouter(sim);
+  const sms = createSmsSim({
+    accountSid: secrets.twilioAccountSid,
+    authToken: secrets.twilioAuthToken,
+    msg91Key: secrets.msg91AuthKey,
+    log,
+  });
+  const restoreFetch = installFetchRouter(sim, sms);
   const host = createAppHost({ root: ROOT, distDir, appUrl, gatewayUrl, sim, log });
   await listen(host.server, hostPort);
+
+  /**
+   * Points the server functions at the SMS stand-in: 'twilio' (with delivery
+   * receipts to /api/sms-status unless receipts is false), 'msg91' (with the
+   * emergency templates), or null (no provider). Stays until changed or close().
+   */
+  function useSms(provider, { receipts = true } = {}) {
+    for (const name of ['SMS_PROVIDER', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM', 'MSG91_AUTH_KEY',
+      'SMS_STATUS_CALLBACK_URL', 'MSG91_EMERGENCY_VERIFY_TEMPLATE_ID', 'MSG91_EMERGENCY_OWNER_TEMPLATE_ID',
+      'MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID']) setEnv(name, undefined);
+    if (provider === 'twilio') {
+      setEnv('SMS_PROVIDER', 'twilio');
+      setEnv('TWILIO_ACCOUNT_SID', secrets.twilioAccountSid);
+      setEnv('TWILIO_AUTH_TOKEN', secrets.twilioAuthToken);
+      setEnv('TWILIO_FROM', '+15005550006');
+      if (receipts) setEnv('SMS_STATUS_CALLBACK_URL', `${appUrl}/api/sms-status`);
+    } else if (provider === 'msg91') {
+      setEnv('SMS_PROVIDER', 'msg91');
+      setEnv('MSG91_AUTH_KEY', secrets.msg91AuthKey);
+      setEnv('MSG91_EMERGENCY_VERIFY_TEMPLATE_ID', 'tmpl_emergency_verify');
+      setEnv('MSG91_EMERGENCY_OWNER_TEMPLATE_ID', 'tmpl_emergency_owner');
+      setEnv('MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID', 'tmpl_emergency_public');
+    }
+  }
+  setEnv('CRON_SECRET', secrets.cronSecret);
 
   return {
     db,
     gateway,
     sim,
+    sms,
+    useSms,
     secrets,
     keys: { anonKey: secrets.anonKey, serviceRoleKey: secrets.serviceRoleKey },
     /** Superuser SQL, queued behind in-flight API requests (one connection). */

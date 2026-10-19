@@ -163,6 +163,15 @@ jobs:
       - name: suspension guard, adversarial (live baseline vs migrations; local stack)
         run: npm run test:suspension
 
+      # AAROH emergency module (migration 029) and the Tap column guard (030):
+      # tables and functions closed to every client role; limits, idempotency,
+      # retries, receipts and retention; the owner-write bypasses with the
+      # pre-030 chain as the negative control; then over HTTP with the SMS
+      # stand-in (refusals, outages, timeouts, no provider, a database failure
+      # mid-send, forged receipts). Outbound network denied.
+      - name: emergency contacts and alerts, Tap column guard (local stack)
+        run: npm run test:emergency
+
       # V6-051 (Stage 4): the admin edge functions' role checks against the
       # real admin tables; a customer cannot reach admin by editing their
       # token or metadata. Outbound network denied.
