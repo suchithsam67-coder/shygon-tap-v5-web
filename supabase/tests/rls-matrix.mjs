@@ -174,7 +174,7 @@ const MODEL = {
   // D-6 / O-14 (023): no insert, not even of the caller's own Tap.
   tap_profiles: { owner: OWN('user_id'), select: sel(NONE, OWN('user_id'), ALL), update: OWN('user_id') },
   tap_visitor_salts: { owner: NONE, select: sel(NONE, NONE) }, // V6-073 (025): record_tap_event only
-  // The emergency module (029, DEC-2026-038 PROPOSED): no API client reaches
+  // The emergency module (029, DEC-2026-038 Q1, approved 2026-10-19): no API client reaches
   // any of it, not even the owner or an administrator; only the server
   // function (service_role) through the definer functions.
   emergency_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
@@ -187,7 +187,7 @@ const MODEL = {
     select: sel(NONE, NONE),
   },
   emergency_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
-  // The Return-to-Owner relay (031, DEC-2026-038 PROPOSED): closed the same way.
+  // The Return-to-Owner relay (031, DEC-2026-038 Q12, approved 2026-10-19): closed the same way.
   rescue_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   rescue_threads: { owner: OWN('owner_user_id'), select: sel(NONE, NONE) },
   rescue_messages: { owner: `thread_id IN (SELECT id FROM public.rescue_threads WHERE owner_user_id = auth.uid())`, select: sel(NONE, NONE) },

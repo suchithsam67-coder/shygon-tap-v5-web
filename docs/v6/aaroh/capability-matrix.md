@@ -1,5 +1,7 @@
 # SHYGON AAROH capability matrix and backend process definitions (Session A, 2026-10-19)
 
+**Status update 2026-10-19:** DEC-2026-038 approved (Q1–Q13 as recommended). See the record for outcomes.
+
 **Sources:**
 - this repository at `v6/aaroh-backend`;
 - the architecture pack `docs/shygon-os/` (docs 03, 04, 05, 07, 08, 10; their designs are PROPOSED unless a DEC approves them);
@@ -22,10 +24,10 @@ Nothing here is deployed. Production runs the V5 schema with drift (V6-106).
 
 | # | Capability | Implemented | Partial | Planned | Unknown | Evidence | Gap |
 |---|---|---|---|---|---|---|---|
-| 1a | **Emergency SOS** (owner alerts verified contacts) | ✔ (local) | | | | 029, `/api/emergency`, `test:emergency` 44 | live SMS (provider, DLT); DEC-038 Q1/Q3 |
-| 1b | **Emergency alert from the public page** (visitor → owner's contacts, relay only) | ✔ (local, off) | | | | same; host switch `EMERGENCY_PUBLIC_ALERTS`, owner opt-in | DEC-038 Q2 |
-| 1c | **Emergency Profile / Emergency Tap information view** (a responder sees approved emergency details) | | | ✔ | trigger, fields, disclosure | doc 04 §4.1 ("separate, purpose-bound release channel", default off); showroom "details that you approve, shown only in an emergency flow" | **ambiguous; not built.** DEC-038 Q11 |
-| 2 | **Return-to-Owner / SHYGON Rescue** (protected finder relay) | ✔ (local, off) | item lifecycle | | | 031, `/api/rescue`, `test:rescue` | DEC-038 Q12; lost mode needs the card registry |
+| 1a | **Emergency SOS** (owner alerts verified contacts) | ✔ (local), APPROVED Q1 | | | | 029, `/api/emergency`, `test:emergency` 47 | live SMS: MSG91 account + DLT templates (Q3, human), smoke test |
+| 1b | **Emergency alert from the public page** (visitor → owner's contacts, relay only) | ✔ (local), OFF by Q2 = B | | | | same; host switch `EMERGENCY_PUBLIC_ALERTS`, owner opt-in | revisit after supervised owner alerts |
+| 1c | **Emergency Profile / Emergency Tap information view** | decided Q11 = B (no new backend) | | | | presentation of `public.status`; only action = 1b | hidden while 1b is off; never a contact detail |
+| 2 | **Return-to-Owner / SHYGON Rescue** (protected finder relay) | ✔ (local), APPROVED Q12, off until release | item lifecycle | | | 031, `/api/rescue`, `test:rescue` 18 | lost mode needs the card registry |
 | 3 | **Smart Identity / SHYGON ID** | account identity ✔ | customer-facing ID | | the ID's format | `customers.customer_id` (`CUST-…`), 021 identity contract 69 | D-9 (what the customer-facing ID is) |
 | 4 | **SHYGON Connect** | | | ✔ | | doc 03 §3.4 `connections`, `consent_grants`; doc 10 Phase 2 | no schema; DEC-2026-025 (organisations), DEC-038 Q13 |
 | 5 | **Student Passport / Student Tap** | | | ✔ | | doc 10 Phase 2; minors' data | legal review DEC-2026-017 (hard gate) |
@@ -34,7 +36,7 @@ Nothing here is deployed. Production runs the V5 schema with drift (V6-106).
 | 8 | **Event Tap** | | seasonal event themes ✔ | event mode | | `tap_event_themes` (admin-managed timed themes) | event-specific profile, attendees: Phase 2 |
 | 9 | **Info Tap / SHYGON Locations** | | | Locations ✔ (Phase 4) | **Info is undefined** | owner 10-16: "Business and Info first" | definition (DEC-038 Q7) |
 | 10 | **Access Tap** | | | gated (Phase 5) | | doc 10: pen-test, SDM hardware, legal | **Unsupported** for AAROH (DEC-037) |
-| 11 | **SHYGON Privé demo** | | | | conflict | 10-16 "outside launch scope" vs 10-19 ×3 "demo-only" | DEC-038 Q6 |
+| 11 | **SHYGON Privé demo** | | | | | Q6 read as B: out of the launch | owner says "Privé demo-only" to change it |
 | 12 | **Cloud Storage** | | | ✔ | | showroom Planned; storage bucket gaps V6-095/V6-108 | no design approved |
 
 Card lifecycle sits under every capability that a physical tap starts. It is partial for V5 cards (activation, OTP, replacement request) and BLOCKED for AAROH: no cards are sold, there is no registry, and `/d/` is not built (contract §3 P-4 and §7).

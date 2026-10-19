@@ -39,6 +39,7 @@ export function stackSecrets(seed) {
     twilioAccountSid: `AC${derive('twilio-sid', 32)}`,
     twilioAuthToken: derive('twilio-token', 32),
     msg91AuthKey: derive('msg91-key', 24),
+    msg91DlrSecret: derive('msg91-dlr', 40),
     cronSecret: derive('cron-secret', 40),
   };
 }
@@ -85,7 +86,7 @@ const PROVIDER_SETTINGS = [
   'TWILIO_AUTH_TOKEN', 'TWILIO_FROM', 'TWILIO_MESSAGING_SERVICE_SID', 'SHIPROCKET_EMAIL', 'SHIPROCKET_PASSWORD',
   'OTP_DEV_MODE', 'ALLOW_LIVE_PAYMENTS_LOCALLY', 'VITE_SUPABASE_URL', 'SMS_STATUS_CALLBACK_URL', 'CRON_SECRET',
   'MSG91_EMERGENCY_VERIFY_TEMPLATE_ID', 'MSG91_EMERGENCY_OWNER_TEMPLATE_ID', 'MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID',
-  'EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY',
+  'EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY', 'MSG91_DLR_SECRET',
 ];
 
 /**
@@ -135,6 +136,7 @@ export async function startStack({
     accountSid: secrets.twilioAccountSid,
     authToken: secrets.twilioAuthToken,
     msg91Key: secrets.msg91AuthKey,
+    msg91ReportUrl: () => `${appUrl}/api/sms-status?provider=msg91`,
     log,
   });
   const restoreFetch = installFetchRouter(sim, sms);
@@ -149,7 +151,7 @@ export async function startStack({
   function useSms(provider, { receipts = true } = {}) {
     for (const name of ['SMS_PROVIDER', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM', 'MSG91_AUTH_KEY',
       'SMS_STATUS_CALLBACK_URL', 'MSG91_EMERGENCY_VERIFY_TEMPLATE_ID', 'MSG91_EMERGENCY_OWNER_TEMPLATE_ID',
-      'MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID']) setEnv(name, undefined);
+      'MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID', 'MSG91_DLR_SECRET']) setEnv(name, undefined);
     if (provider === 'twilio') {
       setEnv('SMS_PROVIDER', 'twilio');
       setEnv('TWILIO_ACCOUNT_SID', secrets.twilioAccountSid);
@@ -162,6 +164,7 @@ export async function startStack({
       setEnv('MSG91_EMERGENCY_VERIFY_TEMPLATE_ID', 'tmpl_emergency_verify');
       setEnv('MSG91_EMERGENCY_OWNER_TEMPLATE_ID', 'tmpl_emergency_owner');
       setEnv('MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID', 'tmpl_emergency_public');
+      if (receipts) setEnv('MSG91_DLR_SECRET', secrets.msg91DlrSecret);
     }
   }
   setEnv('CRON_SECRET', secrets.cronSecret);

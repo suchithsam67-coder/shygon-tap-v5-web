@@ -1558,7 +1558,8 @@ CREATE TRIGGER trg_profiles_zz_guard_suspension_insert
 --            notified, audited), doc 05 §2 (3 per day per device), doc 07 T18
 --            (relay, never reveal; no medical data). Migration numbering N-1:
 --            027 is held aside (DEC-2026-037), 028 is the suspension guard.
---            PROPOSED: not yet reviewed or approved.
+--            APPROVED by the owner 2026-10-19 (DEC-2026-038 Q1, in session).
+--            Approval of the design is not approval to apply: see Level.
 -- Level:     L3 (new tables holding third-party personal data; new privileged
 --            functions). Under DEC-2026-018 it needs a 24-hour cool-off plus the
 --            checklist review before it is approved or applied. Never applied by
@@ -2687,7 +2688,8 @@ GRANT EXECUTE ON FUNCTION public.admin_list_emergency_events(text, integer, inte
 -- Decision:  the owner's AAROH backend brief of 2026-10-19 ("the owner must not
 --            be able to grant themselves paid entitlements ... enforce these
 --            restrictions in the backend"); DEC-2026-038 (PROPOSED). Migration
---            numbering N-1. PROPOSED: not yet reviewed or approved.
+--            numbering N-1. APPROVED by the owner 2026-10-19 (DEC-2026-038 Q5, in session).
+--            Approval of the design is not approval to apply: see Level.
 -- Level:     L3 (a trigger guarding authorization-relevant columns). Under
 --            DEC-2026-018 it needs a 24-hour cool-off plus the checklist review
 --            before it is approved or applied. Never applied by tooling to
@@ -2784,7 +2786,8 @@ CREATE TRIGGER trg_tap_profiles_01_guard_server_columns
 --            DEC-2026-038 Q12 (PROPOSED). Design: doc 03 §3.4 (rescue_threads,
 --            rescue_messages), doc 05 §2 (finder endpoints and limits), doc 07
 --            T6 (spam and harassment controls), doc 08 (lost mode).
---            PROPOSED: not yet reviewed or approved.
+--            APPROVED by the owner 2026-10-19 (DEC-2026-038 Q12, in session).
+--            Approval of the design is not approval to apply: see Level.
 -- Level:     L3 (new tables holding messages between strangers; privileged
 --            functions). DEC-2026-018 24-hour cool-off plus checklist review
 --            before approval or application. Never applied by tooling to

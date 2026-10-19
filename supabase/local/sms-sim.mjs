@@ -17,7 +17,7 @@ import { twilioSignature } from '../../netlify/lib/sms.mjs';
 
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-export function createSmsSim({ accountSid, authToken, msg91Key, log = () => {} }) {
+export function createSmsSim({ accountSid, authToken, msg91Key, msg91ReportUrl = () => null, log = () => {} }) {
   const messages = [];
   const scenarios = [];
   let fallback = 'accept';
@@ -94,8 +94,27 @@ export function createSmsSim({ accountSid, authToken, msg91Key, log = () => {} }
     return { status: response.status, body: await response.json().catch(() => null) };
   }
 
+  /**
+   * Sends an MSG91 "Report Received" webhook for one accepted message: JSON,
+   * one report per recipient, with the custom header the dashboard would add.
+   */
+  async function deliverMsg91(requestId, status, { secret } = {}) {
+    const record = messages.find((m) => m.provider === 'msg91' && m.sid === requestId);
+    const report = {
+      requestId, status: String(status), telNum: record?.to ?? null, senderId: 'SHYGON', route: '4',
+      event: String(status) === '1' ? 'delivered' : 'failed', failureReason: String(status) === '1' ? '' : 'Operator rejected',
+      requestedAt: new Date().toISOString(), deliveryTime: new Date().toISOString(),
+    };
+    const response = await fetch(msg91ReportUrl(), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(secret ? { 'x-shygon-dlr-secret': secret } : {}) },
+      body: JSON.stringify(report),
+    });
+    return { status: response.status, body: await response.json().catch(() => null) };
+  }
+
   return {
-    messages, queue, setDefault, deliver,
+    messages, queue, setDefault, deliver, deliverMsg91,
     reset() {
       messages.length = 0;
       scenarios.length = 0;

@@ -11,7 +11,7 @@
 | Responsible (R) | Session A (AAROH backend), Claude Code: implementation and evidence only |
 | Consulted (C) | Security Owner, Data Owner (the same person under DEC-018); counsel for Q9 (DEC-2026-017) |
 | Informed (I) | Session B (AAROH frontend), the stabilisation session |
-| State | **PROPOSED: HUMAN DECISION REQUIRED.** Implemented locally on `v6/aaroh-backend` so the decision can be taken on working, tested code. Nothing is applied, pushed or deployed |
+| State | **APPROVED 2026-10-19, in session:** "Approve DEC-2026-038 Q1–Q13 as recommended in the record". Outcomes and interpretations are in **Recorded decision** below. Approval of the design is not approval to apply: 029–031 are L3, so the DEC-2026-018 24-hour cool-off and checklist review run before any application, and production waits for the release track (B-1, the rebaseline, DEC-2026-003 §3.1). Nothing is applied, pushed or deployed |
 
 ## Priority
 
@@ -161,9 +161,27 @@ Options:
 
 ## Decision
 
-Q1 ____ Q2 ____ Q3 ____ Q4 ____ Q5 ____ Q6 ____ Q7 ____ Q8 ____ Q9 ____ Q10 ____ Q11 ____ Q12 ____ Q13 ____
+**Approved by:** the repository owner (DEC-2026-018 Option B), in session. **Date:** 2026-10-19. **Words:** "Approve DEC-2026-038 Q1–Q13 as recommended in the record."
 
-**Approved by:** ________ **Date:** ________
+### Recorded decision
+
+Each question takes the option the record recommends. Where the recommendation was conditional or named a human action, the reading below is Session A's; **the owner should correct any misreading.**
+
+| Q | Outcome | What it means now |
+|---|---|---|
+| Q1 | **A**: emergency module (029) approved as built | Gates list 029 as approved. Application: DEC-018 cool-off, then the release track |
+| Q2 | **B**: visitor emergency alerts stay off | `EMERGENCY_PUBLIC_ALERTS` stays unset until supervised owner alerts have run in production; then the owner decides again |
+| Q3 | **A**: MSG91 for emergency SMS, with three DLT templates | Human: MSG91 account, DLT templates and sender ID. Session A: MSG91 delivery reports (V6-114, next) |
+| Q4 | **A**: an owner may send an alert while the account is suspended | Already the behaviour; Session A pins it with a test |
+| Q5 | **A**: 030 approved, and it joins the 020 + 028 early-fix track | Same conditions as DEC-2026-003 §3.1 (independent review, rotation, checks, the operator's window) |
+| Q6 | **B**: the 2026-10-16 decision stands; Privé stays out of the launch | **Read as B**, because the record recommends B "until clarified" and demo-only (A) only "if the owner confirms". Session A builds nothing for Privé. **Owner: say "Privé demo-only" if A was meant** |
+| Q7 | **A, then B**: one public profile stays the Business mode; the owner defines "Info"; Session A then proposes a mode model | Human: define Info. No mode work until then |
+| Q8 | **A**: contact numbers in plain text in closed tables for v1 | Revisit with the counsel review (Q9) |
+| Q9 | Counsel review of third-party contact data (DEC-2026-017); Privacy Policy emergency/relay section (V6-074) | **Human action, before launch.** Nothing changes in code |
+| Q10 | **A**: the showroom wording for Emergency (and Return to owner) changes, with the text approved by the owner | Session B drafts; the owner approves the words. Until then the customer-facing status stays "Coming soon" |
+| Q11 | **B**: an Emergency Profile shows only owner-approved, non-contact information, and alerts only through the 1b relay | No new backend. The view is the frontend's presentation of `public.status` plus the name the public profile already shows. Hidden while Q2 keeps 1b off. No number is ever shown |
+| Q12 | **A**: the Return-to-Owner relay (031) is approved | `RESCUE_RELAY=on` with the first production release that contains 031 |
+| Q13 | **A**: next stage = the consent ledger plus Connect requests, decisions and revocations | Session A's next stage; Verify waits for issuers |
 
 ## Expected result vs observed result
 

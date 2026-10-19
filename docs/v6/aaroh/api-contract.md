@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.2** (2026-10-19). v0.1 was `c8b869d`; changes in §13. |
+| Contract version | **AAROH-API v0.3** (2026-10-19). v0.1 `c8b869d`, v0.2 `b12967a`; changes in §13. DEC-2026-038 is **APPROVED** (Q1–Q13 as recommended). |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (all PROPOSED, DEC-2026-038). 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038; not applied anywhere). 027 is held aside (DEC-2026-037). |
 | Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
@@ -257,7 +257,7 @@ Rules:
   - 1 per visitor per Tap and 3 per visitor per 24 h (visitor = HMAC of the host-reported client IP and the day);
   - 50 per hour platform-wide.
 - **Host switch.** Visitor alerts run only where the host sets `EMERGENCY_PUBLIC_ALERTS=on`. It is unset (off) everywhere by default, so `public.status` answers `false` and `public.alert` answers `unavailable`, whatever the owner chose.
-- **Status: LIVE-LOCAL, but turning the host switch on in production needs the owner's decision (DEC-2026-038 Q2).** Build the visitor control so that it appears only when `available === true`.
+- **Status: LIVE-LOCAL; OFF by decision (DEC-2026-038 Q2 = B)** until supervised owner alerts have run in production. Build the visitor control so that it appears only when `available === true`.
 
 ### 10.4 Alerts (owner)
 
@@ -350,11 +350,11 @@ These are all migration 029, closed to every API client:
 | Part | Status |
 |---|---|
 | Contacts, settings, verification logic, alert state machine, idempotency, limits, retries, receipts, retention, audit | **LIVE-LOCAL** |
-| Real SMS to real phones (verification and alerts) | **BLOCKED**: `SMS_PROVIDER` plus credentials and, for MSG91, three DLT-approved templates; `docs/v6/aaroh/provider-requirements.md` |
-| Delivery receipts | **BLOCKED** with the provider (Twilio: `SMS_STATUS_CALLBACK_URL`). **MSG91 receipts: NOT IMPLEMENTED** (status stays `sent`) |
+| Real SMS to real phones (verification and alerts) | **BLOCKED**: the provider is MSG91 (DEC-2026-038 Q3). It needs the MSG91 account, `SMS_PROVIDER=msg91`, the key and three DLT-approved templates (human), then the supervised smoke test (`scripts/release/emergency-smoke.mjs`); `docs/v6/aaroh/provider-requirements.md` |
+| Delivery receipts | **LIVE-LOCAL** for both providers: Twilio signed callbacks, and MSG91 "Report Received" webhooks with a secret header (v0.3, V6-114). Live: BLOCKED with the provider (`MSG91_DLR_SECRET` and the webhook configured in MSG91) |
 | Scheduled retries and retention (`/api/emergency-dispatch` every minute with `CRON_SECRET`) | **BLOCKED**: host schedule and secret, and the deploy target (V6-043) |
-| Visitor-initiated alerts in production | **BLOCKED**: DEC-2026-038 Q2 |
-| Migration 029 on any real database | **BLOCKED**: DEC-2026-038 Q1 and the DEC-2026-018 review |
+| Visitor-initiated alerts in production | **OFF by decision** (DEC-2026-038 Q2 = B): `EMERGENCY_PUBLIC_ALERTS` stays unset until supervised owner alerts have run in production; then the owner decides again |
+| Migration 029 on any real database | **APPROVED design** (Q1). Application waits for the DEC-2026-018 cool-off and checklist, then the release track |
 | Location sharing, a callback number from the visitor, medical information, emergency-services integration, email, WhatsApp | **NOT IMPLEMENTED** (deliberately) |
 
 ---
@@ -370,7 +370,7 @@ A finder sends a protected message to a Tap's owner and they talk through SHYGON
 - **Host switch.** Finder operations run only where the host sets `RESCUE_RELAY=on`. It is unset everywhere: `public.status` returns `available:false`, and the other finder operations return `404 unavailable`.
 - **Owner opt-in.** The owner must also turn it on (default off).
 - **Tap state.** The Tap must be published, and neither the Tap nor the account may be suspended.
-- Production use needs DEC-2026-038 Q12.
+- Approved (DEC-2026-038 Q12). The switch goes on with the first production release containing 031.
 
 ### Finder operations (no sign-in)
 
@@ -426,7 +426,7 @@ A finder sends a protected message to a Tap's owner and they talk through SHYGON
 
 **Tests:** `npm run test:rescue`, 18 checks. They cover closure, the cleaner, the host switch, opt-in, start, duplicate start, owner inbox and read state, cross-account refusals on every owner operation, direct REST, auto-quiesce and duplicates, replies, finder and owner limits, poll cap, expiry, block, report and admin review, close, paused/suspended/disabled Taps, retention, and no leak.
 
-**Status:** LIVE-LOCAL, off (switch). Production BLOCKED on DEC-2026-038 Q12 and the 031 review.
+**Status:** LIVE-LOCAL, **APPROVED** (DEC-2026-038 Q12), off (switch) until the first production release with 031.
 
 **Admin** (§12a): `admin_list_rescue_reports(p_limit, p_offset)` returns reported threads with their messages (moderation needs the text). It requires `support.read`, and every read is in `admin_audit_log`.
 
@@ -437,10 +437,10 @@ A finder sends a protected message to a Tap's owner and they talk through SHYGON
 | Feature | Status | Why |
 |---|---|---|
 | Return-to-owner relay | **Moved to §10a in v0.2** (LIVE-LOCAL, off) | Lost or found item lifecycle is still BLOCKED (card registry) |
-| Emergency Profile / Emergency Tap information view (a responder sees approved emergency details) | NOT IMPLEMENTED | Ambiguous in the sources: doc 04 "purpose-bound release", the showroom "details you approve, shown only in an emergency flow". DEC-2026-038 Q11. Never reveal contact details because a page was opened |
+| Emergency Profile / Emergency Tap information view | **Decided (Q11 = B): no new backend** | The view presents `public.status` (§10.3) plus the name the public profile already shows, and its only action is the visitor alert (`public.alert`). Hidden while Q2 keeps visitor alerts off. Never show a contact detail |
 | Connect requests | NOT IMPLEMENTED | Phase 2 (doc 10); needs `connections` and `consent_grants`; DEC-2026-025 |
 | Credential verification (`/v/<code>`) | NOT IMPLEMENTED | No schema. DEC-037: an AAROH card is not an access or authentication credential |
-| SHYGON Privé (demo hotels, guest requests) | **BLOCKED** (decision conflict) | 2026-10-16: the owner removed Privé from the launch. 2026-10-19 brief: Privé as demo-only. DEC-2026-038 Q6. No real hotel, PMS, booking or access-control integration in any case |
+| SHYGON Privé (demo hotels, guest requests) | **OUT** (DEC-2026-038 Q6 read as B: the 2026-10-16 decision stands) | Not shown, not built. Demo-only Privé needs the owner's explicit "Privé demo-only". No real hotel, PMS, booking or access-control integration in any case |
 | Student Passport, Event mode, Places/objects, Cloud storage | NOT IMPLEMENTED | "Planned" in the showroom; no schema, no approval |
 | Card activation/lost cards for AAROH | BLOCKED | §7 |
 
@@ -463,8 +463,8 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Analytics | LIVE-LOCAL | §8 |
 | What visitors see (publish/pause, per field) | LIVE-LOCAL | §5 |
 | Card activation and lost cards | BLOCKED | §7 |
-| Emergency information / alerts | LIVE-LOCAL logic; **BLOCKED** for real delivery | §10.7. Showroom copy must change from "nothing like it is stored today" only when the owner approves DEC-2026-038 |
-| Return to owner | LIVE-LOCAL, off (`RESCUE_RELAY`) | §10a; customer-facing status stays "Coming soon" until DEC-2026-038 Q12 |
+| Emergency information / alerts | LIVE-LOCAL logic, **APPROVED** (Q1); real delivery **BLOCKED** (§10.7) | Showroom wording changes per Q10 = A: Session B drafts it and the owner approves the text. Until then the customer-facing status stays "Coming soon" |
+| Return to owner | LIVE-LOCAL, **APPROVED** (Q12), off (`RESCUE_RELAY`) until the first production release with 031 | §10a. Customer copy per Q10: Session B drafts, owner approves |
 | Connect | NOT IMPLEMENTED | §11 |
 | Verify | NOT IMPLEMENTED | §11 |
 | Privé | BLOCKED (decision) | §11 |
@@ -475,7 +475,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Operation | Status |
 |---|---|
 | `rpc('admin_list_emergency_events', { p_status?: text \| 'reported', p_limit?: 1–200, p_offset? })` → events with `userId`, statuses, `reportReason`, and per recipient `last4, status, attempts, provider, providerMessageId, providerStatus, lastError, attemptLog[]`. **No contact names, no full numbers.** Needs `support.read`; every call writes `admin_audit_log` `emergency.events.read` | LIVE-LOCAL; PROPOSED (DEC-2026-038; listed as PROPOSED in `test:admin-contract`) |
-| `rpc('admin_list_rescue_reports', { p_limit?: 1–200, p_offset? })`: reported Return-to-Owner threads with `ownerUserId`, `reportReason` and messages. Needs `support.read`; audited `rescue.reports.read` | LIVE-LOCAL; PROPOSED (DEC-2026-038 Q12) |
+| `rpc('admin_list_rescue_reports', { p_limit?: 1–200, p_offset? })`: reported Return-to-Owner threads with `ownerUserId`, `reportReason` and messages. Needs `support.read`; audited `rescue.reports.read` | LIVE-LOCAL; APPROVED (DEC-2026-038 Q12) |
 | Every other `admin_*` RPC | Unchanged; frozen admin contract (doc 12 §2) |
 
 ---
@@ -485,4 +485,5 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.3 | 2026-10-19 | DEC-2026-038 approved: statuses updated (029/030/031 APPROVED, not applied); Q2 visitor alerts off; Q6 Privé out; Q11 Emergency Profile = presentation of `public.status`, no new endpoint. MSG91 delivery reports (`/api/sms-status?provider=msg91`): `deliveryReceipts` can now be `supported` with MSG91. Operator smoke script. No request or response shape changed. | Showroom copy for Emergency and Return to owner: draft it for the owner's approval (Q10). Privé: not shown. Emergency Profile: build it on `public.status`; hidden while it says `false`. |
 | v0.2 | 2026-10-19 | New: §10a `/api/rescue` (Return-to-Owner relay, migration 031); `rescue` notifications (§9); `admin_list_rescue_reports` (§12a); the capability matrix. §11 now lists Emergency Profile as NOT IMPLEMENTED (Q11). No v0.1 operation changed. | New routes: `/shygontap/return-to-owner` (owner inbox) and a finder flow on `/t/:slug`. The finder token goes in `sessionStorage` or the URL fragment only. Show the relay control only when `public.status` says `available`. |

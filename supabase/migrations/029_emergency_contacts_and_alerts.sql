@@ -10,7 +10,8 @@
 --            notified, audited), doc 05 §2 (3 per day per device), doc 07 T18
 --            (relay, never reveal; no medical data). Migration numbering N-1:
 --            027 is held aside (DEC-2026-037), 028 is the suspension guard.
---            PROPOSED: not yet reviewed or approved.
+--            APPROVED by the owner 2026-10-19 (DEC-2026-038 Q1, in session).
+--            Approval of the design is not approval to apply: see Level.
 -- Level:     L3 (new tables holding third-party personal data; new privileged
 --            functions). Under DEC-2026-018 it needs a 24-hour cool-off plus the
 --            checklist review before it is approved or applied. Never applied by

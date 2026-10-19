@@ -8,7 +8,7 @@
 |---|---|---|
 | SMS via **MSG91** (India, DLT) | `netlify/lib/sms.mjs` (shared with the card OTP and order confirmation) | Integrated; not configured |
 | SMS via **Twilio** | the same file | Integrated; not configured |
-| Delivery receipts | Twilio: `netlify/functions/sms-status.mjs` (signature-verified). MSG91: **not implemented** | — |
+| Delivery receipts | `netlify/functions/sms-status.mjs`: Twilio (signature-verified) and, since 2026-10-19 (V6-114), MSG91 (`?provider=msg91`, secret header) | Integrated; not configured |
 | Email, WhatsApp, push to customers | none | NOT IMPLEMENTED (DEC-2026-031 is still PROPOSED) |
 
 The emergency module reuses this SMS layer. **No new provider was introduced.** Choosing between MSG91 and Twilio, or another provider, is the owner's decision (DEC-2026-038 Q3, extending DEC-2026-031).
@@ -27,6 +27,7 @@ Set them in the host's environment (Netlify and/or Vercel). **Never prefix them 
 | `MSG91_EMERGENCY_OWNER_TEMPLATE_ID` | owner-initiated alert | Variables `##name##`, `##time##` (`MSG91_EMERGENCY_TIME_VAR`) |
 | `MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID` | visitor-initiated alert | Variables `##name##`, `##time##` |
 | **Twilio:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM` or `TWILIO_MESSAGING_SERVICE_SID` | Twilio | An India sender also needs Twilio's India DLT registration |
+| `MSG91_DLR_SECRET` | MSG91 delivery reports | A random value of 32 or more characters. In MSG91: SMS > Webhook (New) > event "On Report Received", URL `https://<production host>/api/sms-status?provider=msg91`, content type JSON, custom header `x-shygon-dlr-secret: <the same value>`. MSG91 does not sign webhooks, so this header is the only proof a report came from your MSG91 account. Without it, alerts stay `sent` (unconfirmed) |
 | `SMS_STATUS_CALLBACK_URL` | Twilio delivery receipts | Exactly `https://<production host>/api/sms-status`. The signature is checked against this exact string, so it must match the public URL character for character. Without it, alerts stay `sent` (unconfirmed) |
 | `EMERGENCY_PUBLIC_ALERTS` | visitor-initiated emergency alerts | **Leave unset** (off) until DEC-2026-038 Q2. `on` enables them |
 | `RESCUE_RELAY` | the Return-to-Owner relay's finder side (`/api/rescue`) | **Leave unset** (off) until DEC-2026-038 Q12. `on` enables it. The relay needs no SMS provider: owner notices are in-app |
@@ -57,7 +58,7 @@ This depends on the single deploy target (V6-043, open). Until it is scheduled:
 | Provider | "accepted" (status `sent`) | "delivered" | Failure receipts |
 |---|---|---|---|
 | Twilio | HTTP 201 from the Messages API (`sid`, `queued`) | Only from a signed status callback `delivered` (or `read`) | `undelivered`, `failed` (+ `ErrorCode`) |
-| MSG91 | `{"type":"success"}` with a request id | **Never.** MSG91 delivery reports are not implemented | — |
+| MSG91 | `{"type":"success"}` with a request id | Only from a "Report Received" webhook with status `1`, carrying the secret header | `2` failed, `9` NDNC, `16`/`25` rejected, `17` blocked number, `20` country blocked (stored as fixed codes, never MSG91's free text). `0` sent changes nothing. That the report's `requestId` equals the send's request id is INFERRED from MSG91's docs; the smoke test confirms it |
 
 A provider accepting a message does not prove it was received or read. The API and the contract say so.
 
@@ -66,5 +67,5 @@ A provider accepting a message does not prove it was received or read. The API a
 1. **Owner:** decide DEC-2026-038 Q3 (provider) and Q2 (visitor alerts in production).
 2. **Owner or operator:** create the provider account. For MSG91: register the three DLT templates and the sender ID. For Twilio: India sender registration.
 3. **Operator:** set the §2 variables on the production host (after the B-1 rotation), plus `CRON_SECRET` and the schedule (§4).
-4. **Operator:** a supervised smoke test. Add your own phone as a contact, verify it, send one owner alert, confirm the received text and the status shown, and receive a receipt (Twilio). Record the evidence without numbers or values.
+4. **Operator:** the supervised smoke test (`scripts/release/emergency-smoke.mjs`; DEC-2026-038 Q2 asks for supervised owner alerts before visitor alerts are reconsidered). It runs with your own session token and your own second phone. It sends one verification text and, after you type SEND, one alert, then follows the status until a receipt arrives. It prints evidence with no number, code or token, and removes the contact. Record the evidence plus your eyewitness check of the received text.
 5. **Until then the feature stays BLOCKED for live delivery.** The UI must show `providerConfigured: false` honestly.

@@ -333,6 +333,21 @@ await t.check('retention: numbers erased 7 days after completion; alerts deleted
   return JSON.stringify(purged);
 });
 
+await t.check('DEC-2026-038 Q4: a suspended account may still alert its own verified contacts; visitor alerts stop for it', async () => {
+  const U3 = 'c3000000-0000-4000-8000-000000000003';
+  await db.exec(`INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES ('${U3}', 'three@example.test', '{"full_name":"Chitra"}');
+    INSERT INTO public.tap_profiles (user_id, customer_id, slug, username, display_name, status)
+    VALUES ('${U3}', (SELECT id FROM public.customers WHERE user_id = '${U3}'), 'chitra-q4', 'chitra-q4', 'Chitra', 'active');`);
+  await verified(U3, '+919866666661');
+  await fn('emergency_settings_set', [U3, true, true]);
+  assert(await fn('emergency_public_target', ['chitra-q4']), 'visitor alerts available before the suspension');
+  await db.query(`UPDATE public.profiles SET suspended_at = now(), suspended_reason = 'test' WHERE id = $1`, [U3]);
+  const opened = await fn('emergency_alert_open', [U3, 'owner', key(), null, null]);
+  assert(opened.ok, `owner alert while suspended: ${JSON.stringify(opened)}`);
+  assertEqual(await fn('emergency_public_target', ['chitra-q4']), null, 'visitor alerts while suspended');
+  return 'safety over moderation for the owner\'s own contacts';
+});
+
 await t.check('deleting an account deletes its contacts, alerts, recipients, attempts and audit (ON DELETE CASCADE)', async () => {
   await db.query(`DELETE FROM auth.users WHERE id = $1`, [U2]);
   for (const table of TABLES) {
@@ -780,15 +795,57 @@ await t.check('admin investigation: a customer is refused; a support admin sees 
 });
 
 await t.check('MSG91: the DLT template and variables are used; with no receipts the status stays "sent" (unconfirmed)', async () => {
-  stack.useSms('msg91');
+  stack.useSms('msg91', { receipts: false });
   await freshWindow();
   await stack.query(`DELETE FROM public.emergency_events WHERE user_id = $1 AND initiator = 'owner'`, [asha.userId]);
   const r = await call({ op: 'alerts.create', idempotencyKey: newKey() }, { token: asha.token });
   assertEqual([r.body.event.status, r.body.event.deliveryReceipts], ['sent', 'not_supported'], 'event');
   const last = sms.messages.at(-1);
   assertEqual([last.provider, last.templateId, last.vars.name], ['msg91', 'tmpl_emergency_owner', 'Asha Rao'], 'template');
-  stack.useSms('twilio');
+  const without = await sms.deliverMsg91(last.sid, 1, { secret: stack.secrets.msg91DlrSecret });
+  assertEqual(without.status, 503, 'receipts refused while MSG91_DLR_SECRET is unset');
   return 'accepted, delivery unconfirmed';
+});
+
+await t.check('MSG91 receipts (V6-114): only a report with the secret header counts; 1 = delivered, 17 = not delivered; nothing moves back', async () => {
+  stack.useSms('msg91');
+  await stack.query(`DELETE FROM public.emergency_events WHERE user_id = $1 AND initiator = 'owner'`, [asha.userId]);
+  const r = await call({ op: 'alerts.create', idempotencyKey: newKey() }, { token: asha.token });
+  assertEqual([r.body.event.status, r.body.event.deliveryReceipts], ['sent', 'supported'], 'event before reports');
+  const [a, b] = sms.messages.filter((m) => m.provider === 'msg91').slice(-2);
+  assertEqual((await sms.deliverMsg91(a.sid, 1, { secret: 'not-the-secret' })).status, 403, 'wrong secret');
+  assertEqual((await sms.deliverMsg91(a.sid, 1)).status, 403, 'no secret header');
+  let e = await call({ op: 'alerts.get', eventId: r.body.event.id }, { token: asha.token });
+  assertEqual(e.body.event.status, 'sent', 'unchanged by refused reports');
+  assertEqual((await sms.deliverMsg91(a.sid, 1, { secret: stack.secrets.msg91DlrSecret })).body.matched, 1, 'delivered report');
+  assertEqual((await sms.deliverMsg91(b.sid, 17, { secret: stack.secrets.msg91DlrSecret })).body.matched, 1, 'blocked-number report');
+  assertEqual((await sms.deliverMsg91(a.sid, 2, { secret: stack.secrets.msg91DlrSecret })).body.matched, 1, 'a late failure report for a delivered message');
+  assertEqual((await sms.deliverMsg91('unknown-request', 1, { secret: stack.secrets.msg91DlrSecret })).body.matched, 0, 'unknown request id');
+  e = await call({ op: 'alerts.get', eventId: r.body.event.id }, { token: asha.token });
+  assertEqual(e.body.event.status, 'partial', 'event');
+  const byStatus = e.body.event.recipients.map((x) => [x.status, x.lastError]).sort();
+  assertEqual(byStatus, [['delivered', null], ['undelivered', 'blocked_number']], 'recipients (fixed error vocabulary, no provider free text)');
+  stack.useSms('twilio');
+  return 'delivered and not-delivered both shown as the provider reported';
+});
+
+await t.check('operator smoke script (scripts/release/emergency-smoke.mjs) runs end to end: verify, SEND, receipt, contact removed', async () => {
+  const { runSmoke } = await import('../../scripts/release/emergency-smoke.mjs');
+  const operator = await signUp(stack, { name: 'Operator Test' });
+  const lines = [];
+  const evidence = await runSmoke({
+    base: stack.appUrl, token: operator.token, phone: '+919876500077', pollMs: 20, maxPolls: 50,
+    ask: async (question) => (/6-digit/.test(question) ? /code: (\d{6})/.exec(sms.messages.at(-1).body)[1] : 'SEND'),
+    log: (line) => {
+      lines.push(line);
+      if (/^alert .*: sent/.test(line)) setTimeout(() => sms.deliver(sms.messages.at(-1).sid, 'delivered'), 5);
+    },
+  });
+  assertEqual([evidence.result, evidence.finalStatus, evidence.deliveryReceipts], ['delivered-confirmed', 'delivered', 'supported'], 'evidence');
+  const left = (await stack.query(`SELECT count(*)::int AS n FROM public.emergency_contacts WHERE user_id = $1`, [operator.userId])).rows[0].n;
+  assertEqual(left, 0, 'smoke contact removed');
+  assert(!JSON.stringify(evidence).includes('9876500077') && !lines.join(' ').includes('9876500077'), 'a number in the evidence or output');
+  return evidence.result;
 });
 
 await t.check('nothing secret or personal reached a response or a log line', async () => {

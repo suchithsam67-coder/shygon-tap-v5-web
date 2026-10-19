@@ -10,7 +10,8 @@
 --            DEC-2026-038 Q12 (PROPOSED). Design: doc 03 §3.4 (rescue_threads,
 --            rescue_messages), doc 05 §2 (finder endpoints and limits), doc 07
 --            T6 (spam and harassment controls), doc 08 (lost mode).
---            PROPOSED: not yet reviewed or approved.
+--            APPROVED by the owner 2026-10-19 (DEC-2026-038 Q12, in session).
+--            Approval of the design is not approval to apply: see Level.
 -- Level:     L3 (new tables holding messages between strangers; privileged
 --            functions). DEC-2026-018 24-hour cool-off plus checklist review
 --            before approval or application. Never applied by tooling to

@@ -4,7 +4,8 @@
 -- Decision:  the owner's AAROH backend brief of 2026-10-19 ("the owner must not
 --            be able to grant themselves paid entitlements ... enforce these
 --            restrictions in the backend"); DEC-2026-038 (PROPOSED). Migration
---            numbering N-1. PROPOSED: not yet reviewed or approved.
+--            numbering N-1. APPROVED by the owner 2026-10-19 (DEC-2026-038 Q5, in session).
+--            Approval of the design is not approval to apply: see Level.
 -- Level:     L3 (a trigger guarding authorization-relevant columns). Under
 --            DEC-2026-018 it needs a 24-hour cool-off plus the checklist review
 --            before it is approved or applied. Never applied by tooling to

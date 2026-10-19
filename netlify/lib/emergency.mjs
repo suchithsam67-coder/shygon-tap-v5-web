@@ -132,6 +132,7 @@ export const statusCallbackUrl = () => (smsProvider() === 'twilio' ? env('SMS_ST
 /** What the owner's status page can say about receipts with the current settings. */
 export function deliveryReceipts() {
   if (smsProvider() === 'twilio' && env('SMS_STATUS_CALLBACK_URL')) return 'supported';
+  if (smsProvider() === 'msg91' && env('MSG91_DLR_SECRET')) return 'supported';
   return 'not_supported';
 }
 

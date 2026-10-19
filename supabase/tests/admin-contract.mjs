@@ -123,24 +123,24 @@ const APPROVED_POLICY_CHANGES = {
 const APPROVED_NEW_RELATIONS = {
   order_admin_notes: 'DEC-2026-035 V6-010 F2 (migration 022)',
   tap_visitor_salts: 'DEC-2026-035 V6-073 (migration 025)',
+  ...Object.fromEntries(['emergency_settings', 'emergency_contacts', 'emergency_contact_challenges', 'emergency_events',
+    'emergency_event_recipients', 'emergency_delivery_attempts', 'emergency_audit']
+    .map((t) => [t, 'DEC-2026-038 Q1, approved 2026-10-19 (migration 029)'])),
+  ...Object.fromEntries(['rescue_settings', 'rescue_threads', 'rescue_messages', 'rescue_blocks', 'rescue_audit']
+    .map((t) => [t, 'DEC-2026-038 Q12, approved 2026-10-19 (migration 031)'])),
 };
 
 // New admin_* functions (new names, not overloads), with their decision.
 // state 'PROPOSED' passes the check but is reported as not approved.
 const NEW_ADMIN_FUNCTIONS = {
-  'admin_list_emergency_events(text,integer,integer)': { decision: 'DEC-2026-038 (migration 029)', state: 'PROPOSED' },
-  'admin_list_rescue_reports(integer,integer)': { decision: 'DEC-2026-038 Q12 (migration 031)', state: 'PROPOSED' },
+  'admin_list_emergency_events(text,integer,integer)': { decision: 'DEC-2026-038 Q1, approved 2026-10-19 (migration 029)', state: 'APPROVED' },
+  'admin_list_rescue_reports(integer,integer)': { decision: 'DEC-2026-038 Q12, approved 2026-10-19 (migration 031)', state: 'APPROVED' },
 };
 
 // Relations a PROPOSED decision adds. Held to the same rule (closed, RLS on),
 // but NOT approved: the check names them as pending so the gate output says so.
 // Move an entry to APPROVED_NEW_RELATIONS only when the owner approves it.
-const PROPOSED_NEW_RELATIONS = Object.fromEntries([
-  'emergency_settings', 'emergency_contacts', 'emergency_contact_challenges', 'emergency_events',
-  'emergency_event_recipients', 'emergency_delivery_attempts', 'emergency_audit',
-].map((t) => [t, 'DEC-2026-038 PROPOSED (migration 029)']).concat(
-  ['rescue_settings', 'rescue_threads', 'rescue_messages', 'rescue_blocks', 'rescue_audit']
-    .map((t) => [t, 'DEC-2026-038 Q12 PROPOSED (migration 031)'])));
+const PROPOSED_NEW_RELATIONS = {};
 
 const aclItems = (acl) => (acl ? acl.replace(/^\{|\}$/g, '').split(',').filter(Boolean) : []);
 const grantee = (item) => item.slice(0, item.indexOf('='));
