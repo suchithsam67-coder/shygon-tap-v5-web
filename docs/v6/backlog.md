@@ -85,7 +85,7 @@ Priority: P0 release blocker · P1 must complete · P2 should complete · P3 def
 | V6-119 | Abuse | No bot check on the public relays (`public.alert`, `public.start`): limits only. Doc 05 specifies Turnstile | P2 | owner (provider/key) | new |
 | V6-120 | Emergency | Emergency Profile / information view is undefined (doc 04 vs showroom) | P2 | DEC-2026-038 Q11 | new |
 | V6-121 | Connect | SHYGON Connect and the consent ledger (DEC-2026-038 Q13): migration 032, `/api/connect`, contract §10b | P1 | AAROH backend | **done locally; APPROVED 2026-10-20** (DEC-2026-039 Q1–Q7 as built); `test:connect` 16/16 |
-| V6-122 | Privé | SHYGON Privé, demo only (DEC-2026-038 Q6 → A, 2026-10-20): migration 033, `/api/prive`, `netlify/lib/hospitality.mjs`, contract §10c | P2 | AAROH backend | **done locally**, PROPOSED (DEC-2026-040 Q1–Q5); `test:prive` 12/12. No real hotel integration exists or is called |
+| V6-122 | Privé | SHYGON Privé, demo only (DEC-2026-038 Q6 → A, 2026-10-20): migration 033, `/api/prive`, `netlify/lib/hospitality.mjs`, contract §10c | P2 | AAROH backend | **done locally; APPROVED 2026-10-20** (DEC-2026-040 Q1–Q5 as built); `test:prive` 12/12. No real hotel integration exists or is called |
 
 ## Deferred to the card release (D-2, card decision)
 V6-003 (I-4 card records), V6-011 (O-7 owner undoes card suspension), V6-019 (I-5 pgcrypto), V6-034 (F3 card state vs Tap), V6-035 (F4 + O-3 card OTP).

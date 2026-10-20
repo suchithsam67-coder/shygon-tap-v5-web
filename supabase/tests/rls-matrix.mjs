@@ -211,7 +211,7 @@ const MODEL = {
   connections: { owner: OWN('requester_user_id'), select: sel(NONE, NONE) },
   consent_grants: { owner: OWN('grantor_user_id'), select: sel(NONE, NONE) },
   connect_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
-  // Privé, demo only (033, DEC-2026-040 PROPOSED): closed the same way; even the
+  // Privé, demo only (033, DEC-2026-040, approved 2026-10-20): closed the same way; even the
   // sample catalogue is read through the server function only.
   prive_demo_hotels: { owner: NONE, select: sel(NONE, NONE) },
   prive_demo_requests: { owner: OWN('user_id'), select: sel(NONE, NONE) },

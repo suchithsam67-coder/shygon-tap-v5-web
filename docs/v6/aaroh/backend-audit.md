@@ -168,7 +168,7 @@ The rules enforced by this design:
 | `npm run test:rescue` | **18 passed, 0 failed** |
 | `npm run test:connect` | **16 passed, 0 failed** |
 | `npm run test:prive` | **12 passed, 0 failed** |
-| `npm run test:db` | PASS: apply ×2 (020–033); verify 21; adversarial 64; **rls-matrix 1459 (51 tables × 7 callers)**; identity 69; admin-notes 12; golden 15 (one per migration prefix); **admin-contract 15** (029, 031 and 032 objects APPROVED; 033's three tables "PROPOSED, NOT APPROVED"); rollbacks 14 (every 020–033 rollback, plus the chain); **account-deletion 9** (emergency, rescue, Connect and Privé demo data); bundle check; history 2 |
+| `npm run test:db` | PASS: apply ×2 (020–033); verify 21; adversarial 64; **rls-matrix 1459 (51 tables × 7 callers)**; identity 69; admin-notes 12; golden 15 (one per migration prefix); **admin-contract 15** (029, 031, 032 and 033 objects all APPROVED; nothing pending); rollbacks 14 (every 020–033 rollback, plus the chain); **account-deletion 9** (emergency, rescue, Connect and Privé demo data); bundle check; history 2 |
 | `test:payments:ci` | payments 15; functions-security 13 + **1 BLOCKED** (needs Node 22; known) |
 | `test:payment-chain` 30 · `test:public-tap` 25 · `test:suspension` 46 · `test:admin-edge` 11 · `test:observability` 10 · `test:security` 11 · `test:push-guard` 18 | all PASS |
 | `lint` · `build` · `test:bundle` · `test:bundle-secrets` (207 files) · `test:seo` · `test:components` 23 | all PASS |
@@ -226,8 +226,8 @@ Three problems found during the runs were real and are fixed, not worked around:
 | Tests (step 13) | PASS except the known secret-scan finding and the Node 22 check |
 | DEC-2026-038 | **APPROVED 2026-10-19** (Q1–Q13 as recommended; Q6 read as B, conflict still open) |
 | Connect stage (DEC-2026-038 Q13) | PASS locally (`test:connect` 16); **DEC-2026-039 APPROVED 2026-10-20** (every choice as built) |
-| Privé (DEC-2026-038 Q6 → A, 2026-10-20) | PASS locally (`test:prive` 12), demo only; its choices PROPOSED in DEC-2026-040 |
-| **Gate** | **STOPPED for owner review of DEC-2026-040.** Also waiting: the "Info" definition and the human actions below. Production: NOT AUTHORIZED |
+| Privé (DEC-2026-038 Q6 → A, 2026-10-20) | PASS locally (`test:prive` 12), demo only; **DEC-2026-040 APPROVED 2026-10-20** (every choice as built) |
+| **Gate** | **STOPPED: every backend stage approved so far is built, approved and verified locally (029–033).** Waiting on the owner: the "Info" definition and the human actions below. Production: NOT AUTHORIZED |
 
 ## 14. Next smallest safe stage (2026-10-20)
 
@@ -235,7 +235,7 @@ Three problems found during the runs were real and are fixed, not worked around:
 
 **Waiting on the owner:**
 1. ~~DEC-2026-039~~: **approved 2026-10-20**, every choice as built; 032 is approved in the gates.
-2. ~~Privé~~: **demo-only, 2026-10-20.** Built as 033; its choices are in DEC-2026-040 (PROPOSED).
+2. ~~Privé~~: **demo-only, 2026-10-20.** Built as 033; DEC-2026-040 approved the same day.
 3. **"Info" mode:** define it (Q7). Session A then proposes a mode model.
 4. **Human actions:** the MSG91 account, the three DLT templates and the sender ID (Q3); counsel review and the Privacy Policy section (Q9); approval of Session B's showroom wording (Q10, `docs/v6/aaroh/showroom-copy-Q10-draft.md` on Session B's branch).
 

@@ -8,7 +8,9 @@
 --            the 2026-10-19 briefs (a demo request "may be genuinely created
 --            and updated inside the SHYGON demo environment, but it must never
 --            be represented as having reached a real hotel"). The choices this
---            file makes are DEC-2026-040 (PROPOSED).
+--            file makes are DEC-2026-040 Q1-Q5, APPROVED by the owner 2026-10-20
+--            (in session). Approval of the design is not approval to apply:
+--            see Level.
 -- Level:     L3 (new tables, seed rows, privileged functions). DEC-2026-018
 --            cool-off plus checklist review before approval or application.
 --            Never applied by tooling.

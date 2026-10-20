@@ -10,7 +10,7 @@
 | **Accountable Owner (A)** | Repository owner (DEC-2026-018 Option B) |
 | Responsible (R) | Session A (AAROH backend) |
 | Informed (I) | Session B (frontend) |
-| State | **PROPOSED: HUMAN DECISION REQUIRED.** The owner decided "Privé demo-only" on 2026-10-20 (DEC-2026-038 Q6 → A). This record asks about the specific choices. Implemented locally (`test:prive` 12/12), listed as PROPOSED, NOT APPROVED in `test:admin-contract`. Not applied, pushed or deployed |
+| State | **APPROVED 2026-10-20, in session:** "Approve DEC-2026-040 Q1–Q5 as recommended in the record". Every recommendation is the behaviour 033 already has, so no code changed; the gates now list 033 as approved. Approval of the design is not approval to apply: DEC-2026-018 cool-off and checklist review first, then the release track. Not applied, pushed or deployed |
 
 ## Priority
 
@@ -45,6 +45,14 @@ Options:
 
 ## Decision
 
-Q1 ____ Q2 ____ Q3 ____ Q4 ____ Q5 ____
+**Approved by:** the repository owner (DEC-2026-018 Option B), in session. **Date:** 2026-10-20. **Words:** "Approve DEC-2026-040 Q1–Q5 as recommended in the record."
 
-**Approved by:** ________ **Date:** ________
+### Recorded decision
+
+| Q | Outcome | What it means now |
+|---|---|---|
+| Q1 | **A**: only signed-in SHYGON accounts create demo requests | The public showroom walkthrough stays client-only and sends nothing |
+| Q2 | **A**: three fictional SHYGON-owned sample hotels, names starting "SHYGON Demo", every row demo | As built |
+| Q3 | **A**: a simulated desk inside SHYGON: received → acknowledged (20 s) → in progress (1 min) → completed (3 min); the guest may cancel until completed | As built |
+| Q4 | **A**: 10 per hour and 50 per day per account; 30-day retention; deleted with the account | As built |
+| Q5 | **A**: `HotelProvider` with a single `demo` implementation; any other `HOTEL_PROVIDER` fails closed; no network calls | A real integration needs its own decision, contract, credentials and security review |
