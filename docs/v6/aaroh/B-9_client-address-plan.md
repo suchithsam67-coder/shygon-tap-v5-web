@@ -5,7 +5,7 @@
 | Requested by | Session B, 2026-10-20 (B-9) |
 | Owner's direction, 2026-10-20 | "Authorise investigation and a local-development-only solution. Keep this separate from DEC-2026-041. Do not trust a client-supplied address header in production. Production must rely on correctly configured trusted proxy infrastructure." |
 | Status | **Part A BUILT locally on 2026-10-20**, on the owner's instruction in Session A's session: "Build B-9 Part A (local stack only) as described in the plan, with its tests. Nothing under netlify/, api/ or migrations." See §5. **Part B: PROPOSED**, not built; it needs separate approval. |
-| Note | Session B received owner text approving B-9 as "INVESTIGATION ONLY". Session A followed the direct instruction above. The change is local-only and can be reverted with one commit. |
+| Note | Session B first received owner text approving B-9 as "INVESTIGATION ONLY". Later the same day the owner confirmed to Session B (relayed): "Yes. The backend session may build B-9 Part A (local stack only) with its tests, as local commits. Nothing under netlify/, api/ or migrations, and no deployment." Discrepancy closed. Part B and B-10 remain unapproved for implementation. |
 | Backlog | V6-124 (Part A, local), V6-126 (Part B, production header trust) |
 
 Labels: **OBSERVED** (verified in this repository), **INFERRED**, **UNKNOWN**, **PROPOSED**.
