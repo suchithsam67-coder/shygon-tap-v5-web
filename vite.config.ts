@@ -97,7 +97,7 @@ function seoPages(site: string, sales: { cardSales: boolean }): Plugin {
  * same handlers). The Razorpay keys in .env must be TEST keys.
  */
 function devFunctions(serverEnv: Record<string, string>): Plugin {
-  const allowed = new Set(['check-delivery', 'card-otp', 'create-order', 'verify-payment', 'razorpay-webhook', 'payment-mode', 'health']);
+  const allowed = new Set(['check-delivery', 'card-otp', 'create-order', 'verify-payment', 'razorpay-webhook', 'payment-mode', 'health', 'emergency', 'sms-status', 'emergency-dispatch', 'rescue', 'connect']);
   return {
     name: 'shygon-dev-functions',
     apply: 'serve',

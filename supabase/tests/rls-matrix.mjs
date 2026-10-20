@@ -98,9 +98,43 @@ for (const [u, n] of [[A, 1], [B, 2]]) {
     VALUES ((SELECT id FROM public.customers WHERE user_id = '${u}'), '0${n}000000-0000-4000-8000-0000000000c${n}',
             'ca000000-0000-4000-8000-000000000001');
   `);
+  // The emergency module (029): one row in each table, owned by this customer.
+  await db.exec(`
+    INSERT INTO public.emergency_settings (user_id, public_alerts_enabled) VALUES ('${u}', true);
+    INSERT INTO public.emergency_contacts (id, user_id, name, phone_e164, verified_at)
+    VALUES ('0${n}000000-0000-4000-8000-0000000000f${n}', '${u}', 'Matrix contact ${n}', '+9198000000${n}${n}', now());
+    INSERT INTO public.emergency_contact_challenges (user_id, contact_id, phone_digest, code_hash, expires_at)
+    VALUES ('${u}', '0${n}000000-0000-4000-8000-0000000000f${n}', 'digest', 'hash', now() + interval '10 minutes');
+    INSERT INTO public.emergency_events (id, user_id, initiator, idempotency_key, recipient_count)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000a${n}'::uuid, '${u}', 'owner', 'matrix-key-000000${n}', 1);
+    INSERT INTO public.emergency_event_recipients (id, event_id, contact_id, contact_name, phone_last4, phone_e164)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000b${n}'::uuid, '1${n}000000-0000-4000-8000-0000000000a${n}', '0${n}000000-0000-4000-8000-0000000000f${n}',
+            'Matrix contact ${n}', '00${n}${n}', '+9198000000${n}${n}');
+    INSERT INTO public.emergency_delivery_attempts (recipient_id, attempt_no, outcome)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000b${n}', 1, 'accepted');
+    INSERT INTO public.emergency_audit (user_id, event_id, actor, action)
+    VALUES ('${u}', '1${n}000000-0000-4000-8000-0000000000a${n}', 'owner', 'matrix.test');
+    INSERT INTO public.rescue_settings (user_id, enabled) VALUES ('${u}', true);
+    INSERT INTO public.rescue_threads (id, owner_user_id, finder_token_hash, finder_digest, idempotency_key)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000c${n}', '${u}', 'matrix-token-${n}', 'matrix-digest-${n}', 'matrix-rescue-key-${n}');
+    INSERT INTO public.rescue_messages (thread_id, sender, body)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000c${n}', 'finder', 'Matrix finder message ${n}');
+    INSERT INTO public.rescue_blocks (owner_user_id, finder_digest, expires_at) VALUES ('${u}', 'blocked-${n}', now() + interval '1 day');
+    INSERT INTO public.rescue_audit (user_id, actor, action) VALUES ('${u}', 'owner', 'matrix.test');
+    INSERT INTO public.connect_settings (user_id, enabled) VALUES ('${u}', true);
+    INSERT INTO public.connect_audit (user_id, action) VALUES ('${u}', 'matrix.test');
+  `);
 }
 
 // --- the expected access model -----------------------------------------------
+await db.exec(`
+  INSERT INTO public.connections (id, requester_user_id, target_user_id, status, idempotency_key)
+  VALUES ('1c000000-0000-4000-8000-0000000000c1', '${A}', '${B}', 'accepted', 'matrix-connect-key-1');
+  INSERT INTO public.consent_grants (grantor_user_id, grantee_user_id, scope, connection_id)
+  VALUES ('${A}', '${B}', ARRAY['email'], '1c000000-0000-4000-8000-0000000000c1'),
+         ('${B}', '${A}', ARRAY['phone'], '1c000000-0000-4000-8000-0000000000c1');
+`);
+
 const NONE = 'false';
 const ALL = 'true';
 const OWN = (c) => `${c} = auth.uid()`;
@@ -150,6 +184,30 @@ const MODEL = {
   // D-6 / O-14 (023): no insert, not even of the caller's own Tap.
   tap_profiles: { owner: OWN('user_id'), select: sel(NONE, OWN('user_id'), ALL), update: OWN('user_id') },
   tap_visitor_salts: { owner: NONE, select: sel(NONE, NONE) }, // V6-073 (025): record_tap_event only
+  // The emergency module (029, DEC-2026-038 Q1, approved 2026-10-19): no API client reaches
+  // any of it, not even the owner or an administrator; only the server
+  // function (service_role) through the definer functions.
+  emergency_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  emergency_contacts: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  emergency_contact_challenges: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  emergency_events: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  emergency_event_recipients: { owner: `event_id IN (SELECT id FROM public.emergency_events WHERE user_id = auth.uid())`, select: sel(NONE, NONE) },
+  emergency_delivery_attempts: {
+    owner: `recipient_id IN (SELECT r.id FROM public.emergency_event_recipients r JOIN public.emergency_events e ON e.id = r.event_id WHERE e.user_id = auth.uid())`,
+    select: sel(NONE, NONE),
+  },
+  emergency_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  // The Return-to-Owner relay (031, DEC-2026-038 Q12, approved 2026-10-19): closed the same way.
+  rescue_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  rescue_threads: { owner: OWN('owner_user_id'), select: sel(NONE, NONE) },
+  rescue_messages: { owner: `thread_id IN (SELECT id FROM public.rescue_threads WHERE owner_user_id = auth.uid())`, select: sel(NONE, NONE) },
+  rescue_blocks: { owner: OWN('owner_user_id'), select: sel(NONE, NONE) },
+  rescue_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  // Connect and the consent ledger (032, DEC-2026-039 PROPOSED): closed the same way.
+  connect_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  connections: { owner: OWN('requester_user_id'), select: sel(NONE, NONE) },
+  consent_grants: { owner: OWN('grantor_user_id'), select: sel(NONE, NONE) },
+  connect_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };

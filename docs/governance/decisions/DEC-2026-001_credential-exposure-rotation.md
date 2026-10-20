@@ -10,10 +10,10 @@
 | Domain / Level | Security / **L3** |
 | **Accountable Owner** | Security Owner: **UNASSIGNED — HUMAN ACTION REQUIRED** (OQ-16 / DEC-2026-018) |
 | Consulted | Data Owner (DB contents) and Release Owner (env update + redeploy). Both UNASSIGNED. |
-| State | **OPEN — HUMAN ACTION REQUIRED** |
+| State | **OPEN. Rotation APPROVED by the repository owner on 2026-10-18 ("proceed immediately"); NOT DONE yet.** HUMAN ACTION REQUIRED |
 | Priority | **P0 triage (provisional)** until the exposure history is established. The pack's classification was I3 U3 Irr1 R2 = 9 → P1 · matrix P0 · Final P1 (doc 13 §1.1). See the priority change below. |
 | Deadline | Immediate |
-| Credential rotation | **NOT DONE.** Assume this until a human explicitly confirms otherwise. |
+| Credential rotation | **NOT DONE** (approved 2026-10-18). Assume this until a human explicitly confirms otherwise. A human performs it; Claude Code never handles a credential value or changes a security setting. |
 | doc 12 §2A gate ("any work at all") | **WAIVED FOR M0.3** (2026-10-02) **and for SHYGON V6 development / release-candidate work** (2026-10-05) by the repository owner, in session. See "Waiver" and "Extension" below. Rotation remains required, and is a V6 release requirement. |
 | Production data | **UNKNOWN — HUMAN CONFIRMATION REQUIRED.** It has not been inspected, and must not be inspected just to answer this question. |
 
@@ -106,8 +106,27 @@ Any one of these confirms a P0:
 | Expires | When the V6 release candidate reaches the production gate (Stage 6), or earlier if the owner withdraws it. **It is temporary: credentials may not stay unrotated indefinitely.** |
 | Risk accepted | V6 development continues while the exposure history of the project ZIPs is unestablished. V6 adds no new use of any credential |
 
+## Owner decision, 2026-10-18 (in session)
+"B-1: Rotate potentially exposed credentials. Decision: APPROVED — proceed immediately."
+
+The owner's conditions:
+- Rotate the potentially exposed Supabase service-role credential, and any other credential confirmed to be affected.
+- Update the authorized secret stores, CI/CD environments and deployed consumers that depend on them. The consumers are listed in `docs/runbooks/RUNBOOK-secrets.md` §1; CI holds no production secret.
+- Verify that legitimate services keep working (runbook §4).
+- Review the relevant access logs for unauthorized use, and record the outcome.
+- Never expose a credential value anywhere.
+- Do not disable the existing credential until its replacement is ready and the rotation can complete safely.
+
+Evidence required, with no values:
+- rotation confirmation;
+- an inventory of the affected consumers;
+- service-health checks;
+- an access-log review summary.
+
+Context for the review: the production read-only packs of 2026-10-18 report counts only. Production then held 6 sign-in accounts, 0 paid orders, 0 Taps, 0 cards, 4 published `shygontap_profiles` pages and 9 stored photos. That is the data the exposed key could reach.
+
 ## Decision
-- **Decision:** ________ (HUMAN ACTION REQUIRED)
-- **Approved by:** ________
+- **Decision:** APPROVED: rotate now (S1, and S3/S5/S6–S8 where confirmed affected; runbook §1).
+- **Approved by:** the repository owner (DEC-2026-018), 2026-10-18, in session.
 - **Rotation completed (date, by whom, which credentials; no values):** ________
 - **Verification evidence:** ________

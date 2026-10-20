@@ -163,6 +163,36 @@ jobs:
       - name: public Tap lifecycle, privacy and analytics (local stack)
         run: npm run test:public-tap
 
+      # F1 (migrations 020 and 028): every owner attack on the suspension
+      # columns succeeds on the live baseline and is refused after the
+      # migrations; the two admin RPCs still suspend, restore, audit and notify;
+      # the attacks again over HTTP, with forged tokens. Outbound network denied.
+      - name: suspension guard, adversarial (live baseline vs migrations; local stack)
+        run: npm run test:suspension
+
+      # AAROH emergency module (migration 029) and the Tap column guard (030):
+      # tables and functions closed to every client role; limits, idempotency,
+      # retries, receipts and retention; the owner-write bypasses with the
+      # pre-030 chain as the negative control; then over HTTP with the SMS
+      # stand-in (refusals, outages, timeouts, no provider, a database failure
+      # mid-send, forged receipts). Outbound network denied.
+      - name: emergency contacts and alerts, Tap column guard (local stack)
+        run: npm run test:emergency
+
+      # AAROH Return-to-Owner relay (migration 031): closed tables; the anonymous
+      # finder and the signed-in owner over HTTP; cross-account refusals; limits,
+      # duplicates, expiry, block, report, close, retention; no owner detail or
+      # message text leaks. Outbound network denied.
+      - name: Return-to-Owner relay (local stack)
+        run: npm run test:rescue
+
+      # SHYGON Connect and the consent ledger (migration 032): closed tables; an
+      # append-only ledger even for the server role; requests, decisions, live
+      # reads under active grants, revocation, block never revealed, limits,
+      # expiry; no value reaches a caller without a grant. Outbound network denied.
+      - name: Connect and the consent ledger (local stack)
+        run: npm run test:connect
+
       # V6-051 (Stage 4): the admin edge functions' role checks against the
       # real admin tables; a customer cannot reach admin by editing their
       # token or metadata. Outbound network denied.

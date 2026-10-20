@@ -91,8 +91,10 @@ function readBody(request) {
  * @param {string} options.appUrl      this host's own origin
  * @param {string} options.gatewayUrl  the local Supabase gateway
  * @param {object} options.sim         the Razorpay stand-in
+ * @param {object} [options.control]   the SMS stand-in and the host switches,
+ *                                     for /__sim/sms/* and /__sim/switches (browser E2E)
  */
-export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, log = () => {} }) {
+export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, control = null, log = () => {} }) {
   const rules = parseNetlifyToml(fs.readFileSync(path.join(root, 'netlify.toml'), 'utf8'));
   const gateway = new URL(gatewayUrl);
   const securityHeaders = { ...rules.headers };
@@ -179,6 +181,63 @@ export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, log = ()
     }
     if (url.pathname === '/__sim/razorpay/state') {
       return send(200, { orders: [...sim.orders.values()], payments: [...sim.payments.values()], deliveries: sim.deliveries });
+    }
+    if (control && (url.pathname.startsWith('/__sim/sms/') || url.pathname === '/__sim/switches')) {
+      return controlRoute(request, body, url, send);
+    }
+    return send(404, { error: 'unknown simulator route' });
+  }
+
+  /**
+   * Browser E2E control of the SMS stand-in and the host switches (Session B,
+   * B-4). Loopback callers only; the stack never runs outside a developer's
+   * machine or CI, and none of this exists in a deployed build.
+   *   POST /__sim/sms/provider   { provider: 'twilio' | 'msg91' | null, receipts?: boolean }
+   *   POST /__sim/sms/queue      { scenarios: ['accept' | 'reject' | 'error' | 'busy' | 'timeout' | 'network', ...] }
+   *   GET  /__sim/sms/last-code?to=<E.164>   the latest verification code texted to that number
+   *   GET  /__sim/sms/messages   provider, to, sid and scenario of every message (no bodies)
+   *   POST /__sim/sms/deliver    { sid, status }  a signed receipt (Twilio status, or an MSG91 code)
+   *   POST /__sim/switches       { EMERGENCY_PUBLIC_ALERTS?: boolean, RESCUE_RELAY?: boolean }
+   */
+  async function controlRoute(request, body, url, send) {
+    const remote = request.socket.remoteAddress ?? '';
+    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote)) return send(403, { error: 'loopback only' });
+    const input = request.method === 'POST' ? JSON.parse(body.toString('utf8') || '{}') : {};
+    const { sms } = control;
+    if (url.pathname === '/__sim/sms/provider' && request.method === 'POST') {
+      if (![null, 'twilio', 'msg91'].includes(input.provider ?? null)) return send(400, { error: 'provider: twilio, msg91 or null' });
+      control.useSms(input.provider ?? null, { receipts: input.receipts !== false });
+      return send(200, { provider: input.provider ?? null, receipts: input.receipts !== false });
+    }
+    if (url.pathname === '/__sim/sms/queue' && request.method === 'POST') {
+      const allowed = new Set(['accept', 'reject', 'error', 'busy', 'timeout', 'network']);
+      const scenarios = Array.isArray(input.scenarios) ? input.scenarios : [];
+      if (!scenarios.every((s) => allowed.has(s))) return send(400, { error: `scenarios: ${[...allowed].join(', ')}` });
+      sms.queue(...scenarios);
+      return send(200, { queued: scenarios.length });
+    }
+    if (url.pathname === '/__sim/sms/last-code' && request.method === 'GET') {
+      const to = url.searchParams.get('to');
+      const message = [...sms.messages].reverse().find((m) => m.to === to || m.to === to?.replace(/^\+/, ''));
+      const code = message?.provider === 'msg91' ? message.vars?.otp : /code: (\d{6})/.exec(message?.body ?? '')?.[1];
+      return code ? send(200, { code }) : send(404, { error: 'no code sent to that number' });
+    }
+    if (url.pathname === '/__sim/sms/messages' && request.method === 'GET') {
+      return send(200, sms.messages.map(({ provider, to, sid, scenario, at }) => ({ provider, to, sid, scenario, at })));
+    }
+    if (url.pathname === '/__sim/sms/deliver' && request.method === 'POST') {
+      const message = sms.messages.find((m) => m.sid === input.sid);
+      if (!message) return send(404, { error: 'unknown message' });
+      const result = message.provider === 'msg91'
+        ? await sms.deliverMsg91(input.sid, input.status, { secret: control.msg91DlrSecret })
+        : await sms.deliver(input.sid, input.status);
+      return send(200, result);
+    }
+    if (url.pathname === '/__sim/switches' && request.method === 'POST') {
+      for (const name of ['EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY']) {
+        if (typeof input[name] === 'boolean') control.setSwitch(name, input[name]);
+      }
+      return send(200, control.switches());
     }
     return send(404, { error: 'unknown simulator route' });
   }

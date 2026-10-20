@@ -60,12 +60,39 @@ const OWNED = {
   orders: (id) => `SELECT count(*)::int AS n FROM public.orders WHERE user_id = '${id}'`,
   order_items: (id) => `SELECT count(*)::int AS n FROM public.order_items i JOIN public.orders o ON o.id = i.order_id WHERE o.user_id = '${id}'`,
   payments: (id) => `SELECT count(*)::int AS n FROM public.payments p JOIN public.orders o ON o.id = p.order_id WHERE o.user_id = '${id}'`,
+  // Migration 029 (counted only where it exists).
+  emergency_settings: (id) => `SELECT count(*)::int AS n FROM public.emergency_settings WHERE user_id = '${id}'`,
+  emergency_contacts: (id) => `SELECT count(*)::int AS n FROM public.emergency_contacts WHERE user_id = '${id}'`,
+  emergency_contact_challenges: (id) => `SELECT count(*)::int AS n FROM public.emergency_contact_challenges WHERE user_id = '${id}'`,
+  emergency_events: (id) => `SELECT count(*)::int AS n FROM public.emergency_events WHERE user_id = '${id}'`,
+  emergency_event_recipients: (id) => `SELECT count(*)::int AS n FROM public.emergency_event_recipients r JOIN public.emergency_events e ON e.id = r.event_id WHERE e.user_id = '${id}'`,
+  emergency_delivery_attempts: (id) => `SELECT count(*)::int AS n FROM public.emergency_delivery_attempts a JOIN public.emergency_event_recipients r ON r.id = a.recipient_id JOIN public.emergency_events e ON e.id = r.event_id WHERE e.user_id = '${id}'`,
+  emergency_audit: (id) => `SELECT count(*)::int AS n FROM public.emergency_audit WHERE user_id = '${id}'`,
+  // Migration 031 (counted only where it exists).
+  rescue_settings: (id) => `SELECT count(*)::int AS n FROM public.rescue_settings WHERE user_id = '${id}'`,
+  rescue_threads: (id) => `SELECT count(*)::int AS n FROM public.rescue_threads WHERE owner_user_id = '${id}'`,
+  rescue_messages: (id) => `SELECT count(*)::int AS n FROM public.rescue_messages m JOIN public.rescue_threads t ON t.id = m.thread_id WHERE t.owner_user_id = '${id}'`,
+  rescue_blocks: (id) => `SELECT count(*)::int AS n FROM public.rescue_blocks WHERE owner_user_id = '${id}'`,
+  rescue_audit: (id) => `SELECT count(*)::int AS n FROM public.rescue_audit WHERE user_id = '${id}'`,
+  // Migration 032 (counted only where it exists).
+  connect_settings: (id) => `SELECT count(*)::int AS n FROM public.connect_settings WHERE user_id = '${id}'`,
+  connections: (id) => `SELECT count(*)::int AS n FROM public.connections WHERE requester_user_id = '${id}' OR target_user_id = '${id}'`,
+  consent_grants: (id) => `SELECT count(*)::int AS n FROM public.consent_grants WHERE grantor_user_id = '${id}' OR grantee_user_id = '${id}'`,
+  connect_audit: (id) => `SELECT count(*)::int AS n FROM public.connect_audit WHERE user_id = '${id}'`,
 };
 const KEPT = ['orders', 'order_items', 'payments'];
+const has032 = async (db) => (await db.query(`SELECT to_regclass('public.connections') IS NOT NULL AS x`)).rows[0].x;
+const has031 = async (db) => (await db.query(`SELECT to_regclass('public.rescue_threads') IS NOT NULL AS x`)).rows[0].x;
+const has029 = async (db) => (await db.query(`SELECT to_regclass('public.emergency_contacts') IS NOT NULL AS x`)).rows[0].x;
 
 async function owned(db, id) {
   const out = {};
-  for (const [table, sql] of Object.entries(OWNED)) out[table] = (await db.query(sql(id))).rows[0].n;
+  for (const [table, sql] of Object.entries(OWNED)) {
+    if (table.startsWith('emergency_') && !(await has029(db))) continue;
+    if (table.startsWith('rescue_') && !(await has031(db))) continue;
+    if (['connect_settings', 'connections', 'consent_grants', 'connect_audit'].includes(table) && !(await has032(db))) continue;
+    out[table] = (await db.query(sql(id))).rows[0].n;
+  }
   return out;
 }
 
@@ -99,6 +126,46 @@ async function customer(db, id, slug, { request = null, fulfilment = 'fulfilled'
     INSERT INTO public.support_tickets (user_id, subject, category${request ? ', reference' : ''})
       VALUES ('${id}', 'Where is my invoice?', 'order'${request ? `, 'ST-Q${slug.slice(0, 7).toUpperCase()}'` : ''});
   `);
+  if (await has029(db)) {
+    await db.exec(`
+      INSERT INTO public.emergency_settings (user_id, public_alerts_enabled) VALUES ('${id}', true);
+      INSERT INTO public.emergency_contacts (user_id, name, phone_e164, verified_at) VALUES ('${id}', 'Contact', '+919800000077', now());
+      INSERT INTO public.emergency_contact_challenges (user_id, contact_id, phone_digest, code_hash, expires_at)
+        SELECT '${id}', id, 'digest', 'hash', now() + interval '10 minutes' FROM public.emergency_contacts WHERE user_id = '${id}';
+      INSERT INTO public.emergency_events (user_id, initiator, idempotency_key, recipient_count)
+        VALUES ('${id}', 'owner', 'deletion-test-key-${slug.slice(0, 6)}', 1);
+      INSERT INTO public.emergency_event_recipients (event_id, contact_id, contact_name, phone_last4, phone_e164)
+        SELECT e.id, c.id, c.name, '0077', c.phone_e164 FROM public.emergency_events e, public.emergency_contacts c
+         WHERE e.user_id = '${id}' AND c.user_id = '${id}';
+      INSERT INTO public.emergency_delivery_attempts (recipient_id, attempt_no, outcome)
+        SELECT r.id, 1, 'accepted' FROM public.emergency_event_recipients r JOIN public.emergency_events e ON e.id = r.event_id
+         WHERE e.user_id = '${id}';
+      INSERT INTO public.emergency_audit (user_id, actor, action) VALUES ('${id}', 'owner', 'contact.added');
+    `);
+  }
+  if (await has031(db)) {
+    await db.exec(`
+      INSERT INTO public.rescue_settings (user_id, enabled) VALUES ('${id}', true);
+      INSERT INTO public.rescue_threads (owner_user_id, finder_token_hash, finder_digest, idempotency_key)
+        VALUES ('${id}', 'token-${slug}', 'digest-${slug}', 'deletion-rescue-${slug.slice(0, 6)}');
+      INSERT INTO public.rescue_messages (thread_id, sender, body)
+        SELECT id, 'finder', 'I found your card' FROM public.rescue_threads WHERE owner_user_id = '${id}';
+      INSERT INTO public.rescue_blocks (owner_user_id, finder_digest, expires_at) VALUES ('${id}', 'blocked-${slug}', now() + interval '1 day');
+      INSERT INTO public.rescue_audit (user_id, actor, action) VALUES ('${id}', 'owner', 'settings.enabled');
+    `);
+  }
+  if (await has032(db)) {
+    // A connection to a peer of its own, so no other test account is touched.
+    await db.exec(`DO $$ DECLARE p uuid := gen_random_uuid(); c uuid := gen_random_uuid(); BEGIN
+      INSERT INTO auth.users (id, email) VALUES (p, 'peer-${slug}@example.test');
+      INSERT INTO public.connect_settings (user_id, enabled) VALUES ('${id}', true);
+      INSERT INTO public.connections (id, requester_user_id, target_user_id, status, idempotency_key)
+        VALUES (c, '${id}', p, 'accepted', 'deletion-connect-${slug.slice(0, 6)}');
+      INSERT INTO public.consent_grants (grantor_user_id, grantee_user_id, scope, connection_id)
+        VALUES ('${id}', p, ARRAY['email'], c), (p, '${id}', ARRAY['phone'], c);
+      INSERT INTO public.connect_audit (user_id, action) VALUES ('${id}', 'request.sent');
+    END $$;`);
+  }
   if (request) {
     await db.exec(`
       INSERT INTO public.support_tickets (user_id, subject, category, reference)

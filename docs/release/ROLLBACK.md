@@ -6,9 +6,9 @@ Roll back the smallest thing that fixes the problem: the application first (seco
 
 1. In the host (Netlify: Deploys; Vercel: Deployments), **promote the previous deployment**. It takes effect at once.
 2. Check `GET /api/health?deep=1` and the smoke test of `DEPLOYMENT.md` §5.
-3. The database stays as it is. Each of 020–026 was written so the V5 screens keep working (see each header), but an application rollback to V5 is not tested end to end: run the smoke test after it.
+3. The database stays as it is. Each of 020–026 and 028 was written so the V5 screens keep working (see each header), but an application rollback to V5 is not tested end to end: run the smoke test after it.
 
-## 2. Database migrations (020–026)
+## 2. Database migrations (020–026, 028)
 
 Each migration's header carries a `ROLLBACK (begin) … ROLLBACK (end)` block. Every one has been **exercised on a local copy of the live schema**: `npm run test:rollbacks` applies 020…k, runs k's rollback and compares the schema with 020…k-1 (functions, policies, grants, relations, triggers and constraints). It also rolls the whole chain back to the live baseline and re-applies it identically.
 
@@ -16,6 +16,7 @@ Roll back **in reverse order**, newest first, only as far as needed:
 
 | Migration | Rollback restores | Data notes |
 |---|---|---|
+| 028 guard suspension on insert | drops the insert guard function and its two triggers | none (a signed-in account with no profile row could again create one already suspended) |
 | 026 orders outlive account deletion | `orders_user_id_fkey … ON DELETE CASCADE` | none. **After rolling back, "Delete user" destroys order records again**: do not delete users |
 | 025 public Tap privacy and analytics | the previous `record_tap_event` and `enforce_tap_edit_rules`; re-grants the legacy `get_public_tap`; drops `tap_visitor_salts` and its index | **re-opens O-2** (the legacy function shows a hidden address to anyone); daily salts are discarded (visitor hashes restart) |
 | 024 policies to authenticated | the previous policy targets and grants | none |
