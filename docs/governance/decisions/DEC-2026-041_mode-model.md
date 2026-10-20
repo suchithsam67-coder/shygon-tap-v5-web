@@ -255,9 +255,12 @@ Everything below is **OBSERVED in that evidence file**, not verified against liv
 3. **The single change, when approved.** P-1 gains one condition: return null when the Tap's active mode is not Business. The shape is unchanged, and every Tap not on Info returns byte-identical payloads (golden test).
 4. **What an older client shows.** For a Tap on Info: P-1 returns null, then P-2 returns `active`, so the page shows the existing **"Tap not found"** (`PublicTap.tsx:186–190`, with `noindex`). Nothing leaks, and no new copy is needed.
    - Optional: P-2 could answer `unavailable` for Info Taps, which reads the same. Not recommended; it changes a second frozen function.
-5. **New clients** call `get_public_tap` first, and fall back to P-1 only if the function does not exist yet (PostgREST 404). So the frontend can deploy before the backend.
-6. **Rollback.** Switch Info off in the catalogue (Taps on Info show "unavailable", per BQ-2), then remove the P-1 condition. Business payloads are unaffected throughout.
-7. **Tests:**
+5. **Unknown payload keys are not rendered** [OBSERVED with `git show`, Session B's commit c0e27a0]. `PublicTap` renders `PublicExperience`, and `src/components/showroom/PublicExperience.test.tsx:258` ("renders only the published fields: anything else in the payload never reaches the page") feeds extra keys and checks the DOM in every view.
+   - So production's extra `pageTemplate` key (F-3) is neither shown nor used for routing by the V6 frontend.
+   - That page's `?mode=` URL parameter selects a **presentational view** only. It must never select the server mode or grant a role (AQ-1), and today it does not: it shows only published fields.
+6. **New clients** call `get_public_tap` first, and fall back to P-1 only if the function does not exist yet (PostgREST 404). So the frontend can deploy before the backend.
+7. **Rollback.** Switch Info off in the catalogue (Taps on Info show "unavailable", per BQ-2), then remove the P-1 condition. Business payloads are unaffected throughout.
+8. **Tests:**
    - the golden P-1 for Taps not on Info;
    - an older-client simulation (P-1 null plus P-2 `active` renders "Tap not found");
    - the new client's fallback;
