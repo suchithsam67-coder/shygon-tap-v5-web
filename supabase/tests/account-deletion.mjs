@@ -79,8 +79,12 @@ const OWNED = {
   connections: (id) => `SELECT count(*)::int AS n FROM public.connections WHERE requester_user_id = '${id}' OR target_user_id = '${id}'`,
   consent_grants: (id) => `SELECT count(*)::int AS n FROM public.consent_grants WHERE grantor_user_id = '${id}' OR grantee_user_id = '${id}'`,
   connect_audit: (id) => `SELECT count(*)::int AS n FROM public.connect_audit WHERE user_id = '${id}'`,
+  // Migration 033 (counted only where it exists).
+  prive_demo_requests: (id) => `SELECT count(*)::int AS n FROM public.prive_demo_requests WHERE user_id = '${id}'`,
+  prive_demo_request_events: (id) => `SELECT count(*)::int AS n FROM public.prive_demo_request_events e JOIN public.prive_demo_requests r ON r.id = e.request_id WHERE r.user_id = '${id}'`,
 };
 const KEPT = ['orders', 'order_items', 'payments'];
+const has033 = async (db) => (await db.query(`SELECT to_regclass('public.prive_demo_requests') IS NOT NULL AS x`)).rows[0].x;
 const has032 = async (db) => (await db.query(`SELECT to_regclass('public.connections') IS NOT NULL AS x`)).rows[0].x;
 const has031 = async (db) => (await db.query(`SELECT to_regclass('public.rescue_threads') IS NOT NULL AS x`)).rows[0].x;
 const has029 = async (db) => (await db.query(`SELECT to_regclass('public.emergency_contacts') IS NOT NULL AS x`)).rows[0].x;
@@ -91,6 +95,7 @@ async function owned(db, id) {
     if (table.startsWith('emergency_') && !(await has029(db))) continue;
     if (table.startsWith('rescue_') && !(await has031(db))) continue;
     if (['connect_settings', 'connections', 'consent_grants', 'connect_audit'].includes(table) && !(await has032(db))) continue;
+    if (table.startsWith('prive_') && !(await has033(db))) continue;
     out[table] = (await db.query(sql(id))).rows[0].n;
   }
   return out;
@@ -165,6 +170,14 @@ async function customer(db, id, slug, { request = null, fulfilment = 'fulfilled'
         VALUES ('${id}', p, ARRAY['email'], c), (p, '${id}', ARRAY['phone'], c);
       INSERT INTO public.connect_audit (user_id, action) VALUES ('${id}', 'request.sent');
     END $$;`);
+  }
+  if (await has033(db)) {
+    await db.exec(`
+      INSERT INTO public.prive_demo_requests (user_id, hotel_id, service, idempotency_key)
+        SELECT '${id}', id, 'housekeeping', 'deletion-prive-${slug.slice(0, 6)}' FROM public.prive_demo_hotels WHERE slug = 'demo-residence';
+      INSERT INTO public.prive_demo_request_events (request_id, status, actor)
+        SELECT id, 'received', 'guest' FROM public.prive_demo_requests WHERE user_id = '${id}';
+    `);
   }
   if (request) {
     await db.exec(`

@@ -36,7 +36,7 @@ Nothing here is deployed. Production runs the V5 schema with drift (V6-106).
 | 8 | **Event Tap** | | seasonal event themes ✔ | event mode | | `tap_event_themes` (admin-managed timed themes) | event-specific profile, attendees: Phase 2 |
 | 9 | **Info Tap / SHYGON Locations** | | | Locations ✔ (Phase 4) | **Info is undefined** | owner 10-16: "Business and Info first" | definition (DEC-038 Q7) |
 | 10 | **Access Tap** | | | gated (Phase 5) | | doc 10: pen-test, SDM hardware, legal | **Unsupported** for AAROH (DEC-037) |
-| 11 | **SHYGON Privé demo** | | | | | Q6 read as B: out of the launch | owner says "Privé demo-only" to change it |
+| 11 | **SHYGON Privé demo** | ✔ (local), demo only; 033 PROPOSED (DEC-2026-040) | | real hotel integrations: not built, by decision | | 033, `/api/prive`, `test:prive` 12; owner's word 2026-10-20 | DEC-2026-040 |
 | 12 | **Cloud Storage** | | | ✔ | | showroom Planned; storage bucket gaps V6-095/V6-108 | no design approved |
 
 Card lifecycle sits under every capability that a physical tap starts. It is partial for V5 cards (activation, OTP, replacement request) and BLOCKED for AAROH: no cards are sold, there is no registry, and `/d/` is not built (contract §3 P-4 and §7).
@@ -193,7 +193,10 @@ NOT IMPLEMENTED. DEC-038 Q7.
 
 Doc 10 Phase 5 gates: an independent pen-test, SDM hardware in the field, and legal review for physical access. DEC-037: an AAROH card is not an access credential.
 
-### 11. SHYGON Privé demo (BLOCKED: conflicting instructions)
+### 11. SHYGON Privé demo (IMPLEMENTED locally, demo only; 033, DEC-2026-040 PROPOSED)
+
+Decided 2026-10-20: demo-only. Built as below, for signed-in accounts; see contract §10c. The rest of this section is the original design note.
+
 
 The conflict is DEC-038 Q6. If the owner chooses demo-only:
 - a `demo_` schema area holding SHYGON-owned sample hotels;

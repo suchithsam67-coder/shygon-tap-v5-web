@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.5** (2026-10-20). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`; changes in §13. DEC-2026-038 and DEC-2026-039 are **APPROVED**. |
+| Contract version | **AAROH-API v0.6** (2026-10-20). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`; changes in §13. DEC-2026-038 and DEC-2026-039 are **APPROVED**; DEC-2026-040 (Privé demo choices) is PROPOSED. |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039); none applied anywhere. 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (PROPOSED, DEC-2026-040); none applied anywhere. 027 is held aside (DEC-2026-037). |
 | Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
@@ -501,6 +501,48 @@ Connection = { id, direction: 'outgoing' | 'incoming',
 
 ---
 
+## 10c. SHYGON Privé, demo only — `POST /api/prive` (v0.6)
+
+Sample hotels owned by SHYGON, and guest service requests that are really stored and moved on inside SHYGON.
+- **Never a real hotel.** No request reaches a real hotel, and nothing books, opens a door or contacts staff.
+- **Labelled.** Every response, errors included, carries `demo: true` and `notice: "Demo: SHYGON Privé sample hotel. No real hotel received this request; nothing is booked and no door opens."` Show the notice whenever a Privé result is on screen.
+- **Status:** LIVE-LOCAL. Privé is demo-only by the owner's decision of 2026-10-20 (DEC-2026-038 Q6 → A); 033's choices are PROPOSED in DEC-2026-040.
+
+| op | Auth | Request | Success | Errors |
+|---|---|---|---|---|
+| `hotels.list` | none | `{ op }` | 200 `{ hotels: [{ slug, name, city, description, services: [{ id, label }], demo: true, label }] }` | 503 `not_supported` (a non-demo provider configured) |
+| `requests.create` | Bearer | `{ op, hotelSlug, service, idempotencyKey }` | **201** `{ request, replayed: false }`; the same key again → 200, same request | 400 `invalid_service` `invalid_idempotency_key`; 404 `hotel_not_found`; 429 `rate_limited`; 401 |
+| `requests.list` | Bearer | `{ op }` | 200 `{ requests: Request[] }` (newest first) | 401 |
+| `requests.get` | Bearer | `{ op, requestId }` | 200 `{ request }` | 400; 404 `request_not_found`; 401 |
+| `requests.cancel` | Bearer | `{ op, requestId }` | 200 `{ request }` | 404; 409 `already_closed`; 401 |
+
+```
+Request = { id, demo: true, status: 'received' | 'acknowledged' | 'in_progress' | 'completed' | 'cancelled',
+            hotel: { slug, name, label }, service: { id, label },
+            createdAt, updatedAt, completedAt, cancelledAt,
+            steps: [{ status, by: 'guest' | 'demo_hotel_simulator', at }] }
+```
+
+**Sample hotels:**
+- `demo-residence`, SHYGON Demo Residence: the same services as your walkthrough (`fresh_towels`, `housekeeping`, `late_checkout`, `restaurant_table`);
+- `demo-seaside`, SHYGON Demo Seaside;
+- `demo-hills`, SHYGON Demo Hills.
+
+**The "hotel desk"** is a simulator inside SHYGON:
+- received → acknowledged (about 20 s) → in progress (about 1 min) → completed (about 3 min);
+- one step per sweep or read, each step shown as `by: 'demo_hotel_simulator'`;
+- write "SHYGON's demo desk", never "the hotel".
+
+**Limits:** 10 per hour and 50 per day per account. **Retention:** 30 days.
+
+**Boundary:** `netlify/lib/hospitality.mjs` (`HotelProvider`, implementation `demo` only). Any other `HOTEL_PROVIDER` makes this endpoint answer 503.
+
+**Entities (migration 033):** `prive_demo_hotels`, `prive_demo_requests`, `prive_demo_request_events`. All are closed to every API client.
+
+**Tests:** `npm run test:prive`, 12 checks. They cover closure, demo by construction (database checks), the catalogue, sign-in and validation, idempotency, isolation, the simulated desk, cancel, limits, the fail-closed boundary, retention through the sweep, direct REST, and every response labelled with no booking, receiving or door claim.
+
+---
+
 ## 11. Operations that do not exist (NOT IMPLEMENTED unless stated)
 
 | Feature | Status | Why |
@@ -509,7 +551,7 @@ Connection = { id, direction: 'outgoing' | 'incoming',
 | Emergency Profile / Emergency Tap information view | **Decided (Q11 = B): no new backend** | The view presents `public.status` (§10.3) plus the name the public profile already shows, and its only action is the visitor alert (`public.alert`). Hidden while Q2 keeps visitor alerts off. Never show a contact detail |
 | Connect requests | **Moved to §10b in v0.4** (LIVE-LOCAL, APPROVED) | Guest requesters (no SHYGON account): **not built, by decision** (DEC-2026-039 Q1 = A) |
 | Credential verification (`/v/<code>`) | NOT IMPLEMENTED | No schema. DEC-037: an AAROH card is not an access or authentication credential |
-| SHYGON Privé (demo hotels, guest requests) | **OUT** (DEC-2026-038 Q6 read as B: the 2026-10-16 decision stands) | Not shown, not built. Demo-only Privé needs the owner's explicit "Privé demo-only". No real hotel, PMS, booking or access-control integration in any case |
+| SHYGON Privé real-hotel integrations (PMS, booking, room access) | **Not built, by decision** (DEC-2026-038 Q6 → A: demo only) | The demo is §10c. A real integration needs its own decision, contract and review |
 | Student Passport, Event mode, Places/objects, Cloud storage | NOT IMPLEMENTED | "Planned" in the showroom; no schema, no approval |
 | Card activation/lost cards for AAROH | BLOCKED | §7 |
 
@@ -536,7 +578,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Return to owner | LIVE-LOCAL, **APPROVED** (Q12), off (`RESCUE_RELAY`) until the first production release with 031 | §10a. Customer copy per Q10: Session B drafts, owner approves |
 | Connect | LIVE-LOCAL, **APPROVED** (DEC-2026-039) | §10b. Customer-facing: "Coming soon" until it is deployed, with wording the owner approves |
 | Verify | NOT IMPLEMENTED | §11 |
-| Privé | BLOCKED (decision) | §11 |
+| Privé | LIVE-LOCAL, **demo only** (DEC-2026-038 Q6 → A); choices PROPOSED (DEC-2026-040) | §10c. Always labelled demo; customer wording is the owner's to approve |
 | Student, Event, Places, Cloud | NOT IMPLEMENTED | §11 |
 
 ## 12a. Administration (admin app; not the customer frontend)
@@ -554,6 +596,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.6 | 2026-10-20 | Privé demo-only (owner's word, DEC-2026-038 Q6 → A): §10c `/api/prive` (migration 033, PROPOSED in DEC-2026-040); the sweep also runs the demo desk and its retention. No earlier operation changed. | Your demo may switch on and use §10c for signed-in accounts. Keep the public showroom walkthrough client-only (DEC-2026-040 Q1). Show the `notice` with every Privé result; never write "the hotel" for the simulator. |
 | v0.5 | 2026-10-20 | DEC-2026-039 approved: every Connect choice as built; 032 listed as approved. No operation, request or response changed. | The Connect control may ship with the first release containing 032; its wording needs the owner's approval. No guest connect (Q1 = A). |
 | v0.4 | 2026-10-19 | New: §10b `/api/connect` (Connect and the consent ledger, migration 032, PROPOSED in DEC-2026-039); `connect` notifications; the sweep now expires Connect requests; browser E2E hooks on the local stack (§1 rule 11). No earlier operation changed. | A Connect UI may be built against §10b, but must not ship until DEC-2026-039 is decided. Never show `blocked` to a requester (the API already maps it). Show shared values as self-reported. Revocation copy: "already-copied details cannot be un-shared". |
 | v0.3 | 2026-10-19 | DEC-2026-038 approved: statuses updated (029/030/031 APPROVED, not applied); Q2 visitor alerts off; Q6 Privé out; Q11 Emergency Profile = presentation of `public.status`, no new endpoint. MSG91 delivery reports (`/api/sms-status?provider=msg91`): `deliveryReceipts` can now be `supported` with MSG91. Operator smoke script. No request or response shape changed. | Showroom copy for Emergency and Return to owner: draft it for the owner's approval (Q10). Privé: not shown. Emergency Profile: build it on `public.status`; hidden while it says `false`. |

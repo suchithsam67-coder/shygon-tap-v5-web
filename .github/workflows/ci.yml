@@ -186,6 +186,13 @@ jobs:
       - name: Connect and the consent ledger (local stack)
         run: npm run test:connect
 
+      # SHYGON Privé, demo only (migration 033): closed tables; every hotel and
+      # request is marked demo; requests, idempotency, limits, the simulator,
+      # cancel; only the demo hotel provider exists; no network call. Outbound
+      # network denied.
+      - name: Privé demo (local stack)
+        run: npm run test:prive
+
       # V6-051 (Stage 4): the admin edge functions' role checks against the
       # real admin tables; a customer cannot reach admin by editing their
       # token or metadata. Outbound network denied.
