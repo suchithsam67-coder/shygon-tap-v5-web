@@ -49,6 +49,12 @@ Labels: **OBSERVED** (verified in this repository), **INFERRED**, **PROPOSED**.
 | `connections.list`, `consents.list` | Always work, so people can see what exists | As today |
 | `settings.get` / `settings.set` | Work, and report `publicAllowed: false` | Report `publicAllowed: true` |
 
+**Why a switch in the function is enough** [OBSERVED]:
+- every `connect_*` function and every Connect table is closed to `anon` and `authenticated` and reachable only by `service_role` (032; `test:connect` asserts it);
+- so `/api/connect` is the only path, and no migration is needed.
+
+Session B confirmed this independently on 2026-10-20 (read-only).
+
 **Why each choice:**
 - The visitor's status answer and the request are locked on the server, as with the two existing switches. Hiding the interface alone would not be enough (owner's direction).
 - Sharing more is locked, but withdrawing is never blocked: a person can always revoke consent, which follows the consent-ledger principle in DEC-2026-039.
@@ -66,7 +72,11 @@ Labels: **OBSERVED** (verified in this repository), **INFERRED**, **PROPOSED**.
 - the 16 existing checks run with the switch on.
 
 **Contract:** a versioned change note (AAROH-API v0.8 or a point release).
-- Frontend impact: show Connect only when `public.status` is true (already the case), and show "not yet available" when `publicAllowed` is false.
+- Frontend impact (Session B, 2026-10-20):
+  - the public Connect card already appears only when `public.status` is true;
+  - `?mode=connect` never opens a view;
+  - the signed-in `/shygontap/connect/:slug` page does not check `public.status` first. With the switch off it would show the 404 as a refusal, never as success. Session B would add a status check so the form is not offered;
+  - show "not yet available" when `publicAllowed` is false.
 
 **Release:** `CONNECT_PUBLIC` stays unset on production until the owner's verification of the connection and consent workflows. Add it to the deployment environment list.
 

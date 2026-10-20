@@ -1,7 +1,8 @@
 // The local stack's web host (V6, D-4): the built site and the server
 // functions on one origin, routed the way netlify.toml routes them.
 //
-//   /api/*  →  /.netlify/functions/*  →  netlify/functions/<name>.mjs (the real handlers)
+//   /api/*  →  /.netlify/functions/*  →  netlify/functions/<name>.mjs (the real handlers),
+//           with the visitor's address set by this host, never by the browser (B-9)
 //   static files from the build, with netlify.toml's redirects (rewrites,
 //   301s and the 404 rule) and its security headers
 //   /__sim/razorpay/*  the Razorpay stand-in's browser side (local stack only)
@@ -38,6 +39,46 @@ const TYPES = {
 
 /** What the hosts compress: text. Images and fonts are already compressed. */
 const COMPRESSIBLE = /\.(html|m?js|css|json|webmanifest|svg|txt|xml)$/i;
+
+// The visitor's address (B-9, V6-124). Netlify's edge sets
+// x-nf-client-connection-ip and Vercel's sets x-vercel-forwarded-for; a visitor
+// never chooses either. This host plays Netlify's part: every address header
+// the browser sent is dropped, and the socket's address is set instead.
+//
+// Browser E2E sometimes needs visitors that look distinct. Only when the stack
+// runs with STACK_SIM_CLIENT_ADDRESS=1 (read on each request; off by default)
+// may a loopback caller send x-shygon-sim-client: an RFC 5737 documentation
+// address, never a real one, or `none` to play a host that reports no address.
+// None of this exists in a deployed build.
+export const ADDRESS_HEADERS = ['x-nf-client-connection-ip', 'x-vercel-forwarded-for', 'x-real-ip', 'x-forwarded-for'];
+export const SIM_CLIENT_HEADER = 'x-shygon-sim-client';
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const DOCUMENTATION_ADDRESS = /^(?:192\.0\.2|198\.51\.100|203\.0\.113)\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+
+/**
+ * The headers a server function receives: the browser's, without any address
+ * header, plus the address this host reports. Returns { headers }, or { error }
+ * for a simulated address that is not a documentation address.
+ */
+export function functionHeaders(incoming, remoteAddress, { simClientAddress = false } = {}) {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(incoming)) {
+    const name = key.toLowerCase();
+    if (typeof value !== 'string' || ADDRESS_HEADERS.includes(name) || name === SIM_CLIENT_HEADER) continue;
+    headers.set(name, value);
+  }
+  const remote = String(remoteAddress ?? '');
+  let address = remote.startsWith('::ffff:') ? remote.slice('::ffff:'.length) : remote;
+  const simulated = incoming[SIM_CLIENT_HEADER];
+  if (simClientAddress && LOOPBACK.has(remote) && typeof simulated === 'string') {
+    const value = simulated.trim();
+    if (value === 'none') address = '';
+    else if (DOCUMENTATION_ADDRESS.test(value)) address = value;
+    else return { error: `${SIM_CLIENT_HEADER}: an RFC 5737 documentation address (192.0.2.x, 198.51.100.x, 203.0.113.x) or none` };
+  }
+  if (address) headers.set('x-nf-client-connection-ip', address);
+  return { headers };
+}
 
 /** The [[redirects]] and the "/*" [[headers]] of netlify.toml. */
 export function parseNetlifyToml(text) {
@@ -115,9 +156,13 @@ export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, control 
     }
     if (!modules.has(name)) modules.set(name, import(pathToFileURL(file).href));
     const handler = (await modules.get(name)).default;
-    const headers = new Headers();
-    for (const [key, value] of Object.entries(request.headers)) {
-      if (typeof value === 'string') headers.set(key, value);
+    const { headers, error } = functionHeaders(request.headers, request.socket.remoteAddress, {
+      simClientAddress: process.env.STACK_SIM_CLIENT_ADDRESS === '1',
+    });
+    if (error) {
+      response.writeHead(400, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ error }));
+      return;
     }
     const fnRequest = new Request(url, {
       method: request.method,

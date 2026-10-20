@@ -425,8 +425,12 @@ t.section('B. Over HTTP on the local stack (real functions, SMS stand-in)');
 
 const stack = await startStack();
 const sms = stack.sms;
+// Distinct visitors: the host replaces any address header a caller sends, so
+// these checks name their visitor through the stack's opt-in simulator (B-9);
+// an empty address plays a host that reports none.
+process.env.STACK_SIM_CLIENT_ADDRESS = '1';
 const api = (body, { token, ip = '203.0.113.7', headers = {} } = {}) =>
-  callFunction(stack, 'emergency', { token, body, headers: { 'x-nf-client-connection-ip': ip, ...headers } });
+  callFunction(stack, 'emergency', { token, body, headers: { 'x-shygon-sim-client': ip || 'none', ...headers } });
 const bodies = [];
 const record = (r) => {
   bodies.push(JSON.stringify(r.body));

@@ -8,6 +8,12 @@
 // run). No .env file is read: the build gets an empty env folder. When it is
 // ready it prints one line and writes .e2e/stack.json (URLs and the stack's
 // own throwaway keys) for the end-to-end tests. Ctrl+C stops it.
+//
+// The server functions see the visitor's address the way a host reports it:
+// from the connection, never from a header the browser sends (B-9). For E2E
+// visitors that must look distinct, start with STACK_SIM_CLIENT_ADDRESS=1 and
+// send `x-shygon-sim-client: <192.0.2.x | 198.51.100.x | 203.0.113.x | none>`
+// (see app-host.mjs). Off by default.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

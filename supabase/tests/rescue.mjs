@@ -63,9 +63,13 @@ await db.close();
 t.section('B. Over HTTP on the local stack: finder and owner');
 
 const stack = await startStack();
+// Distinct finders: the host replaces any address header a caller sends, so
+// these checks name their finder through the stack's opt-in simulator (B-9);
+// `none` plays a host that reports no address.
+process.env.STACK_SIM_CLIENT_ADDRESS = '1';
 const bodies = [];
 const call = async (body, { token, ip = '203.0.113.50' } = {}) => {
-  const r = await callFunction(stack, 'rescue', { token, body, headers: ip === null ? {} : { 'x-nf-client-connection-ip': ip } });
+  const r = await callFunction(stack, 'rescue', { token, body, headers: { 'x-shygon-sim-client': ip ?? 'none' } });
   bodies.push(JSON.stringify(r.body));
   return r;
 };
