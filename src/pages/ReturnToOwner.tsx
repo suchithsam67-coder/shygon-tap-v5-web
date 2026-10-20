@@ -63,8 +63,8 @@ export default function ReturnToOwner() {
   return (
     <AppShell
       eyebrow="SHYGON OS"
-      title="Return to owner"
-      description="If someone finds your card, they can message you through SHYGON without seeing your number or email."
+      title="Return to Owner"
+      description="Lost something with SHYGON? Let the finder contact you through a privacy-conscious relay, without automatically exposing your personal contact details."
     >
       <div style={{ display: 'grid', gap: 18, maxWidth: 760 }}>
         {load.kind === 'loading' ? (
@@ -159,7 +159,7 @@ function SettingsPanel({ settings, onChanged }: { settings: RescueSettings; onCh
           <p>
             {settings.enabled ? 'On.' : 'Off.'}{' '}
             {settings.relayAllowed
-              ? 'A “Return to owner” option appears on your published Tap while this is on.'
+              ? 'A “Return to Owner” option appears on your published Tap while this is on.'
               : 'SHYGON has not switched the relay on yet, so finders cannot write even while this is on.'}
           </p>
         </div>

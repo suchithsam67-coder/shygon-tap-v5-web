@@ -102,7 +102,9 @@ describe('AarohOverview', () => {
     const features = within(document.getElementById('ao-features')!);
     expect(features.getByRole('heading', { name: 'Upcoming SHYGON OS features' })).toBeTruthy();
     expect(features.queryByText(/Privé/)).toBeNull();
-    fireEvent.click(features.getByRole('button', { name: /^Return to owner/ }));
+    fireEvent.click(features.getByRole('button', { name: /^Return to Owner/ }));
+    // The owner's words for this one (2026-10-20); the rest of the roadmap keeps "Planned".
+    expect(features.getAllByText('Coming soon').length).toBeGreaterThan(0);
     expect(features.getAllByText('Planned').length).toBeGreaterThan(0);
     expect((features.getByRole('button', { name: 'Not available yet' }) as HTMLButtonElement).disabled).toBe(true);
     expect(features.queryByRole('link', { name: /Set up|Open|Choose|See|Manage/ })).toBeNull();

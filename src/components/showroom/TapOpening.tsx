@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import BrandMark from '../brand/BrandMark';
 import './opening.css';
 
@@ -16,9 +16,13 @@ import './opening.css';
  * It is a curtain over a page that is rendered and reachable the whole time:
  * the overlay is aria-hidden, so a screen reader or keyboard user is never
  * held by it. A tap on it is swallowed rather than passed through, so nobody
- * calls a number by accident while the light is still moving. If the
- * stylesheet fails, the timers still remove it. Callers do not mount it under
- * reduced motion.
+ * calls a number by accident while the light is still moving.
+ *
+ * If its stylesheet did not load, it is not a curtain at all, just stray text
+ * at the top of the page; it then leaves before the first paint and the
+ * normal page shows at once (owner, 2026-10-20). Callers do not mount it under
+ * reduced motion, an owner who turned openings off gets no reveal, and a link
+ * straight to a mode (such as emergency information) is never held behind it.
  */
 
 /** How long the reveal plays before the curtain may lift. */
@@ -49,12 +53,19 @@ export function TapOpening({
   const [skipped, setSkipped] = useState(false);
   const done = useRef(false);
   const leaving = useRef(false);
+  const root = useRef<HTMLDivElement>(null);
 
   const finish = useCallback(() => {
     if (done.current) return;
     done.current = true;
     onDone();
   }, [onDone]);
+
+  // No stylesheet, no curtain: leave before the browser paints this frame.
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (el && getComputedStyle(el).position !== 'fixed') finish();
+  }, [finish]);
 
   // The reveal's own clock, from the moment it first painted.
   useEffect(() => {
@@ -89,6 +100,7 @@ export function TapOpening({
 
   return (
     <div
+      ref={root}
       className={`tap-opening is-${phase}`}
       aria-hidden="true"
       data-testid="tap-opening"
@@ -107,6 +119,7 @@ export function TapOpening({
         <span className="tap-opening-product">{product}</span>
       </span>
       {caption && <span className="tap-opening-caption">{caption}</span>}
+      <span className="tap-opening-skip">Tap to skip</span>
     </div>
   );
 }

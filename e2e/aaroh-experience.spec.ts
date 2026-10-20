@@ -148,11 +148,11 @@ test('demo: the AAROH demo showroom is labelled, sends nothing to the backend, a
   await expect(page.getByRole('note').first()).toContainText('not a real person’s card');
   await expect(page.getByRole('heading', { level: 1, name: 'Sample Profile' })).toBeVisible();
   await expect(page.getByTestId('tap-opening')).toHaveCount(0, { timeout: 6000 });
-  await expect(slide(page, 'Return to owner')).toContainText('Coming soon');
-  await expect(slide(page, 'Return to owner').getByRole('button')).toHaveCount(0);
-  await expect(slide(page, 'Emergency')).toContainText('Demo');
+  await expect(slide(page, 'Return to Owner')).toContainText('Coming soon');
+  await expect(slide(page, 'Return to Owner').getByRole('button')).toHaveCount(0);
+  await expect(slide(page, 'Emergency Profile')).toContainText('Demo');
 
-  await slide(page, 'Emergency').getByRole('button', { name: 'Try the demo' }).click();
+  await slide(page, 'Emergency Profile').getByRole('button', { name: 'Try the demo' }).click();
   await expect(page.getByText('Nothing here is sent to anyone.')).toBeVisible();
   await expect(page.getByRole('link', { name: /Call 112/ })).toHaveAttribute('href', 'tel:112');
   await page.getByRole('button', { name: 'Walk through an alert' }).click();
@@ -209,9 +209,16 @@ test('owner: sign in, the SHYGON OS opening, the AAROH experience page, a change
   await expect(slide(visitor, 'Business')).toContainText('Journey Works');
   await visitor.close();
 
-  // The emergency page is the real one, backed by /api/emergency.
-  await page.getByRole('link', { name: 'Open emergency settings' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Emergency contacts and alerts' })).toBeVisible();
+  // Emergency Profile, Return to Owner and SHYGON Connect read "Coming soon" and are not linked
+  // until released (owner, 2026-10-20); the page itself is reachable for verification.
+  for (const name of ['Emergency Profile', 'Return to Owner', 'SHYGON Connect']) {
+    const panel = page.locator('section', { has: page.getByRole('heading', { level: 2, name }) });
+    await expect(panel.getByText('Coming soon')).toBeVisible();
+    await expect(panel.getByRole('link')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Account' }).getByRole('link', { name })).toHaveCount(0);
+  }
+  await page.goto('/shygontap/emergency');
+  await expect(page.getByRole('heading', { level: 1, name: 'Emergency Profile' })).toBeVisible();
 
   // Sign out: the owner pages refuse again.
   await page.getByRole('button', { name: 'Sign out' }).click();
@@ -263,7 +270,7 @@ test('owner emergency contacts on the real backend, with no text-message provide
   await stayLocal(visitor.context());
   await visitor.goto(`/t/${tap!.slug}`);
   await expect(visitor.getByRole('heading', { level: 1, name: 'Emergency Owner' })).toBeVisible();
-  await expect(visitor.getByRole('heading', { level: 2, name: 'Emergency' })).toHaveCount(0);
+  await expect(visitor.getByRole('heading', { level: 2, name: 'Emergency Profile' })).toHaveCount(0);
   await visitor.close();
 
   // Remove: asked first, then gone from the server.
@@ -290,6 +297,6 @@ test('return to owner: the owner can opt in, and the relay stays off on the publ
   await stayLocal(visitor.context());
   await visitor.goto(`/t/${tap!.slug}`);
   await expect(visitor.getByRole('heading', { level: 1, name: 'Relay Owner' })).toBeVisible();
-  await expect(visitor.getByRole('heading', { level: 2, name: 'Return to owner' })).toHaveCount(0);
+  await expect(visitor.getByRole('heading', { level: 2, name: 'Return to Owner' })).toHaveCount(0);
   await visitor.close();
 });

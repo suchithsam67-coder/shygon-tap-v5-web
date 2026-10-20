@@ -7,10 +7,13 @@ import type { PublicProfile } from '../../lib/database.types';
  * dashboard, so the three cannot disagree about what is available.
  *
  * Two vocabularies, kept apart on purpose:
- *   - `availability` is customer copy, the owner-approved words (master brief
- *     2026-10-19 §10): Available, Available after setup, Plan-gated, Coming
- *     soon, Unsupported, plus Demo for a labelled simulation. Nothing is
- *     called "Live": nothing V6 runs on production yet (AAROH-API v0.1 §12).
+ *   - `availability` is customer copy, in the owner's words (frontend gate
+ *     decisions, 2026-10-20 §3): Available, Setup required, Coming soon,
+ *     Unavailable, plus Demo for a labelled simulation. Nothing is called
+ *     "Live": nothing V6 runs on production yet (AAROH-API §12).
+ *   - Names and descriptions of Emergency Profile, Return to Owner and SHYGON
+ *     Connect are the owner's approved wording (same decisions, §1); each stays
+ *     "Coming soon" until it passes its own backend and end-to-end checks.
  *   - `backend` is the engineering status from Session A's contract, for the
  *     integration map and the reports only, never shown to a visitor.
  *
@@ -22,14 +25,13 @@ import type { PublicProfile } from '../../lib/database.types';
  * when its server's `public.status` says it is available for this Tap.
  */
 
-export type Availability = 'available' | 'setup' | 'plan' | 'coming-soon' | 'unsupported' | 'demo';
+export type Availability = 'available' | 'setup' | 'coming-soon' | 'unsupported' | 'demo';
 
 export const AVAILABILITY_LABEL: Record<Availability, string> = {
   available: 'Available',
-  setup: 'Available after setup',
-  plan: 'Plan-gated',
+  setup: 'Setup required',
   'coming-soon': 'Coming soon',
-  unsupported: 'Unsupported',
+  unsupported: 'Unavailable',
   demo: 'Demo',
 };
 
@@ -112,29 +114,33 @@ export const MODES: Record<ModeId, ModeDefinition> = {
   },
   emergency: {
     id: 'emergency',
-    name: 'Emergency',
-    tagline: 'Alert the owner’s emergency contacts.',
-    // Customer copy stays "Coming soon" until the owner decides DEC-2026-038 Q10.
+    name: 'Emergency Profile',
+    tagline: 'Keep the emergency information you choose ready when it matters. You control what is stored and what may be shared.',
+    // "Coming soon" until the backend flow, permissions, contact handling and
+    // notification delivery are verified (owner, 2026-10-20).
     availability: 'coming-soon',
     backend: 'blocked',
-    note: 'Not available on cards yet. SHYGON never contacts emergency services: in an emergency, call 112.',
+    note: 'Not available yet. SHYGON never contacts emergency services: in an emergency, call 112.',
     demoWalkthrough: true,
   },
   return: {
     id: 'return',
-    name: 'Return to owner',
-    tagline: 'Help a finder give a lost card back.',
+    name: 'Return to Owner',
+    tagline: 'Lost something with SHYGON? Let the finder contact you through a privacy-conscious relay, without automatically exposing your personal contact details.',
+    // "Coming soon" until the real relay, owner notifications, abuse controls
+    // and failure handling are verified (owner, 2026-10-20).
     availability: 'coming-soon',
-    backend: 'not-implemented',
-    note: 'Not available yet and not included with a card. Its privacy rules will be published before any launch.',
+    backend: 'blocked',
+    note: 'Not available yet.',
   },
   connect: {
     id: 'connect',
-    name: 'Connect',
-    tagline: 'Share your details back, with consent.',
+    name: 'SHYGON Connect',
+    tagline: 'Build meaningful connections and exchange the information you choose to share.',
+    // "Coming soon" until the connection and consent workflows are verified (owner, 2026-10-20).
     availability: 'coming-soon',
-    backend: 'not-implemented',
-    note: 'Not available on cards yet. Nothing is collected.',
+    backend: 'blocked',
+    note: 'Not available yet. Nothing is collected.',
   },
   student: {
     id: 'student',
@@ -283,6 +289,30 @@ export function liveModesFor(profile: PublicProfile, extras: { emergency?: boole
 export function isModeId(value: string | null | undefined): value is ModeId {
   return Boolean(value && Object.prototype.hasOwnProperty.call(MODES, value));
 }
+
+/** The server-backed features that are switched on one at a time. */
+export type ServerFeature = 'emergency' | 'return' | 'connect';
+
+/**
+ * Whether each server-backed feature is offered to customers: its owner page
+ * linked from the account menu and from "Your AAROH experience". While a
+ * feature is not released, customers see it as "Coming soon" (owner,
+ * 2026-10-20 §1). Each is switched on separately, only once it has passed its
+ * own backend and end-to-end checks; its owner page stays reachable by address
+ * so it can be verified on a test system. On a public Tap the server decides
+ * independently (`public.status`, off everywhere today).
+ */
+export const RELEASED: Record<ServerFeature, boolean> = {
+  emergency: false,
+  return: false,
+  connect: false,
+};
+
+export const OWNER_PAGE: Record<ServerFeature, string> = {
+  emergency: '/shygontap/emergency',
+  return: '/shygontap/return-to-owner',
+  connect: '/shygontap/connections',
+};
 
 /** The id of a showroom card's open button, so focus can return to it. */
 export function openButtonId(id: ModeId): string {

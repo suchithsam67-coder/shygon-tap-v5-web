@@ -83,8 +83,8 @@ describe('switched off (today, everywhere)', () => {
     await waitFor(() => expect(sent('/api/emergency', 'public.status')).toEqual([{ op: 'public.status', slug: 'asha' }]));
     expect(sent('/api/rescue', 'public.status')).toEqual([{ op: 'public.status', slug: 'asha' }]);
     expect(sent('/api/connect', 'public.status')).toEqual([{ op: 'public.status', slug: 'asha' }]);
-    expect(screen.queryByRole('heading', { level: 2, name: 'Emergency' })).toBeNull();
-    expect(screen.queryByRole('heading', { level: 2, name: 'Return to owner' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Emergency Profile' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Return to Owner' })).toBeNull();
   });
 
   it('a server that cannot be reached reads as "not available", and the profile still shows', async () => {
@@ -106,7 +106,7 @@ describe('the emergency relay, when the server says it is available', () => {
   async function open() {
     visit('/t/asha');
     fireEvent.click(await screen.findByRole('button', { name: /Alert their contacts/ }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Emergency' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Emergency Profile' })).toBeTruthy();
   }
 
   it('asks for intent first, sends once, and shows the server’s outcome and safety line; never a contact', async () => {
@@ -205,5 +205,24 @@ describe('Return to owner, when the server says it is available', () => {
     expect(await screen.findByText(/That earlier conversation is no longer available/)).toBeTruthy();
     expect(window.sessionStorage.getItem('shygon.rescue.asha')).toBeNull();
     expect(screen.getByLabelText('Your message')).toBeTruthy();
+  });
+
+  it('network failure: the retry reuses the same key, so it cannot open a second conversation', async () => {
+    let n = 0;
+    routes['rescue:public.start'] = () => {
+      n += 1;
+      return n === 1
+        ? { status: 0, body: null }
+        : { status: 201, body: { finderToken: 'N'.repeat(43), replayed: false, thread: thread() } };
+    };
+    visit('/t/asha');
+    fireEvent.click(await screen.findByRole('button', { name: /Message the owner/ }));
+    fireEvent.change(await screen.findByLabelText('Your message'), { target: { value: 'Found your card.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to the owner' }));
+    expect(await screen.findByText(/could not reach SHYGON/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Send to the owner' }));
+    expect(await screen.findByRole('heading', { name: 'Sent to the owner. Waiting for a reply.' })).toBeTruthy();
+    const [first, second] = sent('/api/rescue', 'public.start');
+    expect(first!.idempotencyKey).toBe(second!.idempotencyKey);
   });
 });

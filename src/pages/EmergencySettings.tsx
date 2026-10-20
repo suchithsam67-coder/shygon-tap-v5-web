@@ -88,8 +88,8 @@ export default function EmergencySettings() {
   return (
     <AppShell
       eyebrow="SHYGON OS"
-      title="Emergency contacts and alerts"
-      description="Add the people to alert in an emergency, send them an alert, and see what actually happened to it."
+      title="Emergency Profile"
+      description="Keep the emergency information you choose ready when it matters. You control what is stored and what may be shared."
     >
       <div style={{ display: 'grid', gap: 18, maxWidth: 760 }}>
         <section className="panel" aria-labelledby="em-112">

@@ -106,4 +106,11 @@ describe('Return to owner inbox', () => {
     expect(await screen.findByText(/Blocked\. No more messages can be sent here\./)).toBeTruthy();
     expect(calls.filter((c) => c.op === 'threads.block')).toEqual([{ op: 'threads.block', threadId: 't1' }]);
   });
+
+  it('unauthorised: a refused session is shown, not an empty inbox', async () => {
+    handler = () => ({ status: 401, body: { error: { code: 'unauthorized', message: 'Your session has expired. Sign in again.' } } });
+    show();
+    expect(await screen.findByText('Your session has expired. Sign in again.')).toBeTruthy();
+    expect(screen.queryByText('No messages.')).toBeNull();
+  });
 });

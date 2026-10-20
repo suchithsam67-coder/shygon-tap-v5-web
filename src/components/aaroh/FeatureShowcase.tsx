@@ -66,7 +66,7 @@ export default function FeatureShowcase({ edition, finish }: { edition: AarohEdi
         >
           <Icon size={20} aria-hidden="true" />
           <span className="fs-tile-name">{feature.name}</span>
-          <span className="fs-tile-status">{STATUS_LABEL[feature.status]}</span>
+          <span className="fs-tile-status">{feature.statusLabel ?? STATUS_LABEL[feature.status]}</span>
         </button>
       </li>
     );
@@ -87,7 +87,7 @@ export default function FeatureShowcase({ edition, finish }: { edition: AarohEdi
             <span className="fs-link-line" />
             <span className="fs-link-icon"><SelectedIcon size={22} /></span>
           </div>
-          <span className={`fs-status fs-status-${selected.status}`}>{STATUS_LABEL[selected.status]}</span>
+          <span className={`fs-status fs-status-${selected.status}`}>{selected.statusLabel ?? STATUS_LABEL[selected.status]}</span>
           <h3 id={`${panelId}-title`} className="fs-panel-title">{selected.name}</h3>
           <p className="fs-benefit">{selected.benefit}</p>
           <dl className="fs-facts">

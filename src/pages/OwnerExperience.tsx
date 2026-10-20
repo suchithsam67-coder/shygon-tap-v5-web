@@ -9,7 +9,7 @@ import type { CardRow } from '../lib/database.types';
 import { cardStatusOf, fetchMyCards } from '../services/cards';
 import { fetchPublicProfile } from '../lib/publicTapClient';
 import type { PublicProfile } from '../lib/database.types';
-import { AVAILABILITY_LABEL, liveModesFor, MODE_ORDER, MODES, type ModeId } from '../components/showroom/modes';
+import { AVAILABILITY_LABEL, liveModesFor, MODE_ORDER, MODES, OWNER_PAGE, RELEASED, type ModeId, type ServerFeature } from '../components/showroom/modes';
 import { TAP_STATUS_HINTS, TAP_STATUS_LABELS } from '../services/tap';
 
 /**
@@ -30,6 +30,13 @@ type Preview =
   | { kind: 'shown'; data: PublicProfile }
   | { kind: 'not-live' }
   | { kind: 'error' };
+
+/** Emergency Profile, Return to Owner and SHYGON Connect: offered only once released (modes.ts RELEASED). */
+const SERVER_FEATURES = [
+  { id: 'emergency', icon: ShieldAlert, open: 'Open Emergency Profile' },
+  { id: 'return', icon: Undo2, open: 'Open Return to Owner' },
+  { id: 'connect', icon: Handshake, open: 'Open SHYGON Connect' },
+] as const;
 
 const LIVE_MODES = MODE_ORDER.filter((id) => MODES[id].availability === 'available');
 // Emergency has its own section; Privé is a demo; Verify and Access are not part of AAROH.
@@ -236,56 +243,9 @@ export default function OwnerExperience() {
             </div>
           </section>
 
-          <section className="panel" aria-labelledby="ox-emergency">
-            <div className="panel-head">
-              <ShieldAlert size={19} aria-hidden="true" />
-              <div>
-                <h2 id="ox-emergency">Emergency contacts and alerts</h2>
-                <p>Kept on SHYGON’s server. The emergency page shows whether text messages can be sent right now.</p>
-              </div>
-            </div>
-            <div className="panel-body" style={{ display: 'grid', gap: 12 }}>
-              <p style={{ margin: 0, fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6 }}>
-                Add emergency contacts, send them an alert, and see each contact’s status as the text-message provider reports
-                it. SHYGON never contacts emergency services.
-              </p>
-              <div>
-                <Link className="btn btn-ghost btn-sm" to="/shygontap/emergency">
-                  Open emergency settings
-                </Link>
-              </div>
-            </div>
-          </section>
-
-          <section className="panel" aria-labelledby="ox-return">
-            <div className="panel-head">
-              <Undo2 size={19} aria-hidden="true" />
-              <div>
-                <h2 id="ox-return">Return to owner</h2>
-                <p>Off unless you turn it on, and not yet switched on by SHYGON. Not shown on your card until both are on.</p>
-              </div>
-            </div>
-            <div className="panel-body">
-              <Link className="btn btn-ghost btn-sm" to="/shygontap/return-to-owner">
-                Open Return to owner
-              </Link>
-            </div>
-          </section>
-
-          <section className="panel" aria-labelledby="ox-connect">
-            <div className="panel-head">
-              <Handshake size={19} aria-hidden="true" />
-              <div>
-                <h2 id="ox-connect">Connect</h2>
-                <p>Off unless you turn it on. Signed-in SHYGON accounts can then ask to connect from your card, and you choose what to share back.</p>
-              </div>
-            </div>
-            <div className="panel-body">
-              <Link className="btn btn-ghost btn-sm" to="/shygontap/connections">
-                Open Connections
-              </Link>
-            </div>
-          </section>
+          {SERVER_FEATURES.map(({ id, icon: Icon, open }) => (
+            <ServerFeaturePanel key={id} id={id} icon={<Icon size={19} aria-hidden="true" />} open={open} />
+          ))}
 
           <section className="panel" aria-labelledby="ox-later">
             <div className="panel-head">
@@ -309,5 +269,38 @@ export default function OwnerExperience() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+/**
+ * One server-backed feature on the owner's page, in the owner's approved
+ * words. Not released: "Coming soon" and nothing to press. Released: a link to
+ * its page.
+ */
+function ServerFeaturePanel({ id, icon, open }: { id: ServerFeature; icon: React.ReactNode; open: string }) {
+  const mode = MODES[id];
+  const released = RELEASED[id];
+  return (
+    <section className="panel" aria-labelledby={`ox-${id}`} data-feature={id}>
+      <div className="panel-head">
+        {icon}
+        <div>
+          <h2 id={`ox-${id}`}>{mode.name}</h2>
+          <p>{mode.tagline}</p>
+        </div>
+      </div>
+      <div className="panel-body">
+        {released ? (
+          <Link className="btn btn-ghost btn-sm" to={OWNER_PAGE[id]}>
+            {open}
+          </Link>
+        ) : (
+          <span className="pill pill-amber">
+            <span className="pill-dot" />
+            {AVAILABILITY_LABEL['coming-soon']}
+          </span>
+        )}
+      </div>
+    </section>
   );
 }

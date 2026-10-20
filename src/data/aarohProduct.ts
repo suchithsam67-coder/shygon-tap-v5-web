@@ -307,6 +307,8 @@ export interface ShowcaseFeature {
   configurable: boolean
   /** The experience or purchase it depends on, when the code says so. */
   requires?: string
+  /** Overrides the status word for one feature, when the owner chose its words. */
+  statusLabel?: string
   /**
    * Where a cardholder manages it today: a real page of the SHYGON account
    * (sign-in first). Only live features have one; planned ones never do.
@@ -427,10 +429,11 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
   },
   {
     id: 'return-to-owner',
-    name: 'Return to owner',
-    benefit: 'Help a finder give your card back.',
+    name: 'Return to Owner',
+    benefit: 'Lost something with SHYGON? Let the finder contact you through a privacy-conscious relay, without automatically exposing your personal contact details.',
     icon: 'return',
     status: 'future',
+    statusLabel: 'Coming soon',
     useCase: 'A candidate SHYGON OS module: someone who finds a lost card could reach you without seeing your details.',
     ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'Its privacy rules would be decided and published before any launch.',
@@ -438,10 +441,11 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
   },
   {
     id: 'emergency',
-    name: 'Emergency information',
-    benefit: 'Approved details for an emergency.',
+    name: 'Emergency Profile',
+    benefit: 'Keep the emergency information you choose ready when it matters. You control what is stored and what may be shared.',
     icon: 'emergency',
     status: 'future',
+    statusLabel: 'Coming soon',
     useCase: 'A candidate SHYGON OS module for emergency details that you approve, shown only in an emergency flow.',
     ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'Highly sensitive: nothing like it is shown or stored today.',

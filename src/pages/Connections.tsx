@@ -85,7 +85,7 @@ export default function Connections() {
 
   if (load.kind !== 'ready') {
     return (
-      <AppShell eyebrow="SHYGON Connect" title="Connections" description="People you have connected with, and what each of you shares.">
+      <AppShell eyebrow="Connections" title="SHYGON Connect" description="Build meaningful connections and exchange the information you choose to share.">
         {load.kind === 'loading' ? (
           <div className="panel" style={{ padding: 24 }}>
             <Skeleton height={140} radius={18} />
@@ -106,7 +106,7 @@ export default function Connections() {
   const ended = connections.filter((c) => !['requested', 'accepted'].includes(c.status));
 
   return (
-    <AppShell eyebrow="SHYGON Connect" title="Connections" description="People you have connected with, and what each of you shares.">
+    <AppShell eyebrow="Connections" title="SHYGON Connect" description="Build meaningful connections and exchange the information you choose to share.">
       <div style={{ display: 'grid', gap: 18, maxWidth: 760 }}>
         {error && (
           <p className="field-error" role="alert" style={{ margin: 0 }}>

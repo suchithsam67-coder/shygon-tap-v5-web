@@ -301,4 +301,22 @@ describe('visitor alerts setting and sign-in', () => {
     expect(await screen.findByText('Your session has expired. Sign in again.')).toBeTruthy();
     expect(screen.queryByText('No contacts yet.')).toBeNull();
   });
+
+  it('expired: an expired verification code is refused, and the contact stays unverified', async () => {
+    handler = (op) =>
+      op === 'contacts.list'
+        ? { status: 200, body: { contacts: [contact({ verified: false })], settings: settings({ verifiedContacts: 0, providerConfigured: true }) } }
+        : op === 'contacts.verify.request'
+          ? { status: 200, body: { contactId: 'c1', phone: '+91 ••••• 00001', expiresAt: '2026-10-20T10:00:00Z', resendAfter: 45 } }
+          : op === 'contacts.verify.confirm'
+            ? { status: 410, body: { error: { code: 'code_expired', message: 'That code has expired. Send a new one.' } } }
+            : base(op)!;
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Verify number' }));
+    fireEvent.change(await screen.findByLabelText(/Code sent to/), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm code' }));
+    expect(await screen.findByText('That code has expired. Send a new one.')).toBeTruthy();
+    expect(screen.getByText('Not verified')).toBeTruthy();
+    expect(screen.queryByText(/Number verified/)).toBeNull();
+  });
 });

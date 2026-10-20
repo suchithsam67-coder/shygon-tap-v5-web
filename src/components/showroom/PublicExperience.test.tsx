@@ -283,7 +283,7 @@ describe('the demo showroom (/aaroh/experience)', () => {
     // Planned modes say so, and have nothing to press.
     for (const id of MODE_ORDER.filter((m) => MODES[m].availability === 'coming-soon' || MODES[m].availability === 'unsupported')) {
       const card = document.querySelector(`[data-mode="${id}"]`) as HTMLElement;
-      expect(within(card).getByText(MODES[id].availability === 'unsupported' ? 'Unsupported' : 'Coming soon')).toBeTruthy();
+      expect(within(card).getByText(MODES[id].availability === 'unsupported' ? 'Unavailable' : 'Coming soon')).toBeTruthy();
       // Only a labelled walkthrough has a button, and it says it is a demo.
       if (MODES[id].demoWalkthrough) expect(within(card).getByRole('button', { name: /Try the demo/ })).toBeTruthy();
       else expect(card.querySelector('button')).toBeNull();
@@ -297,7 +297,7 @@ describe('the demo showroom (/aaroh/experience)', () => {
   it('the emergency walkthrough asks for intent, works once, sends nothing, and never claims an alert went out', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     visit('/aaroh/experience?mode=emergency');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Emergency' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Emergency Profile' })).toBeTruthy();
     expect(screen.getByText(/Nothing here is sent to anyone/)).toBeTruthy();
     expect(screen.getByText(/SHYGON never contacts the police/)).toBeTruthy();
     expect(screen.getByRole('link', { name: /Call 112/ }).getAttribute('href')).toBe('tel:112');

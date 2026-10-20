@@ -23,6 +23,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useAuth } from '../../lib/auth-context';
+import { RELEASED, type ServerFeature } from '../showroom/modes';
 import { useAccount } from '../../lib/account-context';
 
 /**
@@ -43,9 +44,9 @@ const LINKS = [
   { to: '/shygontap/customize', label: 'Customize', icon: Palette },
   { to: '/shygontap/qr', label: 'QR code', icon: QrCode },
   { to: '/shygontap/cards', label: 'Cards', icon: Nfc },
-  { to: '/shygontap/emergency', label: 'Emergency', icon: ShieldAlert },
-  { to: '/shygontap/return-to-owner', label: 'Return to owner', icon: Undo2 },
-  { to: '/shygontap/connections', label: 'Connections', icon: Handshake },
+  { to: '/shygontap/emergency', label: 'Emergency Profile', icon: ShieldAlert, feature: 'emergency' },
+  { to: '/shygontap/return-to-owner', label: 'Return to Owner', icon: Undo2, feature: 'return' },
+  { to: '/shygontap/connections', label: 'SHYGON Connect', icon: Handshake, feature: 'connect' },
   { to: '/shygontap/customizations', label: 'Add-ons', icon: CreditCard },
   { to: '/shygontap/orders', label: 'Orders', icon: Package },
   { to: '/shygontap/analytics', label: 'Analytics', icon: TrendingUp },
@@ -162,7 +163,8 @@ export function AppShell({
           </div>
 
           <ScrollRail className="app-nav-list" label="account menu">
-            {LINKS.map(({ to, label, icon: Icon, ...rest }) => (
+            {/* A feature that is not released yet has no menu entry (it reads "Coming soon"). */}
+            {LINKS.filter((link) => !('feature' in link) || RELEASED[link.feature as ServerFeature]).map(({ to, label, icon: Icon, ...rest }) => (
               <NavLink
                 key={to}
                 to={to}

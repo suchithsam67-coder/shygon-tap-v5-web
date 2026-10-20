@@ -165,4 +165,22 @@ describe('the connections page', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Block' }));
     await waitFor(() => expect(calls.filter((c) => c.op === 'requests.block')).toHaveLength(1));
   });
+
+  it('unauthorised: a refused session is shown, not an empty list', async () => {
+    handler = () => ({ status: 401, body: { error: { code: 'unauthorized', message: 'Your session has expired. Sign in again.' } } });
+    inbox();
+    expect(await screen.findByText('Your session has expired. Sign in again.')).toBeTruthy();
+    expect(screen.queryByText('No connections yet.')).toBeNull();
+  });
+
+  it('expired: a request nobody answered in 30 days is listed as expired, with nothing shared', async () => {
+    handler = (op) =>
+      op === 'connections.list'
+        ? { status: 200, body: { connections: [conn({ id: 'k9', status: 'expired', endedAt: '2026-10-19T10:00:00Z', theyShare: {} })] } }
+        : base(op);
+    inbox();
+    fireEvent.click(await screen.findByText(/Ended \(1\)/));
+    expect(screen.getByText(/Ravi Kumar · Expired/)).toBeTruthy();
+    expect(screen.queryByText('ravi@example.test')).toBeNull();
+  });
 });

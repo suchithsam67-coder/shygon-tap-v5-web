@@ -170,7 +170,7 @@ test('visitor relay: with the host switch on and the owner opted in, a visitor a
   await visitor.context().setExtraHTTPHeaders({ 'x-nf-client-connection-ip': '203.0.113.21' });
   await visitor.goto(`/t/${slug}`);
   await visitor.getByRole('button', { name: /Alert their contacts/ }).click();
-  await expect(visitor.getByRole('heading', { level: 1, name: 'Emergency' })).toBeVisible();
+  await expect(visitor.getByRole('heading', { level: 1, name: 'Emergency Profile' })).toBeVisible();
   await visitor.getByLabel(/I understand this alerts/).check();
   await visitor.getByRole('button', { name: 'Send the alert' }).click();
   await expect(visitor.getByRole('heading', { name: 'Alert handed to the text-message provider' })).toBeVisible();

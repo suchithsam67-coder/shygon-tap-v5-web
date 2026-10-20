@@ -10,3 +10,12 @@ window.scrollTo = (() => {}) as typeof window.scrollTo;
 // (observed: 1.25 s). Waiting longer changes no assertion; it only stops a
 // cold transform from reading as a failure.
 configure({ asyncUtilTimeout: 5000 });
+
+// Vitest does not load imported CSS. The SHYGON opening checks that its own
+// stylesheet arrived (a curtain is position: fixed) and removes itself if not,
+// so the one rule it checks is declared here, as the real stylesheet does.
+// TapOpening.test.tsx removes it to prove the fallback.
+const openingRule = document.createElement('style');
+openingRule.id = 'test-opening-rule';
+openingRule.textContent = '.tap-opening { position: fixed; }';
+document.head.appendChild(openingRule);

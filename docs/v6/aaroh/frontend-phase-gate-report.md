@@ -1,187 +1,165 @@
 # SHYGON AAROH V6: frontend phase-gate report (Session B)
 
-**Gate:** Phase K of the 2026-10-19 brief. **Stopped here for the owner's review.**
-**Nothing is committed, pushed, applied or deployed.**
+**Gate:** the owner's "Frontend gate decisions" of 2026-10-20, §6 ("Before merging the newer backend or enabling any mode"). **Stopped here for the owner's review.** These decisions approve implementation planning; they are not production-release approval.
 
 | | |
 |---|---|
 | Worktree | `.claude/worktrees/shygon-aaroh-v6-frontend-c7fab7` |
-| Branch | `claude/shygon-aaroh-v6-frontend-c7fab7` = `f0b771c` (V6 RC `6d00f2f` + AAROH store) |
-| Backend merged | `v6/aaroh-backend` @ `d1ff25d` (AAROH-API v0.4; v0.5 `f1d2af1` is records only), merged with `--no-commit`. The merge is **staged**; Session B's work is **unstaged** and separate |
-| Evidence labels | OBSERVED (seen in code or a run), CONFIRMED (a test run recorded here), HYPOTHESIZED |
+| Branch | `claude/shygon-aaroh-v6-frontend-c7fab7`, local only, never pushed |
+| Committed (owner's word, 2026-10-20) | `8358495`: the merge of `v6/aaroh-backend` @ `d1ff25d` (AAROH-API v0.4). `0ae7e47`: the frontend |
+| Uncommitted | The gate-decision changes, 25 files (§2). They await the owner's word to commit |
+| Not merged | AAROH-API v0.5–v0.7 (`f1d2af1` … `ef2d976`, `7380a6e`: Privé 033, DEC-040, DEC-041). Per §6, nothing newer is merged and no mode is enabled before this review |
+| Evidence labels | OBSERVED (seen in code or a run), CONFIRMED (a test run recorded here), PROPOSED (needs approval) |
+
+Nothing is pushed, applied to a real database, deployed or switched on.
 
 ## 1. Verdict
 
 | Area | Result |
 |---|---|
-| Public Tap journey (NFC/QR → opening → showroom → mode → back) | **PASS**, CONFIRMED on desktop and phone (e2e) |
-| Owner journey (sign in → OS opening → AAROH experience → change → public reflects it → sign out) | **PASS**, CONFIRMED (e2e) |
-| Emergency contacts and owner alerts on the real backend | **PASS**, CONFIRMED: no provider, provider accepted → receipt-delivered, refusal, retry (e2e) |
-| Visitor emergency relay | **PASS** with the host switch on (e2e). **Off everywhere** (DEC-2026-038 Q2 = B) |
-| Return to owner (finder ↔ owner) | **PASS** with the relay switch on (e2e). **Off everywhere** (`RESCUE_RELAY`) |
-| Connect (request → accept → self-reported values → remove revokes grants) | **PASS**, CONFIRMED (e2e, consent ledger checked) |
-| Gates | See §6. **One pre-existing FAIL** (`admin-contract`, migration 027, not from this work) |
-| Production readiness | **NOT READY.** Inherits every V6 release blocker (B-1 rotation, B-2 migrations unapplied, live payments off, the live site is a second app); the SMS provider is not configured; customer wording awaits approval |
+| Approved wording and availability (§1, §3) | **Applied.** Emergency Profile, Return to Owner and SHYGON Connect use the approved text and read **Coming soon** everywhere a customer can look |
+| Opening (§2) | **Applied:** short (1.8 s), skippable with a visible hint, none under reduced motion or when the owner turned openings off, never holds a not-found/paused page, and drops at once if its stylesheet fails |
+| Showroom first, owner access, Privé (§3–§5) | **Applied.** Owner access is the normal sign-in; the server decides ownership. Privé stays off |
+| §6.1 tests against the committed frontend and merged backend | **PASS** except the two known, tracked failures (§3.1) |
+| §6.2 contracts and DB/RLS per feature | **PASS** for every feature that is customer-visible; the three Coming-soon features are verified locally too (§3.2) |
+| §6.3 customer-visible availability vs backend state | **Matches today.** One gap on any host where 032 is applied: Connect has no host switch (B-10, §3.3) |
+| §6.4 failure paths | **Covered** for every feature; gaps listed (§3.4) |
+| §6.5 027 and the secret-scan finding | **Tracked separately**, not waived: V6-123 and V6-014 (§3.5) |
+| §6.6 production and live configuration | **Still gated.** Nothing deployed or switched on (§3.6) |
+| Production readiness | **NOT READY.** Inherits every V6 release blocker; see §4 |
 
-## 2. Existing frontend architecture and routes (OBSERVED)
+## 2. What the gate decisions changed (uncommitted, 25 files)
 
-- Vite + React 19 SPA.
-- The public Tap (`/t/:slug`, `/tap/:slug`) is the only page in the entry bundle: no Supabase SDK, plain fetch to SECURITY DEFINER RPCs.
-- Everything else (store, checkout, signed-in account `/shygontap/*`) sits behind one lazy `AccountApp`.
-- `ProtectedRoute` is a UX guard; RLS and the server functions are the boundary.
-- The admin UI is the external Expo app; this repo has no admin route.
-
-## 3. Features found vs built
-
-The full checklist is in `frontend-audit.md` §3 and §7. Summary of what this work adds:
-
-| Feature | Before | Now | Customer word |
+| Decision | What changed | Where | Checked by |
 |---|---|---|---|
-| SHYGON opening | per-tier intros only | brand opening, also the loading state; skippable; none under reduced motion or when the owner turned openings off | — |
-| Showroom | none | horizontal snap rail, keyboard and arrow navigation, honest cards | Available |
-| Profile, Business, Contact, Links, Owner access | one card | focused modes from the published payload only | Available |
-| Emergency (visitor) | none | relay view (name + alert, Q11 = B); shown only when `public.status` says so | Coming soon (Q10) |
-| Emergency (owner) | none | contacts, verification, alerts, statuses, visitor opt-in | Coming soon (Q10) |
-| Return to owner | none | finder view + owner inbox | Coming soon (Q10/Q12) |
-| Connect | none | request page + Connections page + consent record | Coming soon (wording awaits approval) |
-| Owner cards and lifecycle | Cards page | also on the AAROH experience page, with shared status wording | — |
-| Demo showroom `/aaroh/experience` | none | every mode with its status; emergency walkthrough sends nothing | Demo |
-| Privé demo | none | **built, switched OFF** (FE-D5 conflict) | — |
-| Student, Events, Places, Cloud | planned | shown only in the demo | Coming soon |
-| Verify, Access | — | shown only in the demo | Unsupported (DEC-037) |
+| §1 wording | Names and descriptions exactly as approved; "Coming soon" | `modes.ts`, `aarohProduct.ts` (`statusLabel`), `EmergencySettings`, `ReturnToOwner`, `Connections`, `OwnerExperience` | `availability.test.tsx` (exact text) |
+| §1 "Coming soon until verified" | `RELEASED` switch per feature (all false): no account-menu entry, no link on the AAROH experience page, a "Coming soon" pill | `modes.ts`, `AppShell`, `OwnerExperience` | `availability.test.tsx`; e2e owner journey |
+| §1 no false claims | No "Live" word anywhere; the store's Emergency and Return entries have no action | `modes.ts`, `aarohProduct.ts` | `availability.test.tsx` |
+| §2 opening | "Tap to skip" hint; a fail-safe that ends the opening at once if its CSS did not load | `TapOpening.tsx`, `opening.css` | `TapOpening.test.tsx` (3) |
+| §3 vocabulary | Available · Setup required · Coming soon · Unavailable (· Demo) | `modes.ts` | `availability.test.tsx` |
+| §5 Privé | `PRIVE_DEMO = false` asserted | `modes.ts` | `availability.test.tsx` |
+| §6.2 contracts | Every operation the frontend sends is in the published contract; the public Tap uses only P-1/P-2/P-3 | `src/test/contract.test.ts` | itself (5 tests) |
+| §6.4 failure paths | Added: expired code (emergency), 401 (Return, Connect), expired connection, finder network retry | the page tests | themselves |
+| §6.5 tracking | Backlog row V6-123 (027) | `docs/v6/backlog.md` | — |
+| Docs | Approved wording record; this report | `showroom-copy-Q10-draft.md`, this file | — |
 
-## 4. User journeys implemented
+## 3. §6 verification, item by item
 
-**Public.**
-- NFC/QR → `/t/:slug` → the SHYGON opening (also the loading state) → the showroom. It lists only what the owner published, plus Emergency, Return or Connect when their servers say they are on.
-- A mode opens on its own address (`?mode=`). Back, or the phone's back button, returns focus to the same card.
+Run on 2026-10-20 on the committed frontend + merged v0.4 backend + the uncommitted gate-decision changes. Node 20.18, Edge, local no-Docker stack (`npm run stack -- --build`, rebuilt for this run). Every number below was observed in this run.
 
-**Owner.**
-- Sign in → SHYGON OS opening (once per session) → dashboard.
-- AAROH experience page: status, preview of the real public page, modes read from the live payload, cards and lifecycle.
-- Emergency, Return to owner and Connections pages.
-- Sign out → protected routes send you to sign in.
+### 3.1 Tests re-run (§6.1)
 
-**Emergency.** The three workflows are kept apart, per the master brief:
-- **Owner SOS:** `alerts.create`.
-- **Visitor relay:** `public.alert`, owner opt-in, host switch.
-- **Emergency Profile (information view):** not built, undefined (Q11 = B). No contact detail ever reaches a public page.
-- SHYGON is never said to contact emergency services; "call 112" is a `tel:` link.
+**Component tests (Vitest):** **94/94** passed (13 files), also inside `test:components`. Up from 76: wording and availability 5, contract 5, opening 3, new failure paths 5.
 
-## 5. API contracts consumed
-
-All of them are AAROH-API v0.1–v0.4; the full map is in `frontend-integration-map.md`.
-
-| Area | Operations |
-|---|---|
-| Public | P-1/P-2/P-3 RPCs; `/api/emergency` `public.status`/`public.alert`; `/api/rescue` `public.*`/`finder.*`; `/api/connect` `public.status` |
-| Owner | T-1/T-2/T-3 (existing editor), C-1 cards, `/api/emergency` §10.1/10.2/10.4, `/api/rescue` owner ops, `/api/connect` §10b |
-
-Contract rules honoured:
-- one idempotency key per intent, reused only on a network retry;
-- `sent` ≠ `delivered`, and `safety` is always shown;
-- masked numbers only, and the finder token never in a path, query string or log;
-- "blocked" is never shown to a requester; shared values are labelled self-reported; the un-share warning on removal.
-
-## 6. Tests executed and exact results
-
-Run on 2026-10-20 on this branch (merge + Session B's work), Node 20.18, Edge, local stack (`npm run stack`). Every number below was observed in this run; none is copied from an earlier stage.
-
-**Component tests (Vitest):** 76/76 passed, stable across repeated runs. That stability needed one fix: `asyncUtilTimeout` raised to 5 s for the cold lazy-chunk transform, which had made 3 tests flaky at 1.25 s.
-- The suites: PublicTap 11, PublicExperience 16, ServerModes 8, EmergencySettings 15, ReturnToOwner 3, Connections 6, plus the existing ones.
-- The brief's required cases (successful request, unauthorized, invalid input, network failure, provider failure, retry, duplicate submission) are each covered for emergency, and as applicable for Return to owner and Connect.
-
-**End-to-end (Playwright, local stack):** **33/33** passed.
-- The first run's only failure was a browser launch timeout ("browserType.launch: Timeout 180000ms"), not a test assertion. That test (a11y public pages) passed on re-run with no violations reported.
-- New: `aaroh-experience.spec.ts`, 6 journeys × desktop + phone (Pixel 7).
-- New: `aaroh-server-paths.spec.ts`, 5 journeys using Session A's v0.4 hooks:
-  - verify → alert → signed receipt → "Delivered", with the DB recipient `delivered`;
-  - refusal final → no provider `not_sent` → retry → `sent`, with the DB showing `['failed','sent']`;
-  - visitor relay, DB initiator `public`, no contact detail on the page;
-  - Return-to-Owner finder ↔ owner conversation;
-  - Connect request → accept → remove, with the DB grants revoked.
-- Existing journeys still pass after two kinds of change:
-  - locators that matched the owner's name twice were pointed at the page heading;
-  - the a11y, landmarks and reduced-motion lists were extended to the new pages.
-
-**Repository gates** (`npm run ci`'s steps, run one by one so a failure hides nothing):
+**Repository gates** (`npm run ci`'s steps, one by one so a failure hides nothing):
 
 | Gate | Result |
 |---|---|
 | lint, build | PASS |
-| test:bundle (public Tap entry JS) | PASS, **85,247 B / 90,000 B**. The base was 88,908 B: the profile card moved into the lazy experience chunk |
+| test:bundle (public Tap entry JS) | PASS, **85,293 B / 90,000 B** (base 88,908 B) |
 | test:bundle-secrets, test:seo (18 pages), test:push-guard | PASS |
-| db:apply, db:verify 21, rls-matrix **1380** (48 tables), identity 69, admin-notes 12, golden 15, rollbacks 14, account-deletion 9, db:bundle:check, db:history, rls-adversarial 64 | PASS |
-| **test:admin-contract** | **FAIL 14/15, PRE-EXISTING.** `card_design_of(text)` body changed by migration 027 (AAROH catalogue). The identical failure (same hashes) was **reproduced on the unmodified base `f0b771c`**. Under DEC-037, 027 is held aside by the stabilisation step and must never receive a contract approval, so this work does not change it |
+| db:apply, db:verify 21, rls-matrix **1380** (48 tables, 7 callers), identity 69, admin-notes 12, golden 15, rollbacks 14, account-deletion 9, db:bundle:check, db:history, rls-adversarial 64 | PASS |
+| **test:admin-contract** | **FAIL 14/15, pre-existing, tracked as V6-123.** `card_design_of(text)` body md5 `766bd5f9…` → `6e7cba1e…` (migration 027). Identical on the unmodified base `f0b771c` |
 | payments:ci, payment-chain 34, aaroh 15, public-tap 25, suspension 46, emergency **48**, rescue **18**, connect **16**, admin-edge 11, observability 10, security 11 | PASS |
-| test:components | PASS 76 |
-| **test:secrets** | **FAIL, known:** the only finding is `9c8caa7` / `ProjectConsultation.tsx:75` (D-7, DEC-2026-020). A redacted scan of this work's uncommitted `src`, `e2e`, docs and host files found no new secret |
+| test:components | PASS 94 |
+| **test:secrets** | **FAIL, known, tracked as V6-014 (D-7):** 64 commits scanned, the only finding is `9c8caa7` / `ProjectConsultation.tsx:75`. The two new local commits add none. A redacted scan of the 25 uncommitted files: no leaks |
 | npm audit (high) | PASS |
 
-**Performance** (slow 4G, 4× CPU, local host):
-- Public Tap LCP **1,432 ms**, CLS 0.001 (budget 2,500 ms / 0.1); landing 1,540 ms.
-- Measured side by side earlier on the same machine: unmodified base median 1,848 ms vs this work's 1,924 ms. That is within run-to-run noise.
-- An earlier design (the opening after load) measured 3,204 ms and was rejected. The opening is now the loading state and paints from the first frame.
+**End-to-end (Playwright, local stack):** **33/33** passed on the first run (6.9 min), desktop and phone (Pixel 7):
+- every existing journey: sign-up and purchase, upgrade, suspension, account data, a11y, mobile;
+- `aaroh-experience`: 6 journeys × 2 projects, including the owner seeing the three features as "Coming soon", with no link and no menu entry;
+- `aaroh-server-paths`: 5 journeys on Session A's v0.4 hooks (emergency receipt → Delivered, refusal and retry, visitor relay, Return to Owner, Connect with the consent grants revoked).
 
-**Not run:** HawkScan DAST. Its runtime and API key are not installed on this machine (hook: `hawk runtime=false, HAWK_API_KEY=false`).
+**Performance** (slow 4G, 4× CPU, local host, measured in this run): the public Tap's largest paint took **1,524 ms** with CLS 0 (budget 2,500 ms / 0.1). The landing page took 1,556 ms.
 
-## 7. Accessibility and responsive checks
+**Not run:** HawkScan DAST (no runtime or API key on this machine).
 
-- **axe (WCAG 2.2 AA, serious and critical fail):** 0 on all public pages, including every showroom mode, the demo and the emergency walkthrough. 0 on all signed-in pages, including AAROH experience, Emergency, Return to owner, Connections and a Connect request.
-  - Caught and fixed on the way: the white-on-red "Call 112" button was 3.76:1; now 6.4:1.
-- **Landmarks:** one `main` and an `h1` on every new page.
-- **Reduced motion:** no running animation on `/t/<slug>` or `/aaroh/experience` (e2e); the opening never mounts (unit and e2e).
-- **Keyboard:**
-  - the showroom moves with ←/→/Home/End;
-  - Back returns focus to the opened card's button;
-  - mode headings take focus;
-  - dialogs trap and restore focus (existing ConfirmDialog);
-  - the opening is `aria-hidden` and ends on any key.
-- **Responsive:**
-  - phone (Pixel 7 project and a 375 px pane): no sideways scroll, measured;
-  - desktop at 1280 px: the active card is centred and the next card peeks in;
-  - 11–14 demo cards use a count instead of wrapping dots.
-- **Touch:** controls are at least 44 px; dots have 24 px targets.
+### 3.2 API contracts and DB/RLS per feature (§6.2)
 
-## 8. UI blocked by backend or owner dependencies
+| Feature | Customer state | Contract operations used | Contract check | DB / RLS check | Browser check |
+|---|---|---|---|---|---|
+| Public Tap: Profile, Business, Contact, Links, Owner access | Available | P-1 `get_public_profile`, P-2 `get_public_tap_state`, P-3 `record_tap_event` | `contract.test.ts`: only these three | rls-matrix, rls-adversarial 64, public-tap 25, suspension 46 | aaroh-experience (desktop + phone), public-tap-mobile, journeys |
+| Owner OS: AAROH experience, cards | Available (signed in) | T-1–T-3, C-1 (existing) | existing tests | rls-matrix, identity 69 | aaroh-experience owner journey |
+| Emergency Profile (owner contacts, owner alerts) | Coming soon | `/api/emergency` contacts.*, alerts.*, settings.* | `contract.test.ts` | emergency 48; rls-matrix on the 7 `emergency_*` tables | server-paths ×2, owner contacts journey |
+| Emergency visitor relay | Coming soon; `EMERGENCY_PUBLIC_ALERTS` off | `public.status`, `public.alert` | `contract.test.ts` | emergency 48 | server-paths visitor relay (switch on in the test only) |
+| Return to Owner | Coming soon; `RESCUE_RELAY` off | `/api/rescue` public.*, finder.*, owner ops | `contract.test.ts` | rescue 18; rls-matrix on the 5 `rescue_*` tables | server-paths Return; relay-off journey |
+| SHYGON Connect | Coming soon; **no host switch (B-10)** | `/api/connect` §10b | `contract.test.ts` | connect 16; rls-matrix on `connect_*`, `connections`, `consent_grants` | server-paths Connect |
+| Privé demo | Off | none (v0.6+ not merged) | — | — | — |
 
-| # | Item | Waiting on |
+### 3.3 Customer-visible availability vs backend state (§6.3)
+
+| Feature | What a customer sees | Backend state | Match |
+|---|---|---|---|
+| Profile, Business, Contact, Links, Owner access | On a Tap, only what the owner published | P-1 returns published fields only | Yes |
+| Emergency Profile | Store, AAROH experience page: "Coming soon". Not in the account menu. Public card only if `public.status` says available | 028–030 applied nowhere real; host switch off; no SMS provider | Yes |
+| Return to Owner | The same | 031 applied nowhere real; host switch off | Yes |
+| SHYGON Connect | AAROH experience page: "Coming soon". Not in the menu. Public card only if `public.status` says available | 032 applied nowhere real. **But `public.status` has no host switch:** it says available whenever an owner enabled Connect on a published Tap | **Yes today; gap wherever 032 is applied.** B-10 proposed to Session A (`CONNECT_PUBLIC`, off by default); Session A agrees and has put it to the owner |
+| Privé | Nothing | 033 not merged here | Yes |
+| Student Passport, Events, Places, Cloud | Store: "Planned". Demo showroom: "Coming soon" | Not built | Yes (word question Q-B) |
+| Verify, Access | Demo showroom: "Unavailable" | Unsupported (DEC-037) | Yes |
+| Card edition | Not shown | No card registry (P-4) | Yes (blocked, §4) |
+
+One more boundary, by design: the three owner pages are not linked anywhere, but a signed-in owner can still open them by typing their address. That keeps them testable on test systems. On a host where 028–032 are applied, an owner could store emergency contacts or turn Connect on there. See Q-C.
+
+### 3.4 Failure paths (§6.4)
+
+U = component test, E = browser test on the local stack. "n/a": the path cannot occur for that feature.
+
+| Feature | Success | Unauthorised | Invalid input | Expired / suspended | Duplicate | Network failure | Provider failure |
+|---|---|---|---|---|---|---|---|
+| Public Tap | U, E | n/a (public) | U (invalid address) | U (paused, draft, suspended, archived); E journeys (c) | U (one view recorded) | U (error + retry, offline) | n/a |
+| Emergency: owner contacts and alerts | U, E (receipt → Delivered) | U (no session; 401) | U (refused field) | U (expired code 410) | U (one key per intent; in-progress alert shown; rate limit) | U (retry reuses the key) | U, E (no provider; refusal final; retry once set up) |
+| Emergency: visitor relay | U, E | n/a; switch off → hidden (U) | U (cannot send without intent) | U via the Tap states | U (one press, one request) | U (retry reuses the key) | U (`not_sent`) |
+| Return to Owner: finder | U, E | n/a; switch off → hidden (U, E) | U (wait for reply, 409) | U (expired thread 410) | U (retry cannot open a second thread) | U | n/a |
+| Return to Owner: owner inbox | U, E | U (401) | U (closed thread 409) | U (closed) | U (same client key on retry) | **gap:** a network drop on a reply is not tested separately | n/a |
+| Connect | U, E | U (401) | U (unpublished Tap; declined recently) | U (expired request) | U (retry reuses the key) | U | n/a |
+
+The other conditions in the brief: reduced motion (U, E), mobile and NFC/QR (U `?src=nfc`, E Pixel 7), and keyboard/screen reader (U, E: axe 0 serious or critical, landmarks, focus return). They pass as in the previous gate; the a11y and landmark lists also cover the changed pages.
+
+### 3.5 Tracked, not waived (§6.5)
+
+| ID | Finding | State |
 |---|---|---|
-| 1 | Customer wording for Emergency, Return to owner and Connect (`showroom-copy-Q10-draft.md`) | **Owner** (DEC-2026-038 Q10, Connect wording) |
-| 2 | Privé: demo-only (master brief) or out (Q6 as recorded) | **Owner** |
-| 3 | Real SMS (verification, alerts) | MSG91 credentials + DLT templates (Q3) |
-| 4 | Visitor alerts and the relay in production | Host switches, after supervised owner alerts (Q2 = B; Q12) |
-| 5 | B-9: the local app host's client-address header | Session A (tooling only) |
-| 6 | AAROH card activation and `/d/<code>` | Card registry (card release) |
-| 7 | A per-mode model and "Info" mode | Owner (open with Session A) |
-| 8 | FE-D1, FE-D2, FE-D3 (opening on every Tap, showroom first, Owner access) | **Owner** confirmation |
+| V6-123 | `test:admin-contract` 14/15 on 027 | Open, P1, Phase 0.5. 027 stays held aside (DEC-037); no contract approval to be recorded for it |
+| V6-014 | `test:secrets` on `9c8caa7` | Open, P1 (D-7). No new finding in this work |
 
-## 9. Files changed
+### 3.6 Still gated (§6.6)
 
-**Session B, unstaged:**
-- Modified: e2e specs (a11y, journeys, public-tap-mobile), netlify.toml, vercel.json, playwright.config.ts, AccountApp, App, AppShell, TapExperience, Account, Cards, PublicTap(+test), seo/build.ts, services/cards.ts, tap.css, routes.test.ts, test/setup.ts.
-- New: `src/components/showroom/*`, the three public clients, the three owner services, the pages (OwnerExperience, EmergencySettings, ReturnToOwner, Connections, ConnectRequest, AarohExperienceDemo), the component tests, two e2e specs, four docs.
+- No production apply, deploy, live configuration, live payment or secret rotation was done or prepared.
+- The host switches `EMERGENCY_PUBLIC_ALERTS` and `RESCUE_RELAY` are off; they were turned on only inside the local test stack, by its loopback-only hooks.
 
-**Session A merge, staged:** migrations 028–032, functions, tests and docs. `APPLY_ALL.sql` was regenerated with `db:bundle`.
+## 4. Remaining blockers
 
-## 10. Known issues and next actions
+| # | Blocker | Blocks | Owner of the next step |
+|---|---|---|---|
+| 1 | **B-10:** `CONNECT_PUBLIC` host switch | Enabling Connect anywhere 032 is applied | Owner (approve), then Session A |
+| 2 | B-9: the local host's client-address header (the e2e sets it itself) | Tooling only | Owner, then Session A |
+| 3 | V6-123 (027) and V6-014 (D-7) | Release gates | Phase 0.5 / owner |
+| 4 | SMS provider (MSG91 + DLT templates) | Any real verification or alert | Owner (DEC-038 Q3) |
+| 5 | Host switches stay off until supervised owner alerts | Visitor relay, Return relay | Owner (Q2 = B, Q12) |
+| 6 | Card registry (P-4) | Showing the card edition (§3) and card-level lifecycle | Card release |
+| 7 | Privé wording | `PRIVE_DEMO`, merging v0.6/v0.7 | Owner |
+| 8 | DEC-2026-041 (Info, mode model) PROPOSED | Any mode switching. Also: the showroom calls its sections "modes", the server's `mode` is one exclusive experience per Tap, and `places` is close to Info. The words need reconciling once approved | Owner |
+| 9 | V6 release blockers: secret rotation, migrations unapplied, the live site is a second app | Production | Owner |
+| 10 | Node 20.18 is below the `>=22.12` engine | The known payments check | Environment |
 
-**Known issues**
-1. `admin-contract` fails on 027 (pre-existing; stabilisation step, DEC-037).
-2. The secret-scan gate fails on 9c8caa7 (owner decision D-7).
-3. B-9: the e2e supplies the CDN's client-address header itself until the local host adds it (asked of Session A).
-4. Node 20.18 is below the `>=22.12` engine; the known payments check is BLOCKED on Node 20, as before.
-5. The merge brings in 027 via the base. **This branch's `APPLY_ALL.sql` is not a release bundle.**
-6. AAROH-API **v0.6/v0.7 (Privé, migration 033) are not merged here yet.**
+## 5. Questions for the owner
 
-**Next actions, each needing the owner's word**
-1. Review this gate.
-2. Decide whether to **commit**, as two commits: first the staged merge of `v6/aaroh-backend`, then Session B's unstaged work. Nothing is pushed.
-3. Approve, edit or reject the customer wording in `showroom-copy-Q10-draft.md` (Emergency, Return to owner, Connect). Approve the wording for Privé too.
-4. Confirm FE-D1 (the opening on every Tap unless the owner turned openings off), FE-D2 (showroom first) and FE-D3 (Owner access = the normal sign-in).
-5. Then Session B can:
-   - merge v0.7;
-   - switch `PRIVE_DEMO` on;
-   - build the signed-in Privé page against §10c (showing the `notice`, "SHYGON's demo desk");
-   - replace the store's untrue "nothing like it is stored today" line together with the 029 deployment.
-6. Production stays gated by the V6 release blockers (rotation, migrations review/apply, the live site being a second app, the SMS provider, the host switches).
+| ID | Question | Recommended |
+|---|---|---|
+| Q-A | Commit the gate-decision changes (25 files) locally as one commit? Nothing pushed | Yes |
+| Q-B | Should the store's other roadmap items read "Coming soon" instead of "Planned"? | Yes, one vocabulary |
+| Q-C | Hide the unreleased owner pages in production builds (redirect to the AAROH experience page), keeping them on test builds? | Yes, together with B-10 |
+| Q-D | The notes under the three features on a real Tap ("Found this card? Message the owner through SHYGON…"): keep, or use the approved description alone? | Use the approved description alone |
+| Q-E | Approve B-10 and B-9 for Session A? | Yes |
+| Q-F | Privé demo wording (sample hotel, "SHYGON's demo desk", the demo notice) | Owner's text |
+
+## 6. Previous gate (2026-10-19 brief, Phase K)
+
+Still valid and not repeated here:
+- the architecture and routes (OBSERVED);
+- the user journeys;
+- the emergency workflow separation (owner SOS, visitor relay; no Emergency information view; "call 112" is only a `tel:` link);
+- the contract rules honoured.
+
+They are recorded in `frontend-audit.md` and `frontend-integration-map.md`.
