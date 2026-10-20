@@ -257,6 +257,40 @@
   to = "/index.html"
   status = 200
 
+# The owner's AAROH experience and emergency pages (signed in).
+
+[[redirects]]
+  from = "/shygontap/experience"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/emergency"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/return-to-owner"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/connections"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/shygontap/connect/*"
+  to = "/index.html"
+  status = 200
+
+# The AAROH demo showroom: public, sample data, noindex (FE-D7).
+
+[[redirects]]
+  from = "/aaroh/experience"
+  to = "/index.html"
+  status = 200
+
 # Customer Taps: the address printed on each card and encoded in its QR.
 # `/tap/` is kept so links shared before the change keep resolving.
 

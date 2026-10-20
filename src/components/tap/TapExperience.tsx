@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import BrandMark from '../brand/BrandMark';
 import {
+  ArrowLeft,
   Briefcase,
   ExternalLink,
   Globe,
@@ -84,12 +85,15 @@ export function TapExperience({
   preview = false,
   /** Replays the opening animation; the preview uses it as a key. */
   introKey,
+  /** Back to the AAROH showroom, when the profile was opened from it. */
+  onBack,
 }: {
   data: PublicProfile;
   onLinkClick?: (key: string) => void;
   onShare?: () => void;
   preview?: boolean;
   introKey?: string | number;
+  onBack?: () => void;
 }) {
   const experience = data.experience;
   const theme = data.theme;
@@ -190,6 +194,11 @@ export function TapExperience({
       <div className="tap-stage">
         <main className="tap-column">
           <div className="tap-topbar">
+            {onBack && (
+              <button type="button" onClick={onBack} className="tap-back-button">
+                <ArrowLeft size={16} aria-hidden="true" /> Showroom
+              </button>
+            )}
             {experience !== 'essential' && (
               <span className="tap-chip">
                 <Sparkles size={11} /> {experience === 'goat' ? 'GOAT' : experience}

@@ -25,6 +25,14 @@ export async function fetchMyCards(userId: string): Promise<CardRow[]> {
   return (data ?? []) as unknown as CardRow[];
 }
 
+/** A card's lifecycle state in the customer's words (the server's `cards.status`). */
+export function cardStatusOf(card: Pick<CardRow, 'status'>): { label: string; tone: 'ok' | 'off' | 'idle' } {
+  if (card.status === 'active') return { label: 'Active', tone: 'ok' };
+  if (card.status === 'suspended') return { label: 'Deactivated', tone: 'off' };
+  if (card.status === 'replaced') return { label: 'Replaced', tone: 'idle' };
+  return { label: 'Not activated', tone: 'idle' };
+}
+
 export type CardAction = 'activate' | 'deactivate';
 
 export interface OtpChallenge {

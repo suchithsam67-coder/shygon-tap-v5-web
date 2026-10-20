@@ -24,7 +24,7 @@ test('a published Tap on a phone: renders, no sideways scroll, hidden contact ab
   const { data: tap } = await db.from('tap_profiles').select('slug').eq('user_id', owner.userId).single();
 
   await page.goto(`/t/${tap!.slug}?src=nfc`);
-  await expect(page.getByText('Phone Owner')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Phone Owner' })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
   await expect(page.locator('a[href^="tel:"]')).toHaveCount(0);

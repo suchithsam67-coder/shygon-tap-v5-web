@@ -127,7 +127,9 @@ export function sitemapXml(site: string, lastmod: string): string {
 const PRIVATE_PATHS = [
   '/shygontap/auth', '/shygontap/account', '/shygontap/tap', '/shygontap/tiers', '/shygontap/customize',
   '/shygontap/qr', '/shygontap/cards', '/shygontap/customizations', '/shygontap/checkout', '/shygontap/orders',
-  '/shygontap/notifications', '/shygontap/analytics', '/shygontap/support', '/shygontap/settings', '/api/',
+  '/shygontap/notifications', '/shygontap/analytics', '/shygontap/support', '/shygontap/settings',
+  '/shygontap/experience', '/shygontap/emergency', '/shygontap/return-to-owner', '/shygontap/connections',
+  '/shygontap/connect/', '/api/',
 ];
 
 export function robotsTxt(site: string): string {

@@ -1,13 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Loader2, PauseCircle, SearchX, WifiOff } from 'lucide-react';
-import { TapExperience } from '../components/tap/TapExperience';
 import { fetchPublicProfile, fetchPublicTapState, recordTapEvent } from '../lib/publicTapClient';
 import type { PublicProfile, PublicTapState } from '../lib/database.types';
 // Type-only: the builders in seo/meta carry the product catalogue, which the
 // public Tap bundle must not include.
 import type { PageMeta } from '../seo/meta';
 import { usePageMeta } from '../seo/usePageMeta';
+import { OPENING_MS, TapOpening } from '../components/showroom/TapOpening';
+
+/**
+ * The AAROH experience (opening, showroom, modes, the profile card) is its own
+ * chunk, kept out of the entry bundle (DEC-2026-019 budget). The download
+ * starts the moment this page's code runs, in parallel with the profile
+ * request, so by the time the profile arrives the chunk usually has too.
+ */
+const loadExperience = () => import('../components/showroom/PublicExperience');
+const experienceChunk = loadExperience();
+// A failed early download is retried once when the page needs the chunk.
+experienceChunk.catch(() => undefined);
+const PublicExperience = lazy(() => experienceChunk.catch(loadExperience));
 
 /**
  * The public Tap page — what a visitor sees after an NFC tap or a QR scan.
@@ -138,20 +150,37 @@ export default function PublicTap() {
     else if (source === 'qr') void recordTapEvent(slug, 'qr');
   }, [slug, outcome.kind, searchParams]);
 
-  if (outcome.kind === 'loading') {
-    return (
-      <main className="tap-state-page">
-        <div>
-          <div className="tap-state-icon">
-            <Loader2 size={24} className="spin" />
-          </div>
-          <p style={{ letterSpacing: '0.2em', textTransform: 'uppercase', fontSize: 12 }}>
-            Loading Tap…
-          </p>
-        </div>
-      </main>
-    );
-  }
+  // The SHYGON opening is also the loading state (FE-D1): it paints from the
+  // first frame, plays while the profile and the experience chunk arrive, and
+  // lifts once both are ready and the reveal has played. An owner who turned
+  // their opening off, a link to a mode, a state page or a failure lifts it as
+  // soon as there is something to show. Never under reduced motion.
+  const [curtain, setCurtain] = useState(
+    () => !(typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches),
+  );
+  const [chunkReady, setChunkReady] = useState(false);
+  useEffect(() => {
+    let live = true;
+    // Ready either way: a failed chunk is retried by the lazy loader below.
+    const done = () => live && setChunkReady(true);
+    experienceChunk.then(done, done);
+    return () => {
+      live = false;
+    };
+  }, []);
+  const ready = outcome.kind !== 'loading' && (outcome.kind !== 'tap' || chunkReady);
+  const minMs = outcome.kind === 'tap' && outcome.data.theme.animation !== 'none' && !searchParams.get('mode') ? OPENING_MS : 0;
+
+  return (
+    <>
+      <TapOutcome outcome={outcome} slug={slug} retry={retry} />
+      {curtain && <TapOpening ready={ready} minMs={minMs} caption="One card. Many possibilities." onDone={() => setCurtain(false)} />}
+    </>
+  );
+}
+
+function TapOutcome({ outcome, slug, retry }: { outcome: Outcome; slug: string | undefined; retry: () => void }) {
+  if (outcome.kind === 'loading') return <TapLoading />;
 
   if (outcome.kind === 'offline') {
     return (
@@ -212,13 +241,29 @@ export default function PublicTap() {
   }
 
   return (
-    <TapExperience
-      data={tap}
-      onShare={() => void share()}
-      onLinkClick={(key) => {
-        if (slug) void recordTapEvent(slug, 'link_click', key);
-      }}
-    />
+    <Suspense fallback={<TapLoading />}>
+      <PublicExperience
+        data={tap}
+        opening={false}
+        onShare={() => void share()}
+        onLinkClick={(key) => {
+          if (slug) void recordTapEvent(slug, 'link_click', key);
+        }}
+      />
+    </Suspense>
+  );
+}
+
+function TapLoading() {
+  return (
+    <main className="tap-state-page">
+      <div>
+        <div className="tap-state-icon">
+          <Loader2 size={24} className="spin" />
+        </div>
+        <p style={{ letterSpacing: '0.2em', textTransform: 'uppercase', fontSize: 12 }}>Loading Tap…</p>
+      </div>
+    </main>
   );
 }
 

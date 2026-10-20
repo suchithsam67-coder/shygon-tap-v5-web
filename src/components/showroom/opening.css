@@ -1,0 +1,90 @@
+/* ==========================================================================
+   THE SHYGON OPENING
+   --------------------------------------------------------------------------
+   Part of the public Tap's entry bundle: the opening is what a visitor sees
+   while the profile loads, so it must paint from the first frame. The words
+   arrive within the first tenth of a second (they are the page's first large paint); the
+   light and the glint carry the motion after that. Transform and opacity
+   only. Nothing here runs under reduced motion.
+   ========================================================================== */
+
+.tap-opening {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  background:
+    radial-gradient(60% 45% at 50% 40%, color-mix(in srgb, var(--tap-haze, #0d1a33) 90%, transparent) 0%, transparent 75%),
+    var(--tap-ink, #04070f);
+  color: #fff;
+  font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  cursor: pointer;
+  transition: opacity 0.42s ease, transform 0.42s ease;
+}
+.tap-opening.is-leaving { opacity: 0; transform: translateY(-2%) scale(1.01); pointer-events: none; }
+.tap-opening-light {
+  position: absolute;
+  width: 70vmin;
+  height: 70vmin;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--tap-spark, #7fd7ff) 34%, transparent) 0%, transparent 65%);
+  filter: blur(10px);
+  opacity: 0;
+  animation: tapOpenLight 1.8s ease-out both;
+}
+.tap-opening-lockup { position: relative; display: grid; justify-items: center; gap: 14px; }
+.tap-opening-mark {
+  position: relative;
+  width: 54px;
+  color: var(--tap-accent, #d4af37);
+  opacity: 0;
+  transform: scale(0.9) translateY(8px);
+  animation: tapOpenMark 0.7s 0s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  overflow: hidden;
+}
+.tap-opening-mark svg { width: 100%; height: auto; display: block; }
+.tap-opening-glint {
+  position: absolute;
+  inset: -20% -60%;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.85) 50%, transparent 60%);
+  mix-blend-mode: overlay;
+  transform: translateX(-70%);
+  animation: tapOpenGlint 0.9s 0.35s ease-in-out both;
+}
+.tap-opening-word {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.62em;
+  padding-left: 0.62em;
+  opacity: 0;
+  animation: tapOpenWord 0.6s 0.06s ease-out both;
+}
+.tap-opening-product {
+  font-size: clamp(2.2rem, 11vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  padding-left: 0.34em;
+  color: var(--tap-accent, #d4af37);
+  opacity: 0;
+  animation: tapOpenProduct 0.9s 0.1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.tap-opening-caption {
+  position: relative;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.62);
+  opacity: 0;
+  animation: tapOpenWord 0.6s 0.45s ease-out both;
+}
+@keyframes tapOpenLight { 0% { opacity: 0; transform: scale(0.6); } 40% { opacity: 1; } 100% { opacity: 0.55; transform: scale(1.15); } }
+@keyframes tapOpenMark { to { opacity: 1; transform: none; } }
+@keyframes tapOpenGlint { to { transform: translateX(70%); } }
+@keyframes tapOpenWord { to { opacity: 1; } }
+@keyframes tapOpenProduct { from { opacity: 0; letter-spacing: 0.6em; } to { opacity: 1; letter-spacing: 0.34em; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tap-opening { display: none; }
+}

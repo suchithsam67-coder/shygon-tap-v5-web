@@ -622,5 +622,9 @@
 .tap-state-button:focus-visible { outline: 2px solid #d4af37; outline-offset: 3px; }
 
 /* Visitors of a Tap are covered by the Privacy Policy (visit statistics). */
+/* The SHYGON mark in the footnote. Sized here as well as in enhance.css, which
+   only the signed-in app loads: without it the public Tap drew the mark at the
+   browser's default SVG size. */
+.tap-footnote-mark { display: inline-block; height: 14px; width: auto; margin-right: 5px; vertical-align: -2px; opacity: 0.85; }
 .tap-footnote a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .tap-footnote a:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 2px; }

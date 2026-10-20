@@ -22,6 +22,8 @@ import BrandLoader from './components/BrandLoader';
  * require — lives behind one dynamic import.
  */
 const AccountApp = lazy(() => import('./AccountApp'));
+/** The AAROH demo showroom: public, no session, its own chunk (FE-D7). */
+const AarohExperienceDemo = lazy(() => import('./pages/AarohExperienceDemo'));
 
 function AppFallback() {
   return <BrandLoader label="Loading SHYGON Tap…" />;
@@ -38,6 +40,14 @@ export default function App() {
         */}
         <Route path="/t/:username" element={<PublicTap />} />
         <Route path="/tap/:username" element={<PublicTap />} />
+        <Route
+          path="/aaroh/experience"
+          element={
+            <Suspense fallback={<AppFallback />}>
+              <AarohExperienceDemo />
+            </Suspense>
+          }
+        />
         <Route
           path="*"
           element={

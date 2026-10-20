@@ -14,6 +14,7 @@ import { CARD_SALES_OPEN, CARDS_COMING_SOON } from '../lib/commerce';
 import { cardArt, cardDesignNames, materialLabels, products, type MaterialId, type TierId } from '../data/shygonTapData';
 import {
   CardOtpError,
+  cardStatusOf,
   fetchMyCards,
   requestCardOtp,
   verifyCardOtp,
@@ -31,12 +32,7 @@ import {
 const date = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
-function statusOf(card: CardRow): { label: string; tone: 'ok' | 'off' | 'idle' } {
-  if (card.status === 'active') return { label: 'Active', tone: 'ok' };
-  if (card.status === 'suspended') return { label: 'Deactivated', tone: 'off' };
-  if (card.status === 'replaced') return { label: 'Replaced', tone: 'idle' };
-  return { label: 'Not activated', tone: 'idle' };
-}
+const statusOf = cardStatusOf;
 
 const cardName = (card: CardRow) =>
   card.card_uid ? `Card ${card.card_uid}` : `Card ${card.id.slice(0, 8).toUpperCase()}`;

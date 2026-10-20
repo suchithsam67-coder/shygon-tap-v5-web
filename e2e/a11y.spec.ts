@@ -66,7 +66,13 @@ test('public pages: no serious or critical WCAG 2.2 AA violation', async ({ page
   await page.goto('/shygontap');
   await dismissCookieNotice(page);
   const product = await page.locator('a[href^="/shygontap/store/aaroh"]').first().getAttribute('href');
-  const pages = ['/shygontap', '/shygontap/store', product!, '/shygontap/store/aaroh', '/shygontap/auth', '/shygontap/privacy-policy', '/no-such-page', `/t/${slug}`, '/t/no-such-tap'];
+  const pages = [
+    '/shygontap', '/shygontap/store', product!, '/shygontap/store/aaroh', '/shygontap/auth', '/shygontap/privacy-policy', '/no-such-page',
+    `/t/${slug}`, '/t/no-such-tap',
+    // The AAROH showroom's modes, and the demo showroom with its emergency walkthrough.
+    `/t/${slug}?mode=identity`, `/t/${slug}?mode=business`, `/t/${slug}?mode=contact`, `/t/${slug}?mode=owner`,
+    '/aaroh/experience', '/aaroh/experience?mode=emergency', '/aaroh/experience?mode=links',
+  ];
   const blocking: string[] = [];
   for (const path of pages) {
     await page.goto(path);
@@ -81,7 +87,7 @@ test('signed-in pages: no serious or critical WCAG 2.2 AA violation', async ({ p
   const pages = [
     '/shygontap/account', '/shygontap/tap', '/shygontap/tiers', '/shygontap/customize', '/shygontap/qr', '/shygontap/cards',
     '/shygontap/customizations', '/shygontap/orders', '/shygontap/analytics', '/shygontap/notifications', '/shygontap/support',
-    '/shygontap/settings',
+    '/shygontap/settings', '/shygontap/experience', '/shygontap/emergency', '/shygontap/return-to-owner', '/shygontap/connections',
   ];
   const blocking: string[] = [];
   for (const path of pages) {
@@ -118,7 +124,7 @@ test('keyboard: the sign-in form is reached in order, and focus is always visibl
 test('reduced motion: nothing animates when the visitor asks for less', async ({ page }) => {
   const { slug } = await publishedTap('Calm Visitor View', 'goat');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  for (const path of [`/t/${slug}`, '/shygontap']) {
+  for (const path of [`/t/${slug}`, '/aaroh/experience', '/shygontap']) {
     await page.goto(path);
     await dismissCookieNotice(page);
     await page.waitForTimeout(1200);
@@ -139,14 +145,14 @@ test('reduced motion: nothing animates when the visitor asks for less', async ({
 
 test('landmarks: every page has one main region and a page heading', async ({ page }) => {
   const { owner, slug } = await publishedTap('Landmark Owner', 'business');
-  for (const path of ['/shygontap', '/shygontap/store', '/shygontap/auth', `/t/${slug}`]) {
+  for (const path of ['/shygontap', '/shygontap/store', '/shygontap/auth', `/t/${slug}`, `/t/${slug}?mode=owner`, `/t/${slug}?mode=identity`, '/aaroh/experience']) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
     expect(await page.locator('main').count(), `${path}: main regions`).toBe(1);
     expect(await page.locator('h1').count(), `${path}: h1`).toBeGreaterThanOrEqual(1);
   }
   await signIn(page, owner.email, owner.password);
-  for (const path of ['/shygontap/account', '/shygontap/settings']) {
+  for (const path of ['/shygontap/account', '/shygontap/settings', '/shygontap/experience', '/shygontap/emergency', '/shygontap/return-to-owner', '/shygontap/connections', `/shygontap/connect/${slug}`]) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
     expect(await page.locator('main').count(), `${path}: main regions`).toBe(1);

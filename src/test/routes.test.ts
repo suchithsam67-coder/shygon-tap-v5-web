@@ -35,7 +35,7 @@ const answered = (address: string) =>
 
 /** Every string literal in the app that is an address on this site. */
 const addresses = sources('src').flatMap((file) =>
-  [...code(file).matchAll(/["'`](\/(?:shygontap|t|tap)(?:\/[A-Za-z0-9._~:-]+)*\/?)(?:[?#][^"'`]*)?["'`]/g)].map((match) => ({
+  [...code(file).matchAll(/["'`](\/(?:shygontap|t|tap|aaroh)(?:\/[A-Za-z0-9._~:-]+)*\/?)(?:[?#][^"'`]*)?["'`]/g)].map((match) => ({
     file: file.replace(/\\/g, '/'),
     address: match[1],
   })),

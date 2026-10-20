@@ -11,6 +11,10 @@ import { DEFAULT_THEME } from '../lib/database.types';
  * a failed load, offline. The data layer is replaced at its boundary
  * (src/lib/publicTapClient.ts); what the server returns for each state is
  * proven against the real schema in supabase/tests/public-tap.mjs.
+ *
+ * Since the AAROH showroom (2026-10-19) the visitor lands on the showroom,
+ * whose heading is the owner's name; its cards carry the same contact links
+ * the profile card does (src/components/showroom/PublicExperience.test.tsx).
  */
 
 const client = vi.hoisted(() => ({
@@ -81,7 +85,7 @@ describe('an active Tap', () => {
   it('renders the profile and records exactly one view', async () => {
     client.fetchPublicProfile.mockResolvedValue(profile());
     visit('/t/asha');
-    expect(await screen.findByText('Asha Rao')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Asha Rao' })).toBeTruthy();
     expect(client.fetchPublicProfile).toHaveBeenCalledWith('asha');
     await expectEvents([['asha', 'view']]);
     expect(robots()).toContain('index');
@@ -91,25 +95,25 @@ describe('an active Tap', () => {
   it('records the NFC tap or QR scan that brought the visitor', async () => {
     client.fetchPublicProfile.mockResolvedValue(profile());
     visit('/t/asha?src=nfc');
-    await screen.findByText('Asha Rao');
+    await screen.findByRole('heading', { level: 1, name: 'Asha Rao' });
     await expectEvents([['asha', 'view'], ['asha', 'nfc']]);
     cleanup();
     client.recordTapEvent.mockClear();
     visit('/t/asha?src=qr');
-    await screen.findByText('Asha Rao');
+    await screen.findByRole('heading', { level: 1, name: 'Asha Rao' });
     await expectEvents([['asha', 'view'], ['asha', 'qr']]);
   });
 
   it('still answers at the legacy /tap/ address printed on early cards', async () => {
     client.fetchPublicProfile.mockResolvedValue(profile());
     visit('/tap/asha');
-    expect(await screen.findByText('Asha Rao')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Asha Rao' })).toBeTruthy();
   });
 
   it('shows only the contacts the server returned (a hidden phone or email is absent)', async () => {
     client.fetchPublicProfile.mockResolvedValue(profile({ phone: null, email: null }));
     const { container } = visit('/t/asha');
-    await screen.findByText('Asha Rao');
+    await screen.findByRole('heading', { level: 1, name: 'Asha Rao' });
     expect(container.querySelector('a[href^="tel:"]')).toBeNull();
     expect(container.querySelector('a[href^="mailto:"]')).toBeNull();
   });
@@ -117,7 +121,7 @@ describe('an active Tap', () => {
   it('links the contacts the owner chose to show', async () => {
     client.fetchPublicProfile.mockResolvedValue(profile({ phone: '+919800000000', email: 'asha@example.test' }));
     const { container } = visit('/t/asha');
-    await screen.findByText('Asha Rao');
+    await screen.findByRole('heading', { level: 1, name: 'Asha Rao' });
     expect(container.querySelector('a[href="tel:+919800000000"]')).not.toBeNull();
     expect(container.querySelector('a[href="mailto:asha@example.test"]')).not.toBeNull();
   });
@@ -166,7 +170,7 @@ describe('a Tap that could not be loaded', () => {
     expect(await screen.findByText("We couldn't load this Tap")).toBeTruthy();
     expect(screen.queryByText('Tap not found')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByText('Asha Rao')).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Asha Rao' })).toBeTruthy();
   });
 
   it('offline: says the device has no connection rather than that the Tap is gone', async () => {

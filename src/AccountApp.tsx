@@ -51,6 +51,11 @@ const AnalyticsPage = lazy(() => import('./pages/Analytics'));
 const Support = lazy(() => import('./pages/Support'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Cards = lazy(() => import('./pages/Cards'));
+const OwnerExperience = lazy(() => import('./pages/OwnerExperience'));
+const EmergencySettings = lazy(() => import('./pages/EmergencySettings'));
+const ReturnToOwner = lazy(() => import('./pages/ReturnToOwner'));
+const Connections = lazy(() => import('./pages/Connections'));
+const ConnectRequest = lazy(() => import('./pages/ConnectRequest'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'));
 const Terms = lazy(() => import('./pages/legal/Terms'));
@@ -111,6 +116,13 @@ export default function AccountApp() {
               <Route path="/shygontap/shipping-policy" element={<ShippingPolicy />} />
 
               <Route path="/shygontap/account" element={<Protected title="Your account"><Account /></Protected>} />
+              <Route path="/shygontap/experience" element={<Protected title="Your AAROH experience"><OwnerExperience /></Protected>} />
+              <Route path="/shygontap/emergency" element={<Protected title="Emergency contacts and alerts"><EmergencySettings /></Protected>} />
+              <Route path="/shygontap/return-to-owner" element={<Protected title="Return to owner"><ReturnToOwner /></Protected>} />
+              <Route path="/shygontap/connections" element={<Protected title="Connections"><Connections /></Protected>} />
+              <Route path="/shygontap/connect/:slug" element={<Protected title="Connect"><ConnectRequest /></Protected>} />
+              {/* No Tap chosen: the place to see and answer connections. */}
+              <Route path="/shygontap/connect" element={<Navigate to="/shygontap/connections" replace />} />
               <Route path="/shygontap/tap" element={<Protected title="Tap profile"><TapEditor /></Protected>} />
               <Route path="/shygontap/tiers" element={<Protected title="Digital experience"><Tiers /></Protected>} />
               <Route path="/shygontap/customize" element={<Protected title="Customize your Tap"><Customize /></Protected>} />

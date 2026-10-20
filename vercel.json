@@ -157,6 +157,30 @@
       "destination": "/index.html"
     },
     {
+      "source": "/shygontap/experience",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/emergency",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/return-to-owner",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/connections",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/shygontap/connect/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/aaroh/experience",
+      "destination": "/index.html"
+    },
+    {
       "source": "/t/:path*",
       "destination": "/index.html"
     },

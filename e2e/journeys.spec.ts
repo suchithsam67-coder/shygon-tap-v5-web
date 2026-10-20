@@ -77,7 +77,8 @@ test('(a) a new customer signs up, buys their Tap, publishes it, and a visitor s
   await eventually(async () => (await db.from('tap_profiles').select('status').eq('user_id', owner.userId).single()).data?.status === 'active', 'Tap active');
 
   await visitor.goto(`/t/${tap!.slug}`);
-  await expect(visitor.getByText('Journey Owner')).toBeVisible();
+  // The showroom's heading is the owner's name (the Profile card repeats it).
+  await expect(visitor.getByRole('heading', { level: 1, name: 'Journey Owner' })).toBeVisible();
   await expect(visitor.getByText('Tap not found')).toHaveCount(0);
   await visitor.close();
 });
@@ -135,7 +136,7 @@ test('(c) an administrator suspends a Tap, the public page goes dark, and restor
   await db.from('admin_users').insert({ user_id: moderator.userId, role: 'admin', is_active: true });
 
   await page.goto(`/t/${tap!.slug}`);
-  await expect(page.getByText('Moderated Owner')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Moderated Owner' })).toBeVisible();
 
   // Suspend (the admin app calls this RPC with the administrator's session).
   const suspended = await moderator.client.rpc('admin_set_tap_suspension', { p_tap_id: tap!.id, p_suspended: true, p_reason: 'Journey check' });
@@ -152,7 +153,7 @@ test('(c) an administrator suspends a Tap, the public page goes dark, and restor
   const restored = await moderator.client.rpc('admin_set_tap_suspension', { p_tap_id: tap!.id, p_suspended: false, p_reason: null });
   expect(restored.error).toBeNull();
   await page.reload();
-  await expect(page.getByText('Moderated Owner')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Moderated Owner' })).toBeVisible();
 
   const { data: audit } = await db.from('admin_audit_log').select('action').eq('entity_id', tap!.id).order('created_at');
   expect(audit!.map((a) => a.action)).toEqual(['tap.suspended', 'tap.restored']);

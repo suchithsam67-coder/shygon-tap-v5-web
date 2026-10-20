@@ -17,6 +17,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { AppShell } from '../components/app/AppShell';
+import OwnerOpening from '../components/showroom/OwnerOpening';
 import { useAuth } from '../lib/auth-context';
 import { useAccount } from '../lib/account-context';
 import { useToast } from '../components/app/toast-context';
@@ -157,6 +158,8 @@ export default function Account() {
       title={`Hello, ${firstName}`}
       description="Your Tap, your experience and everything behind it."
     >
+      {/* SHYGON, then SHYGON OS, once per browser session (owner flow, brief §2 side B). */}
+      <OwnerOpening />
       {staleCardSelection && (
         <section className="panel" style={{ marginBottom: 18 }}>
           <div className="panel-body" style={{ display: 'grid', gap: 10 }}>

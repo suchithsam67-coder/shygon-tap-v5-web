@@ -6,6 +6,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Bell,
   CreditCard,
+  Handshake,
+  Layers,
   LayoutDashboard,
   LifeBuoy,
   LogOut,
@@ -14,7 +16,9 @@ import {
   Palette,
   QrCode,
   Settings,
+  ShieldAlert,
   Sparkles,
+  Undo2,
   TrendingUp,
   UserRound,
 } from 'lucide-react';
@@ -33,11 +37,15 @@ import { useAccount } from '../../lib/account-context';
 
 const LINKS = [
   { to: '/shygontap/account', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/shygontap/experience', label: 'AAROH experience', icon: Layers },
   { to: '/shygontap/tap', label: 'Tap profile', icon: UserRound },
   { to: '/shygontap/tiers', label: 'Digital experience', icon: Sparkles },
   { to: '/shygontap/customize', label: 'Customize', icon: Palette },
   { to: '/shygontap/qr', label: 'QR code', icon: QrCode },
   { to: '/shygontap/cards', label: 'Cards', icon: Nfc },
+  { to: '/shygontap/emergency', label: 'Emergency', icon: ShieldAlert },
+  { to: '/shygontap/return-to-owner', label: 'Return to owner', icon: Undo2 },
+  { to: '/shygontap/connections', label: 'Connections', icon: Handshake },
   { to: '/shygontap/customizations', label: 'Add-ons', icon: CreditCard },
   { to: '/shygontap/orders', label: 'Orders', icon: Package },
   { to: '/shygontap/analytics', label: 'Analytics', icon: TrendingUp },

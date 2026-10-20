@@ -39,7 +39,8 @@ export default defineConfig({
     {
       name: 'phone',
       use: { ...devices['Pixel 7'], channel },
-      testMatch: /public-tap-mobile\.spec\.ts/,
+      // The public Tap and the AAROH experience are phone-first, so they also run as a phone.
+      testMatch: /(public-tap-mobile|aaroh-experience)\.spec\.ts/,
     },
   ],
 });
