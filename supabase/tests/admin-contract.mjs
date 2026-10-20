@@ -128,6 +128,8 @@ const APPROVED_NEW_RELATIONS = {
     .map((t) => [t, 'DEC-2026-038 Q1, approved 2026-10-19 (migration 029)'])),
   ...Object.fromEntries(['rescue_settings', 'rescue_threads', 'rescue_messages', 'rescue_blocks', 'rescue_audit']
     .map((t) => [t, 'DEC-2026-038 Q12, approved 2026-10-19 (migration 031)'])),
+  ...Object.fromEntries(['connect_settings', 'connections', 'consent_grants', 'connect_audit']
+    .map((t) => [t, 'DEC-2026-039 Q1-Q7, approved 2026-10-20 (migration 032)'])),
 };
 
 // New admin_* functions (new names, not overloads), with their decision.
@@ -140,8 +142,7 @@ const NEW_ADMIN_FUNCTIONS = {
 // Relations a PROPOSED decision adds. Held to the same rule (closed, RLS on),
 // but NOT approved: the check names them as pending so the gate output says so.
 // Move an entry to APPROVED_NEW_RELATIONS only when the owner approves it.
-const PROPOSED_NEW_RELATIONS = Object.fromEntries(['connect_settings', 'connections', 'consent_grants', 'connect_audit']
-  .map((t) => [t, 'DEC-2026-039 PROPOSED (migration 032)']));
+const PROPOSED_NEW_RELATIONS = {};
 
 const aclItems = (acl) => (acl ? acl.replace(/^\{|\}$/g, '').split(',').filter(Boolean) : []);
 const grantee = (item) => item.slice(0, item.indexOf('='));

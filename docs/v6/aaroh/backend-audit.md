@@ -223,15 +223,15 @@ Three problems found during the runs were real and are fixed, not worked around:
 | Privé (step 12) | BLOCKED (conflict) |
 | Tests (step 13) | PASS except the known secret-scan finding and the Node 22 check |
 | DEC-2026-038 | **APPROVED 2026-10-19** (Q1–Q13 as recommended; Q6 read as B, conflict still open) |
-| Connect stage (DEC-2026-038 Q13) | PASS locally (`test:connect` 16); its choices PROPOSED in DEC-2026-039 |
-| **Gate** | **STOPPED for owner review of DEC-2026-039 and the Privé question.** Production: NOT AUTHORIZED |
+| Connect stage (DEC-2026-038 Q13) | PASS locally (`test:connect` 16); **DEC-2026-039 APPROVED 2026-10-20** (every choice as built) |
+| **Gate** | **STOPPED: the backend scope approved so far is built and verified locally.** Waiting on the owner: Privé (demo-only or out), the "Info" definition and the human actions below. Production: NOT AUTHORIZED |
 
 ## 14. Next smallest safe stage (2026-10-20)
 
 **Done since the first gate:** the DEC-2026-038 approval is recorded, the gates moved to APPROVED, Q4 is pinned, MSG91 delivery reports work, and the smoke script exists (v0.3). The Connect stage (v0.4) is built.
 
 **Waiting on the owner:**
-1. **DEC-2026-039 Q1–Q7** (the Connect choices). Then Session A moves 032 to APPROVED in the gates. If Q1 = B, guest requesters come next, as a relay like Rescue.
+1. ~~DEC-2026-039~~: **approved 2026-10-20**, every choice as built; 032 is approved in the gates.
 2. **Privé:** "Privé demo-only" or "Privé out" (DEC-2026-038 Q6; Session B has a switched-off demo ready).
 3. **"Info" mode:** define it (Q7). Session A then proposes a mode model.
 4. **Human actions:** the MSG91 account, the three DLT templates and the sender ID (Q3); counsel review and the Privacy Policy section (Q9); approval of Session B's showroom wording (Q10, `docs/v6/aaroh/showroom-copy-Q10-draft.md` on Session B's branch).

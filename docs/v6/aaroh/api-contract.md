@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.4** (2026-10-19). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`; changes in §13. DEC-2026-038 is **APPROVED**; DEC-2026-039 (Connect choices) is PROPOSED. |
+| Contract version | **AAROH-API v0.5** (2026-10-20). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`; changes in §13. DEC-2026-038 and DEC-2026-039 are **APPROVED**. |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (PROPOSED, DEC-2026-039); none applied anywhere. 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039); none applied anywhere. 027 is held aside (DEC-2026-037). |
 | Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
@@ -447,7 +447,7 @@ Two **signed-in** SHYGON accounts connect. Each side chooses what it shares from
 - **Self-reported.** Every shared value is marked `provenance: 'self_reported'`; nothing verifies it.
 - **Revocation.** Revoking stops future reads at once. Something already copied off the screen cannot be un-shared, and the UI must say so (doc 04).
 - **Opt-in.** The owner of the Tap being asked must switch Connect on (default off).
-- **Status:** LIVE-LOCAL. The stage is approved (DEC-2026-038 Q13); its choices are **PROPOSED** (DEC-2026-039). Don't ship a Connect control until those are decided.
+- **Status:** LIVE-LOCAL, **APPROVED** (DEC-2026-038 Q13; DEC-2026-039 Q1–Q7 as built, 2026-10-20). A Connect control may ship with the first production release that contains 032. Its customer wording is the owner's to approve, as for Q10.
 
 | op | Auth | Request | Success | Errors |
 |---|---|---|---|---|
@@ -507,7 +507,7 @@ Connection = { id, direction: 'outgoing' | 'incoming',
 |---|---|---|
 | Return-to-owner relay | **Moved to §10a in v0.2** (LIVE-LOCAL, off) | Lost or found item lifecycle is still BLOCKED (card registry) |
 | Emergency Profile / Emergency Tap information view | **Decided (Q11 = B): no new backend** | The view presents `public.status` (§10.3) plus the name the public profile already shows, and its only action is the visitor alert (`public.alert`). Hidden while Q2 keeps visitor alerts off. Never show a contact detail |
-| Connect requests | **Moved to §10b in v0.4** (LIVE-LOCAL; choices PROPOSED, DEC-2026-039) | Guest requesters (no SHYGON account): NOT IMPLEMENTED (DEC-2026-039 Q1) |
+| Connect requests | **Moved to §10b in v0.4** (LIVE-LOCAL, APPROVED) | Guest requesters (no SHYGON account): **not built, by decision** (DEC-2026-039 Q1 = A) |
 | Credential verification (`/v/<code>`) | NOT IMPLEMENTED | No schema. DEC-037: an AAROH card is not an access or authentication credential |
 | SHYGON Privé (demo hotels, guest requests) | **OUT** (DEC-2026-038 Q6 read as B: the 2026-10-16 decision stands) | Not shown, not built. Demo-only Privé needs the owner's explicit "Privé demo-only". No real hotel, PMS, booking or access-control integration in any case |
 | Student Passport, Event mode, Places/objects, Cloud storage | NOT IMPLEMENTED | "Planned" in the showroom; no schema, no approval |
@@ -534,7 +534,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Card activation and lost cards | BLOCKED | §7 |
 | Emergency information / alerts | LIVE-LOCAL logic, **APPROVED** (Q1); real delivery **BLOCKED** (§10.7) | Showroom wording changes per Q10 = A: Session B drafts it and the owner approves the text. Until then the customer-facing status stays "Coming soon" |
 | Return to owner | LIVE-LOCAL, **APPROVED** (Q12), off (`RESCUE_RELAY`) until the first production release with 031 | §10a. Customer copy per Q10: Session B drafts, owner approves |
-| Connect | LIVE-LOCAL; choices PROPOSED (DEC-2026-039) | §10b. Customer-facing: "Coming soon" until DEC-2026-039 is decided |
+| Connect | LIVE-LOCAL, **APPROVED** (DEC-2026-039) | §10b. Customer-facing: "Coming soon" until it is deployed, with wording the owner approves |
 | Verify | NOT IMPLEMENTED | §11 |
 | Privé | BLOCKED (decision) | §11 |
 | Student, Event, Places, Cloud | NOT IMPLEMENTED | §11 |
@@ -554,6 +554,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.5 | 2026-10-20 | DEC-2026-039 approved: every Connect choice as built; 032 listed as approved. No operation, request or response changed. | The Connect control may ship with the first release containing 032; its wording needs the owner's approval. No guest connect (Q1 = A). |
 | v0.4 | 2026-10-19 | New: §10b `/api/connect` (Connect and the consent ledger, migration 032, PROPOSED in DEC-2026-039); `connect` notifications; the sweep now expires Connect requests; browser E2E hooks on the local stack (§1 rule 11). No earlier operation changed. | A Connect UI may be built against §10b, but must not ship until DEC-2026-039 is decided. Never show `blocked` to a requester (the API already maps it). Show shared values as self-reported. Revocation copy: "already-copied details cannot be un-shared". |
 | v0.3 | 2026-10-19 | DEC-2026-038 approved: statuses updated (029/030/031 APPROVED, not applied); Q2 visitor alerts off; Q6 Privé out; Q11 Emergency Profile = presentation of `public.status`, no new endpoint. MSG91 delivery reports (`/api/sms-status?provider=msg91`): `deliveryReceipts` can now be `supported` with MSG91. Operator smoke script. No request or response shape changed. | Showroom copy for Emergency and Return to owner: draft it for the owner's approval (Q10). Privé: not shown. Emergency Profile: build it on `public.status`; hidden while it says `false`. |
 | v0.2 | 2026-10-19 | New: §10a `/api/rescue` (Return-to-Owner relay, migration 031); `rescue` notifications (§9); `admin_list_rescue_reports` (§12a); the capability matrix. §11 now lists Emergency Profile as NOT IMPLEMENTED (Q11). No v0.1 operation changed. | New routes: `/shygontap/return-to-owner` (owner inbox) and a finder flow on `/t/:slug`. The finder token goes in `sessionStorage` or the URL fragment only. Show the relay control only when `public.status` says `available`. |

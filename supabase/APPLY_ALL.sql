@@ -3315,7 +3315,9 @@ GRANT EXECUTE ON FUNCTION public.admin_list_rescue_reports(integer, integer) TO 
 --            doc 04 §4.1-4.2 (a connection is an audience; consent is data;
 --            revocation is immediate for future reads; already-copied data
 --            cannot be un-shared). The policy choices this file makes where the
---            docs are silent are listed in DEC-2026-039 (PROPOSED).
+--            docs are silent are DEC-2026-039 Q1-Q7, APPROVED by the owner
+--            2026-10-20 (in session). Approval of the design is not approval
+--            to apply: see Level.
 -- Level:     L3 (new tables holding who-knows-whom and shared personal data;
 --            privileged functions). DEC-2026-018 cool-off plus checklist review
 --            before approval or application. Never applied by tooling.

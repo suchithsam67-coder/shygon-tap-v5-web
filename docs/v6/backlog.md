@@ -84,7 +84,7 @@ Priority: P0 release blocker · P1 must complete · P2 should complete · P3 def
 | V6-118 | Rescue | Lost or found item lifecycle and device-bound rescue items (doc 08 lost mode) | P2 | after the card registry (DEC-2026-028, card release) | blocked |
 | V6-119 | Abuse | No bot check on the public relays (`public.alert`, `public.start`): limits only. Doc 05 specifies Turnstile | P2 | owner (provider/key) | new |
 | V6-120 | Emergency | Emergency Profile / information view is undefined (doc 04 vs showroom) | P2 | DEC-2026-038 Q11 | new |
-| V6-121 | Connect | SHYGON Connect and the consent ledger (DEC-2026-038 Q13): migration 032, `/api/connect`, contract §10b | P1 | AAROH backend | **done locally**, PROPOSED (DEC-2026-039 Q1–Q7); `test:connect` 16/16 |
+| V6-121 | Connect | SHYGON Connect and the consent ledger (DEC-2026-038 Q13): migration 032, `/api/connect`, contract §10b | P1 | AAROH backend | **done locally; APPROVED 2026-10-20** (DEC-2026-039 Q1–Q7 as built); `test:connect` 16/16 |
 
 ## Deferred to the card release (D-2, card decision)
 V6-003 (I-4 card records), V6-011 (O-7 owner undoes card suspension), V6-019 (I-5 pgcrypto), V6-034 (F3 card state vs Tap), V6-035 (F4 + O-3 card OTP).

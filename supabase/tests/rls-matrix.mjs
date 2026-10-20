@@ -203,7 +203,7 @@ const MODEL = {
   rescue_messages: { owner: `thread_id IN (SELECT id FROM public.rescue_threads WHERE owner_user_id = auth.uid())`, select: sel(NONE, NONE) },
   rescue_blocks: { owner: OWN('owner_user_id'), select: sel(NONE, NONE) },
   rescue_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
-  // Connect and the consent ledger (032, DEC-2026-039 PROPOSED): closed the same way.
+  // Connect and the consent ledger (032, DEC-2026-039, approved 2026-10-20): closed the same way.
   connect_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   connections: { owner: OWN('requester_user_id'), select: sel(NONE, NONE) },
   consent_grants: { owner: OWN('grantor_user_id'), select: sel(NONE, NONE) },
