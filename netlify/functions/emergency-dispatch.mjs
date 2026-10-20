@@ -11,8 +11,8 @@ import { config, dispatchDue, rpc } from '../lib/emergency.mjs';
  *     lease_expired, and retries them if attempts remain;
  *   - sends every retry that is due (30 s after the first failure, 2 minutes
  *     after the second; at most 3 attempts per recipient);
- *   - applies retention (emergency_purge, and rescue_purge for the
- *     Return-to-Owner relay, migration 031).
+ *   - applies retention (emergency_purge; rescue_purge for the Return-to-Owner
+ *     relay, 031; connect_purge for Connect requests and ended connections, 032).
  *
  * Without CRON_SECRET it refuses to run (fail closed): the schedule is a
  * deployment setting (docs/v6/aaroh/provider-requirements.md).
@@ -46,8 +46,9 @@ async function handle(request, log) {
     const dispatched = await dispatchDue(cfg, { limit: 100, log });
     const purged = await rpc(cfg, 'emergency_purge');
     const rescue = await rpc(cfg, 'rescue_purge');
-    log.info('emergency-dispatch.done', { ...dispatched, ...purged, ...rescue });
-    return json({ dispatched, purged, rescue });
+    const connect = await rpc(cfg, 'connect_purge');
+    log.info('emergency-dispatch.done', { ...dispatched, ...purged, ...rescue, ...connect });
+    return json({ dispatched, purged, rescue, connect });
   } catch (error) {
     log.error('emergency-dispatch.error', { error });
     return json({ error: { code: 'internal', message: 'The sweep failed.' } }, 500);

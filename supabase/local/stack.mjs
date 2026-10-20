@@ -140,7 +140,18 @@ export async function startStack({
     log,
   });
   const restoreFetch = installFetchRouter(sim, sms);
-  const host = createAppHost({ root: ROOT, distDir, appUrl, gatewayUrl, sim, log });
+  // Browser E2E control (/__sim/sms/*, /__sim/switches): the host switches only.
+  const SWITCHES = ['EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY'];
+  const control = {
+    sms,
+    useSms: (provider, options) => useSms(provider, options),
+    msg91DlrSecret: secrets.msg91DlrSecret,
+    setSwitch: (name, on) => {
+      if (SWITCHES.includes(name)) setEnv(name, on ? 'on' : undefined);
+    },
+    switches: () => Object.fromEntries(SWITCHES.map((name) => [name, process.env[name] === 'on'])),
+  };
+  const host = createAppHost({ root: ROOT, distDir, appUrl, gatewayUrl, sim, control, log });
   await listen(host.server, hostPort);
 
   /**

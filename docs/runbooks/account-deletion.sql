@@ -24,7 +24,8 @@
 --   numbers), settings, verification codes, alerts with their recipients and
 --   delivery attempts, and the emergency audit trail; where 031 is applied,
 --   the Return-to-Owner settings, conversations (with their messages), blocks
---   and audit trail.
+--   and audit trail; where 032 is applied, Connect settings, connections (both
+--   directions), the consent grants on them, and the Connect audit trail.
 -- Kept ("orders, invoices and payment records ... up to 8 years"):
 --   orders, their items, payments and status history. A card stays as a
 --   hardware record, unlinked from the account and retired, so it opens nothing.
@@ -83,6 +84,13 @@ BEGIN
     DELETE FROM public.rescue_blocks WHERE owner_user_id = target;
     DELETE FROM public.rescue_settings WHERE user_id = target;
     DELETE FROM public.rescue_audit WHERE user_id = target;
+  END IF;
+  -- Connect and its consent ledger (migration 032), only where they exist. The
+  -- grants go with their connections.
+  IF to_regclass('public.connections') IS NOT NULL THEN
+    DELETE FROM public.connections WHERE requester_user_id = target OR target_user_id = target;
+    DELETE FROM public.connect_settings WHERE user_id = target;
+    DELETE FROM public.connect_audit WHERE user_id = target;
   END IF;
 
   -- The Tap; its visit statistics (tap_events) go with it.

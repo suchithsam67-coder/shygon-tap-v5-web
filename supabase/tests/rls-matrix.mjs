@@ -121,10 +121,20 @@ for (const [u, n] of [[A, 1], [B, 2]]) {
     VALUES ('1${n}000000-0000-4000-8000-0000000000c${n}', 'finder', 'Matrix finder message ${n}');
     INSERT INTO public.rescue_blocks (owner_user_id, finder_digest, expires_at) VALUES ('${u}', 'blocked-${n}', now() + interval '1 day');
     INSERT INTO public.rescue_audit (user_id, actor, action) VALUES ('${u}', 'owner', 'matrix.test');
+    INSERT INTO public.connect_settings (user_id, enabled) VALUES ('${u}', true);
+    INSERT INTO public.connect_audit (user_id, action) VALUES ('${u}', 'matrix.test');
   `);
 }
 
 // --- the expected access model -----------------------------------------------
+await db.exec(`
+  INSERT INTO public.connections (id, requester_user_id, target_user_id, status, idempotency_key)
+  VALUES ('1c000000-0000-4000-8000-0000000000c1', '${A}', '${B}', 'accepted', 'matrix-connect-key-1');
+  INSERT INTO public.consent_grants (grantor_user_id, grantee_user_id, scope, connection_id)
+  VALUES ('${A}', '${B}', ARRAY['email'], '1c000000-0000-4000-8000-0000000000c1'),
+         ('${B}', '${A}', ARRAY['phone'], '1c000000-0000-4000-8000-0000000000c1');
+`);
+
 const NONE = 'false';
 const ALL = 'true';
 const OWN = (c) => `${c} = auth.uid()`;
@@ -193,6 +203,11 @@ const MODEL = {
   rescue_messages: { owner: `thread_id IN (SELECT id FROM public.rescue_threads WHERE owner_user_id = auth.uid())`, select: sel(NONE, NONE) },
   rescue_blocks: { owner: OWN('owner_user_id'), select: sel(NONE, NONE) },
   rescue_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  // Connect and the consent ledger (032, DEC-2026-039 PROPOSED): closed the same way.
+  connect_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  connections: { owner: OWN('requester_user_id'), select: sel(NONE, NONE) },
+  consent_grants: { owner: OWN('grantor_user_id'), select: sel(NONE, NONE) },
+  connect_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };

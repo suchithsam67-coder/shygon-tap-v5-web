@@ -179,6 +179,13 @@ jobs:
       - name: Return-to-Owner relay (local stack)
         run: npm run test:rescue
 
+      # SHYGON Connect and the consent ledger (migration 032): closed tables; an
+      # append-only ledger even for the server role; requests, decisions, live
+      # reads under active grants, revocation, block never revealed, limits,
+      # expiry; no value reaches a caller without a grant. Outbound network denied.
+      - name: Connect and the consent ledger (local stack)
+        run: npm run test:connect
+
       # V6-051 (Stage 4): the admin edge functions' role checks against the
       # real admin tables; a customer cannot reach admin by editing their
       # token or metadata. Outbound network denied.

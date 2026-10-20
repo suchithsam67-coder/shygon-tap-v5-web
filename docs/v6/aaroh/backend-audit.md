@@ -148,6 +148,8 @@ The rules enforced by this design:
 |---|---|
 | Migration 029 (PROPOSED) | `supabase/migrations/029_emergency_contacts_and_alerts.sql` (header: purpose, VERIFY ON LIVE, tested rollback) |
 | Migration 030 (PROPOSED) | `supabase/migrations/030_guard_tap_server_columns.sql` |
+| DEC-2026-038 approved, v0.3 (`6be94e3`) | Approval recorded per question; gate lists moved to APPROVED; Q4 pinned by a test; MSG91 delivery reports (`/api/sms-status?provider=msg91`, secret header, V6-114); `scripts/release/emergency-smoke.mjs` (supervised first live alert), exercised on the local stack |
+| Migration 032 (PROPOSED, DEC-2026-039), v0.4 | `supabase/migrations/032_consent_ledger_and_connect.sql`; `netlify/functions/connect.mjs`, `api/connect.mjs`; `supabase/tests/connect.mjs` (16); the matrix, contract and deletion cover it; the sweep runs `connect_purge`; browser E2E hooks `/__sim/sms/*` and `/__sim/switches` on the local stack (Session B's B-4) |
 | Migration 031 (PROPOSED), v0.2 | `supabase/migrations/031_return_to_owner_relay.sql`; `netlify/functions/rescue.mjs`, `api/rescue.mjs`; `supabase/tests/rescue.mjs` (18); matrix, contract and deletion updated; the sweep runs `rescue_purge` |
 | Bundle | `supabase/APPLY_ALL.sql` regenerated (020–030, applies twice on the baseline). **Do not apply as is**: 025 must be re-based for production drift (V6-106 F-4), and 027 is held aside |
 | Server | `netlify/functions/{emergency,sms-status,emergency-dispatch}.mjs`, `netlify/lib/emergency.mjs`, `api/*.mjs` adapters; `netlify/lib/sms.mjs` extended (message ids, timeouts, Twilio callbacks and signature, classified failures; existing callers unchanged); `vite.config.ts` dev allowlist |
@@ -157,19 +159,20 @@ The rules enforced by this design:
 | CI | `package.json` `test:emergency` in `ci`; `.github/workflows/ci.yml` step |
 | Docs | `docs/v6/aaroh/api-contract.md` (AAROH-API v0.1), `provider-requirements.md`, this file; DEC-2026-038; backlog V6-109…V6-116; migrations README |
 
-## 10. Security tests and actual results (2026-10-19, Node 20.18.0, this worktree, v0.2 tree)
+## 10. Security tests and actual results (2026-10-19/20, Node 20.18.0, this worktree, v0.4 tree)
 
 | Suite | Result |
 |---|---|
-| `npm run test:emergency` | **44 passed, 0 failed** |
+| `npm run test:emergency` | **48 passed, 0 failed** (with Q4, MSG91 receipts, the smoke script, the B-4 hooks) |
 | `npm run test:rescue` | **18 passed, 0 failed** |
-| `npm run test:db` | PASS: apply ×2 (020–031); verify 21; adversarial 64; **rls-matrix 1274 (44 tables × 7 callers)**; identity 69; admin-notes 12; golden 13 (one per migration prefix); **admin-contract 15** (new: admin_list_emergency_events, admin_list_rescue_reports and the 12 new tables reported "PROPOSED, NOT APPROVED"); rollbacks 12 (every 020–031 rollback, plus the chain); **account-deletion 9**; bundle check; history 2 |
+| `npm run test:connect` | **16 passed, 0 failed** |
+| `npm run test:db` | PASS: apply ×2 (020–032); verify 21; adversarial 64; **rls-matrix 1380 (48 tables × 7 callers)**; identity 69; admin-notes 12; golden 14 (one per migration prefix); **admin-contract 15** (029/031 objects APPROVED; 032's four tables "PROPOSED, NOT APPROVED"); rollbacks 13 (every 020–032 rollback, plus the chain); **account-deletion 9** (emergency, rescue and Connect data; each shown missing from the old procedure); bundle check; history 2 |
 | `test:payments:ci` | payments 15; functions-security 13 + **1 BLOCKED** (needs Node 22; known) |
 | `test:payment-chain` 30 · `test:public-tap` 25 · `test:suspension` 46 · `test:admin-edge` 11 · `test:observability` 10 · `test:security` 11 · `test:push-guard` 18 | all PASS |
 | `lint` · `build` · `test:bundle` · `test:bundle-secrets` (207 files) · `test:seo` · `test:components` 23 | all PASS |
 | `npm audit --audit-level=high` | PASS (1 low, known) |
-| `test:secrets` (gitleaks 8.30.1) | **FAIL, known:** the single D-7 finding at `9c8caa7` (`ProjectConsultation.tsx:75`, the Web3Forms public key, DEC-2026-020). No new finding |
-| `test:e2e` (Playwright) | **not run**: no UI change by Session A |
+| `test:secrets` (gitleaks 8.30.1) | **FAIL, known:** the single D-7 finding at `9c8caa7` (DEC-2026-020). No new finding |
+| `test:e2e` (Playwright) | **not run** by Session A (no UI change). Session B reports 12/12 against these endpoints on its branch |
 
 Three problems found during the runs were real and are fixed, not worked around:
 - `functions-security` flagged a log line naming the service-role variable;
@@ -219,13 +222,20 @@ Three problems found during the runs were real and are fixed, not worked around:
 | Other modes (step 11) | NOT IMPLEMENTED (no approved definitions); process definitions for all 12 capabilities in `capability-matrix.md` |
 | Privé (step 12) | BLOCKED (conflict) |
 | Tests (step 13) | PASS except the known secret-scan finding and the Node 22 check |
-| **Gate** | **STOPPED for owner review.** Production: NOT AUTHORIZED |
+| DEC-2026-038 | **APPROVED 2026-10-19** (Q1–Q13 as recommended; Q6 read as B, conflict still open) |
+| Connect stage (DEC-2026-038 Q13) | PASS locally (`test:connect` 16); its choices PROPOSED in DEC-2026-039 |
+| **Gate** | **STOPPED for owner review of DEC-2026-039 and the Privé question.** Production: NOT AUTHORIZED |
 
-## 14. Next smallest safe stage
+## 14. Next smallest safe stage (2026-10-20)
 
-After DEC-2026-038 Q1, Q3 and Q5, Session A:
-- moves the decided parts from PROPOSED to APPROVED in `admin-contract.mjs`;
-- implements the provider choice's remaining piece: MSG91 delivery reports (V6-114) if MSG91 is chosen, or nothing if Twilio is chosen;
-- writes the operator smoke-test script.
+**Done since the first gate:** the DEC-2026-038 approval is recorded, the gates moved to APPROVED, Q4 is pinned, MSG91 delivery reports work, and the smoke script exists (v0.3). The Connect stage (v0.4) is built.
 
-Nothing touches production until the 020–028 release track has cleared its own gate.
+**Waiting on the owner:**
+1. **DEC-2026-039 Q1–Q7** (the Connect choices). Then Session A moves 032 to APPROVED in the gates. If Q1 = B, guest requesters come next, as a relay like Rescue.
+2. **Privé:** "Privé demo-only" or "Privé out" (DEC-2026-038 Q6; Session B has a switched-off demo ready).
+3. **"Info" mode:** define it (Q7). Session A then proposes a mode model.
+4. **Human actions:** the MSG91 account, the three DLT templates and the sender ID (Q3); counsel review and the Privacy Policy section (Q9); approval of Session B's showroom wording (Q10, `docs/v6/aaroh/showroom-copy-Q10-draft.md` on Session B's branch).
+
+**After that, the release track.** None of it is Session A's to do: B-1 rotation, the rebaseline with the owner's fresh dump, the DEC-2026-018 review of 020–032, the deploy target and the sweep schedule, then `scripts/release/emergency-smoke.mjs` on production.
+
+Nothing touches production until that track has cleared its own gate.

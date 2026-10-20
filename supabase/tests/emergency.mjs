@@ -848,6 +848,42 @@ await t.check('operator smoke script (scripts/release/emergency-smoke.mjs) runs 
   return evidence.result;
 });
 
+await t.check('B-4: the /__sim control routes drive the running stack the way a browser test would', async () => {
+  const sim = async (method, route, body) => {
+    const res = await fetch(`${stack.appUrl}${route}`, {
+      method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  const owner = await signUp(stack, { name: 'Browser Owner' });
+  const phone = '+919876500088';
+  assertEqual((await sim('POST', '/__sim/sms/provider', { provider: null })).status, 200, 'provider off');
+  const saved = await call({ op: 'contacts.save', name: 'Browser Contact', phone }, { token: owner.token });
+  const none = await call({ op: 'contacts.verify.request', contactId: saved.body.contact.id }, { token: owner.token });
+  assertEqual(codeOf(none), 'provider_not_configured', 'no provider');
+  assertEqual((await sim('POST', '/__sim/sms/provider', { provider: 'twilio' })).status, 200, 'provider on');
+  await stack.query(`UPDATE public.emergency_contact_challenges SET created_at = now() - interval '1 minute'`);
+  await call({ op: 'contacts.verify.request', contactId: saved.body.contact.id }, { token: owner.token });
+  const code = await sim('GET', `/__sim/sms/last-code?to=${encodeURIComponent(phone)}`);
+  assert(code.status === 200 && /^\d{6}$/.test(code.body.code), JSON.stringify(code));
+  const ok = await call({ op: 'contacts.verify.confirm', contactId: saved.body.contact.id, code: code.body.code }, { token: owner.token });
+  assertEqual(ok.body.contact.verified, true, 'verified with the code read through the route');
+  assertEqual((await sim('POST', '/__sim/sms/queue', { scenarios: ['nonsense'] })).status, 400, 'unknown scenario');
+  assertEqual((await sim('POST', '/__sim/sms/queue', { scenarios: ['accept'] })).body.queued, 1, 'queued');
+  const alert = await call({ op: 'alerts.create', idempotencyKey: newKey() }, { token: owner.token });
+  const listed = (await sim('GET', '/__sim/sms/messages')).body;
+  assert(listed.every((m) => !('body' in m)), 'the messages route returns no bodies');
+  const last = listed.at(-1);
+  assertEqual((await sim('POST', '/__sim/sms/deliver', { sid: last.sid, status: 'delivered' })).body.status, 200, 'receipt');
+  const got = await call({ op: 'alerts.get', eventId: alert.body.event.id }, { token: owner.token });
+  assertEqual(got.body.event.status, 'delivered', 'delivered through the route');
+  const before = (await sim('POST', '/__sim/switches', {})).body;
+  const on = (await sim('POST', '/__sim/switches', { RESCUE_RELAY: true, SOMETHING_ELSE: true })).body;
+  assertEqual(on, { ...before, RESCUE_RELAY: true }, 'only the two named switches exist');
+  await sim('POST', '/__sim/switches', { RESCUE_RELAY: before.RESCUE_RELAY });
+  return 'provider, scenarios, code, receipt, switches';
+});
+
 await t.check('nothing secret or personal reached a response or a log line', async () => {
   const secrets = [stack.secrets.twilioAuthToken, stack.secrets.twilioAccountSid, stack.secrets.msg91AuthKey, stack.secrets.cronSecret,
     stack.keys.serviceRoleKey];

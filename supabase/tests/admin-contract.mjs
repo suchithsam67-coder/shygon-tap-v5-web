@@ -140,7 +140,8 @@ const NEW_ADMIN_FUNCTIONS = {
 // Relations a PROPOSED decision adds. Held to the same rule (closed, RLS on),
 // but NOT approved: the check names them as pending so the gate output says so.
 // Move an entry to APPROVED_NEW_RELATIONS only when the owner approves it.
-const PROPOSED_NEW_RELATIONS = {};
+const PROPOSED_NEW_RELATIONS = Object.fromEntries(['connect_settings', 'connections', 'consent_grants', 'connect_audit']
+  .map((t) => [t, 'DEC-2026-039 PROPOSED (migration 032)']));
 
 const aclItems = (acl) => (acl ? acl.replace(/^\{|\}$/g, '').split(',').filter(Boolean) : []);
 const grantee = (item) => item.slice(0, item.indexOf('='));

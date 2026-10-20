@@ -29,7 +29,7 @@ Nothing here is deployed. Production runs the V5 schema with drift (V6-106).
 | 1c | **Emergency Profile / Emergency Tap information view** | decided Q11 = B (no new backend) | | | | presentation of `public.status`; only action = 1b | hidden while 1b is off; never a contact detail |
 | 2 | **Return-to-Owner / SHYGON Rescue** (protected finder relay) | ✔ (local), APPROVED Q12, off until release | item lifecycle | | | 031, `/api/rescue`, `test:rescue` 18 | lost mode needs the card registry |
 | 3 | **Smart Identity / SHYGON ID** | account identity ✔ | customer-facing ID | | the ID's format | `customers.customer_id` (`CUST-…`), 021 identity contract 69 | D-9 (what the customer-facing ID is) |
-| 4 | **SHYGON Connect** | | | ✔ | | doc 03 §3.4 `connections`, `consent_grants`; doc 10 Phase 2 | no schema; DEC-2026-025 (organisations), DEC-038 Q13 |
+| 4 | **SHYGON Connect** | ✔ (local), 032 PROPOSED (DEC-2026-039) | guest requesters | | | 032, `/api/connect`, `test:connect` 16; stage approved by DEC-2026-038 Q13 | DEC-2026-039 Q1–Q7 |
 | 5 | **Student Passport / Student Tap** | | | ✔ | | doc 10 Phase 2; minors' data | legal review DEC-2026-017 (hard gate) |
 | 6 | **SHYGON Verify** | | | ✔ | | doc 03 `credentials`, `verification_records`; doc 10 Phase 3 | issuers (organisations); DEC-037: an AAROH card is not a credential |
 | 7 | **Business Tap / professional profile** | ✔ (local) | | | | `get_public_profile`, Tap editor, add-ons, themes; public-tap 25, golden, identity, matrix | production parity (V6-106) |
@@ -155,7 +155,10 @@ Undecided: which fields, whether any number is ever shown or only relayed, the t
 - **Tests.** `test:identity` 69.
 - **Gap.** The customer-facing SHYGON ID is undefined (D-9). Nothing new was built.
 
-### 4. SHYGON Connect (PLANNED; PROPOSED minimal design, doc 03 §3.4)
+### 4. SHYGON Connect (IMPLEMENTED locally, 032; choices PROPOSED in DEC-2026-039)
+
+Built as described below, for signed-in accounts only. See contract §10b. The rest of this section is the original design note.
+
 
 - **Actor · Trigger.** A visitor (signed in, or a guest who enters details voluntarily) requests to connect from `/t/<slug>`. The owner accepts or declines; either side may revoke.
 - **Writes.** `connections` (requested → accepted, declined, blocked, expired or removed) and `consent_grants` (append-only; revocation sets `revoked_at`).

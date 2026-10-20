@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.3** (2026-10-19). v0.1 `c8b869d`, v0.2 `b12967a`; changes in §13. DEC-2026-038 is **APPROVED** (Q1–Q13 as recommended). |
+| Contract version | **AAROH-API v0.4** (2026-10-19). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`; changes in §13. DEC-2026-038 is **APPROVED**; DEC-2026-039 (Connect choices) is PROPOSED. |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038; not applied anywhere). 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (PROPOSED, DEC-2026-039); none applied anywhere. 027 is held aside (DEC-2026-037). |
 | Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
@@ -49,7 +49,14 @@ No operation is labelled LIVE: nothing is deployed.
    - a Return-to-Owner message links to `/shygontap/return-to-owner` (v0.2).
 
    Build those routes, or tell Session A the routes you use and they change in the next version.
-10. **A contract change you need:** message Session A. It ships as v0.2 with a CHANGELOG entry. Do not work around a missing field.
+10. **A contract change you need:** message Session A. It ships as the next version with a CHANGELOG entry. Do not work around a missing field.
+11. **Browser E2E hooks** (v0.4, your B-4). These run on `npm run stack` only: loopback callers, never in a deployed build.
+    - `POST /__sim/sms/provider` `{ provider: 'twilio' | 'msg91' | null, receipts? }`
+    - `POST /__sim/sms/queue` `{ scenarios: [...] }`, for the next provider answers: `accept`, `reject`, `error`, `busy`, `timeout`, `network`
+    - `GET /__sim/sms/last-code?to=<E.164>`: the latest verification code texted to that number
+    - `GET /__sim/sms/messages`: provider, to, sid and scenario, never bodies
+    - `POST /__sim/sms/deliver` `{ sid, status }`: a signed receipt (a Twilio status, or an MSG91 code)
+    - `POST /__sim/switches` `{ EMERGENCY_PUBLIC_ALERTS?, RESCUE_RELAY? }` (booleans): only those two switches
 
 ---
 
@@ -202,6 +209,7 @@ Totals only; no visitor identity. The counts can be inflated by a client varying
 New categories:
 - **`security`** (v0.1), e.g. "Your emergency contacts were alerted", `link: '/shygontap/emergency'`, `metadata.emergencyEventId`;
 - **`rescue`** (v0.2): "Someone sent you a message through SHYGON", `link: '/shygontap/return-to-owner'`, `metadata.rescueThreadId`. **Never contains the message text.**
+- **`connect`** (v0.4): "New connection request" and "Connection accepted", `link: '/shygontap/connections'`, `metadata.connectionId`. The request notice names the requester and **never contains the note**.
 
 ---
 
@@ -432,13 +440,74 @@ A finder sends a protected message to a Tap's owner and they talk through SHYGON
 
 ---
 
+## 10b. SHYGON Connect and the consent ledger — `POST /api/connect` (v0.4)
+
+Two **signed-in** SHYGON accounts connect. Each side chooses what it shares from its own account profile: `phone`, `email`, `company` and `job_title`.
+- **Live values.** The other side reads the values live, but only while that grant is active.
+- **Self-reported.** Every shared value is marked `provenance: 'self_reported'`; nothing verifies it.
+- **Revocation.** Revoking stops future reads at once. Something already copied off the screen cannot be un-shared, and the UI must say so (doc 04).
+- **Opt-in.** The owner of the Tap being asked must switch Connect on (default off).
+- **Status:** LIVE-LOCAL. The stage is approved (DEC-2026-038 Q13); its choices are **PROPOSED** (DEC-2026-039). Don't ship a Connect control until those are decided.
+
+| op | Auth | Request | Success | Errors |
+|---|---|---|---|---|
+| `public.status` | none | `{ op, slug }` | 200 `{ available }` | none |
+| `settings.get` | Bearer | `{ op }` | 200 `{ settings: { enabled, publicTapPublished, pendingIncoming, connections, shareableFields } }` | 401 |
+| `settings.set` | Bearer | `{ op, enabled: boolean }` | 200 `{ settings }` | 400 `invalid_setting`; 401 |
+| `requests.create` | Bearer | `{ op, slug, idempotencyKey, share: Field[], note?: string(≤200) }` | **201** `{ connection, replayed: false }`; the same key again → 200 with the same connection, `replayed: true` | 400 `invalid_share` `invalid_note` `invalid_idempotency_key` `self`; 404 `unavailable` (Connect off, Tap not published or suspended, a suspended requester, or **blocked**: indistinguishable); 409 `already_connected` `target_busy`; 429 `recently_declined` `rate_limited` (+`retryAfter`); 401 |
+| `requests.accept` | Bearer (target) | `{ op, connectionId, share: Field[] }` | 200 `{ connection }` | 400; 404 `connection_not_found` (also for the requester or a third account); 409 `already_decided`; 401 |
+| `requests.decline` · `requests.block` | Bearer (target) | `{ op, connectionId }` | 200 `{ connection }` | as accept |
+| `connections.list` | Bearer | `{ op, status?: 'requested' \| 'accepted' \| 'declined' \| 'blocked' \| 'expired' \| 'removed' }` | 200 `{ connections: Connection[] }` | 400; 401 |
+| `connections.share` | Bearer (either side, while open; the requester may change it before the decision) | `{ op, connectionId, share: Field[] }` | 200 `{ connection }` | 400 `invalid_share`; 404; 409 `not_open`; 401 |
+| `connections.remove` | Bearer (either side; also withdraws a request) | `{ op, connectionId }` | 200 `{ removed: true, grantsRevoked, connection }` | 404; 409 `not_open`; 401 |
+| `consents.list` | Bearer | `{ op }` | 200 `{ consents: [{ id, connectionId, direction: 'given' \| 'received', other, scope, purpose, version, grantedAt, revokedAt, revokeReason }] }`, revoked grants included | 401 |
+
+`Field = 'phone' | 'email' | 'company' | 'job_title'`
+
+```
+Connection = { id, direction: 'outgoing' | 'incoming',
+               status: 'requested' | 'accepted' | 'declined' | 'blocked' | 'expired' | 'removed',
+               note, createdAt, decidedAt, endedAt,
+               other: { name, tapSlug | null },
+               iShare: Field[],
+               theyShare: { [Field]: { value, provenance: 'self_reported' } } }
+```
+
+- **Status for the requester:** a requester never sees `blocked`; a block shows as `declined`.
+- **What `theyShare` holds:** it is filled only while the connection is open (`requested` or `accepted`) and the other side's grant is active.
+
+**Lifecycle:**
+- `requested` → `accepted` | `declined` | `blocked` | `expired` (30 days unanswered);
+- `accepted` → `removed` (either side).
+- Decline, block, expiry and removal revoke the grants.
+
+**Limits:**
+- 5 requests per hour and 20 per day per requester;
+- 50 open incoming per target;
+- after a decline, 30 days before the same requester may ask again;
+- one open connection per pair, in either direction.
+
+**Notifications** (category `connect`, link `/shygontap/connections`):
+- a new request goes to the target, with the requester's name and **without the note**;
+- an acceptance goes to the requester.
+
+**Ledger:** `consent_grants` is append-only, even for the server role. A grant can only be revoked, once; changing a share revokes the grant and writes the next version.
+
+**Entities (migration 032):** `connect_settings`, `connections`, `consent_grants`, `connect_audit`. All are closed to every API client.
+
+**Retention:** ended connections and their grants are deleted 180 days after they end; account deletion removes everything.
+
+**Tests:** `npm run test:connect`, 16 checks. They cover closure, the ledger's append-only rule, opt-in, sign-in, the exact share, the note cleaner, duplicates, two-party-only access, accept with live reads, share versions, removal, decline cool-down, block never revealed, suspended/paused/off, limits, expiry through the sweep, direct REST, and no value reaching any caller without a grant.
+
+---
+
 ## 11. Operations that do not exist (NOT IMPLEMENTED unless stated)
 
 | Feature | Status | Why |
 |---|---|---|
 | Return-to-owner relay | **Moved to §10a in v0.2** (LIVE-LOCAL, off) | Lost or found item lifecycle is still BLOCKED (card registry) |
 | Emergency Profile / Emergency Tap information view | **Decided (Q11 = B): no new backend** | The view presents `public.status` (§10.3) plus the name the public profile already shows, and its only action is the visitor alert (`public.alert`). Hidden while Q2 keeps visitor alerts off. Never show a contact detail |
-| Connect requests | NOT IMPLEMENTED | Phase 2 (doc 10); needs `connections` and `consent_grants`; DEC-2026-025 |
+| Connect requests | **Moved to §10b in v0.4** (LIVE-LOCAL; choices PROPOSED, DEC-2026-039) | Guest requesters (no SHYGON account): NOT IMPLEMENTED (DEC-2026-039 Q1) |
 | Credential verification (`/v/<code>`) | NOT IMPLEMENTED | No schema. DEC-037: an AAROH card is not an access or authentication credential |
 | SHYGON Privé (demo hotels, guest requests) | **OUT** (DEC-2026-038 Q6 read as B: the 2026-10-16 decision stands) | Not shown, not built. Demo-only Privé needs the owner's explicit "Privé demo-only". No real hotel, PMS, booking or access-control integration in any case |
 | Student Passport, Event mode, Places/objects, Cloud storage | NOT IMPLEMENTED | "Planned" in the showroom; no schema, no approval |
@@ -465,7 +534,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Card activation and lost cards | BLOCKED | §7 |
 | Emergency information / alerts | LIVE-LOCAL logic, **APPROVED** (Q1); real delivery **BLOCKED** (§10.7) | Showroom wording changes per Q10 = A: Session B drafts it and the owner approves the text. Until then the customer-facing status stays "Coming soon" |
 | Return to owner | LIVE-LOCAL, **APPROVED** (Q12), off (`RESCUE_RELAY`) until the first production release with 031 | §10a. Customer copy per Q10: Session B drafts, owner approves |
-| Connect | NOT IMPLEMENTED | §11 |
+| Connect | LIVE-LOCAL; choices PROPOSED (DEC-2026-039) | §10b. Customer-facing: "Coming soon" until DEC-2026-039 is decided |
 | Verify | NOT IMPLEMENTED | §11 |
 | Privé | BLOCKED (decision) | §11 |
 | Student, Event, Places, Cloud | NOT IMPLEMENTED | §11 |
@@ -485,5 +554,6 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.4 | 2026-10-19 | New: §10b `/api/connect` (Connect and the consent ledger, migration 032, PROPOSED in DEC-2026-039); `connect` notifications; the sweep now expires Connect requests; browser E2E hooks on the local stack (§1 rule 11). No earlier operation changed. | A Connect UI may be built against §10b, but must not ship until DEC-2026-039 is decided. Never show `blocked` to a requester (the API already maps it). Show shared values as self-reported. Revocation copy: "already-copied details cannot be un-shared". |
 | v0.3 | 2026-10-19 | DEC-2026-038 approved: statuses updated (029/030/031 APPROVED, not applied); Q2 visitor alerts off; Q6 Privé out; Q11 Emergency Profile = presentation of `public.status`, no new endpoint. MSG91 delivery reports (`/api/sms-status?provider=msg91`): `deliveryReceipts` can now be `supported` with MSG91. Operator smoke script. No request or response shape changed. | Showroom copy for Emergency and Return to owner: draft it for the owner's approval (Q10). Privé: not shown. Emergency Profile: build it on `public.status`; hidden while it says `false`. |
 | v0.2 | 2026-10-19 | New: §10a `/api/rescue` (Return-to-Owner relay, migration 031); `rescue` notifications (§9); `admin_list_rescue_reports` (§12a); the capability matrix. §11 now lists Emergency Profile as NOT IMPLEMENTED (Q11). No v0.1 operation changed. | New routes: `/shygontap/return-to-owner` (owner inbox) and a finder flow on `/t/:slug`. The finder token goes in `sessionStorage` or the URL fragment only. Show the relay control only when `public.status` says `available`. |
