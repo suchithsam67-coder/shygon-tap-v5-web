@@ -4,7 +4,7 @@
 |---|---|
 | Requested by | Session B, 2026-10-20 (B-9) |
 | Owner's direction, 2026-10-20 | "Authorise investigation and a local-development-only solution. Keep this separate from DEC-2026-041. Do not trust a client-supplied address header in production. Production must rely on correctly configured trusted proxy infrastructure." |
-| Status | **Part A BUILT locally on 2026-10-20**, on the owner's instruction in Session A's session: "Build B-9 Part A (local stack only) as described in the plan, with its tests. Nothing under netlify/, api/ or migrations." See §5. **Part B: PROPOSED**, not built; it needs separate approval. |
+| Status | **Part A BUILT locally on 2026-10-20** (`f1a2548`), on the owner's instruction: "Build B-9 Part A (local stack only) as described in the plan, with its tests. Nothing under netlify/, api/ or migrations." See §5. **Part B BUILT locally on 2026-10-20**, on the owner's approval: "Approve B-9 Part B as proposed (TRUSTED_CLIENT_IP_HEADER, fail-closed, both digests), built locally with tests. No deploy; preview verification stays my action." See §6. Nothing is pushed or deployed. |
 | Note | Session B first received owner text approving B-9 as "INVESTIGATION ONLY". Later the same day the owner confirmed to Session B (relayed): "Yes. The backend session may build B-9 Part A (local stack only) with its tests, as local commits. Nothing under netlify/, api/ or migrations, and no deployment." Discrepancy closed. Part B and B-10 remain unapproved for implementation. |
 | Backlog | V6-124 (Part A, local), V6-126 (Part B, production header trust) |
 
@@ -101,7 +101,7 @@ Until that verification is done, both public switches stay off.
 ## 4. Questions for the owner
 
 1. **Part A:** done (§5).
-2. **Part B:** approve the `TRUSTED_CLIENT_IP_HEADER` design, and a preview deployment on each host to verify it before any public switch is turned on?
+2. **Part B:** built (§6). **The preview verification is the owner's action**; the method is in §6.
 
 ## 5. Part A: what was built and verified (2026-10-20)
 
@@ -140,3 +140,46 @@ Until that verification is done, both public switches stay off.
 - it read Vercel's request-headers documentation: Vercel overwrites `x-forwarded-for`, while `x-nf-client-connection-ip` is not a Vercel header and is not documented as stripped. That supports V6-126.
 
 V6-126 stays **INFERRED** until a preview test on each host (Session A has not re-read that documentation). For Netlify, whether a client-sent value is overwritten is **UNKNOWN**.
+
+## 6. Part B: what was built and verified (2026-10-20)
+
+**Changed:**
+- `netlify/lib/client-address.mjs` (new): `clientAddress(request)` and `trustedClientIpHeader()`.
+  - It reads **only** the header named by `TRUSTED_CLIENT_IP_HEADER`, which must be `x-nf-client-connection-ip` or `x-vercel-forwarded-for` (any case), and takes its first entry.
+  - Unset, empty or any other value → `null`.
+  - It never falls back to another header, and never reads `X-Forwarded-For` or `X-Real-IP`.
+- `netlify/lib/emergency.mjs` (`visitorDigest`) and `netlify/functions/rescue.mjs` (`finderDigest`) use it.
+  - The digest input for a given address is unchanged.
+  - Their "no client address" log lines now say `trustedHeaderConfigured: true|false`, so an operator can tell a host that sent no address from a deploy missing the setting.
+- `netlify/functions/emergency.mjs`: the log field only.
+- `supabase/local/stack.mjs`: sets `TRUSTED_CLIENT_IP_HEADER=x-nf-client-connection-ip`, because the local host plays Netlify (Part A).
+- `docs/v6/aaroh/provider-requirements.md`: the new variable and the operator / owner steps.
+- **Not changed:** `api/` (the Vercel entry points pass the request through as before), migrations, and AAROH-API (still v0.7; the visitor outcome when unconfigured is the existing `unavailable`).
+
+**Verified** [OBSERVED]:
+- `test:emergency` 49/49, including the new section A2:
+  - Netlify setting → the Netlify header;
+  - Vercel setting → the Vercel header, with a visitor-sent Netlify header ignored;
+  - name case and first-entry handling;
+  - no fallback to another header;
+  - unset, empty, `x-forwarded-for`, `x-real-ip` and `on` all refused;
+  - a blank value refused;
+  - the digest unchanged by a forged Netlify header on Vercel;
+  - the digest `null` when unset.
+
+  Over HTTP, with the setting removed, `public.alert` → 404 `unavailable`.
+- `test:rescue` 18/18: with the setting removed, `public.start` → `unavailable`.
+- No regressions: `test:local-host` 9/9, `test:connect` 16, `test:prive` 12, `test:public-tap` 25, `test:suspension` 46, `test:payment-chain` 30, `test:admin-edge` 11, `test:observability` 10, `test:security` 11, `test:payments:ci` 15 + functions-security 13 (1 BLOCKED as before: needs Node 22). Lint is clean.
+- **Negative control:** the previous `visitorDigest`, given a Vercel-style request (`x-vercel-forwarded-for` set, plus a visitor-sent `x-nf-client-connection-ip`), produced **different visitors for different forged values**: V6-126 confirmed in code. The new one produces the same visitor, and `null` when the setting is unset.
+
+**Still not verified** (the owner's action, on preview deployments):
+- whether each host replaces a visitor-sent copy of **its own** header. The code now trusts only that one header, so this is the last assumption.
+
+**Preview verification method** (needs a preview connected to a **non-production** database with 031 applied, `RESCUE_RELAY=on` and `TRUSTED_CLIENT_IP_HEADER` set for that preview only):
+1. Turn the relay on for a test owner's Tap.
+2. Send four `public.start` requests to `/api/rescue`, each with a different forged value in **both** `x-nf-client-connection-ip` and `x-vercel-forwarded-for`.
+3. **Expected:** the first three answer 201 and the fourth `rate_limited` (3 per finder per hour). Every request counts as one finder, so the forged values were ignored.
+
+   If all four answer 201, the host passes a visitor's copy of the trusted header through. Stop: keep both public switches off and report it.
+
+**Also unchanged, recorded:** `npm run dev` (the Vite dev server) runs these functions without an address or the setting, so visitor alerts and finder starts answer `unavailable` there, exactly as before. Use `npm run stack` to exercise them locally.

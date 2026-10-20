@@ -120,6 +120,9 @@ export async function startStack({
   };
   setEnv('SUPABASE_URL', gatewayUrl);
   setEnv('SUPABASE_SERVICE_ROLE_KEY', secrets.serviceRoleKey);
+  // The app host plays Netlify's edge (B-9 Part A), so the functions trust
+  // Netlify's address header here, as a Netlify deploy must be told to (Part B).
+  setEnv('TRUSTED_CLIENT_IP_HEADER', 'x-nf-client-connection-ip');
   setEnv('RAZORPAY_KEY_ID', secrets.razorpayKeyId);
   setEnv('RAZORPAY_KEY_SECRET', secrets.razorpayKeySecret);
   setEnv('RAZORPAY_WEBHOOK_SECRET', secrets.razorpayWebhookSecret);

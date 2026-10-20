@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { requestLog } from '../lib/log.mjs';
 import { env } from '../lib/sms.mjs';
+import { clientAddress, trustedClientIpHeader } from '../lib/client-address.mjs';
 import { config, currentUser, DbError, hmac, isUuid, rpc } from '../lib/emergency.mjs';
 
 /**
@@ -76,14 +77,11 @@ const finderToken = (secret, ownerId, key) =>
   crypto.createHmac('sha256', secret).update(`rescue-finder|${ownerId}|${key}`).digest('base64url');
 const tokenHash = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
-/** A finder, for limits and blocks only: an HMAC of the host-reported client address. */
+/** A finder, for limits and blocks only: an HMAC of the host-reported client address (clientAddress). */
 function finderDigest(secret, request) {
-  const ip =
-    request.headers.get('x-nf-client-connection-ip') ??
-    request.headers.get('x-vercel-forwarded-for') ??
-    request.headers.get('x-real-ip');
-  if (!ip || !String(ip).trim()) return null;
-  return hmac(secret, `rescue-finder-ip|${String(ip).split(',')[0].trim()}`);
+  const ip = clientAddress(request);
+  if (!ip) return null;
+  return hmac(secret, `rescue-finder-ip|${ip}`);
 }
 
 const message = (value) => (typeof value === 'string' && value.trim() && value.length <= 2000 ? value : null);
@@ -107,7 +105,7 @@ async function publicStart(cfg, request, body, log) {
   if (!SLUG.test(slug)) return fail('unavailable');
   const digest = finderDigest(cfg.secret, request);
   if (!digest) {
-    log.warn('rescue.no-client-address', {});
+    log.warn('rescue.no-client-address', { trustedHeaderConfigured: Boolean(trustedClientIpHeader()) });
     return fail('unavailable');
   }
   const target = await rpc(cfg, 'rescue_public_target', { p_slug: slug });

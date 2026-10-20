@@ -112,6 +112,13 @@ let firstKey;
 await t.check('finder start: 201 with a finder token and the thread; no owner field anywhere; links stripped', async () => {
   const noIp = await call({ op: 'public.start', slug: SLUG, idempotencyKey: key(), message: 'Hi' }, { ip: null });
   assertEqual(codeOf(noIp), 'unavailable', 'no client address from the host');
+  delete process.env.TRUSTED_CLIENT_IP_HEADER;
+  try {
+    const unconfigured = await call({ op: 'public.start', slug: SLUG, idempotencyKey: key(), message: 'Hi' }, { ip: '192.0.2.150' });
+    assertEqual(codeOf(unconfigured), 'unavailable', 'a host without TRUSTED_CLIENT_IP_HEADER (B-9 Part B)');
+  } finally {
+    process.env.TRUSTED_CLIENT_IP_HEADER = 'x-nf-client-connection-ip';
+  }
   assertEqual(codeOf(await call({ op: 'public.start', slug: SLUG, idempotencyKey: key(), message: '   ' })), 'invalid_message', 'empty');
   firstKey = key();
   const r = await call({ op: 'public.start', slug: SLUG, idempotencyKey: firstKey,

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { requestLog } from '../lib/log.mjs';
 import { env, sendText, SmsError, toE164 } from '../lib/sms.mjs';
+import { trustedClientIpHeader } from '../lib/client-address.mjs';
 import {
   alertsConfigured, codeHash, config, currentUser, DbError, deliveryReceipts, dispatchDue, isUuid, rpc,
   verificationMessage, visitorDigest, PROVIDER_TIMEOUT_MS,
@@ -269,7 +270,7 @@ async function publicAlert(cfg, request, body, log) {
   if (!SLUG.test(slug)) return fail('unavailable');
   const digest = visitorDigest(cfg.secret, request);
   if (!digest) {
-    log.warn('emergency.public-no-client-address', {});
+    log.warn('emergency.public-no-client-address', { trustedHeaderConfigured: Boolean(trustedClientIpHeader()) });
     return fail('unavailable');
   }
   const target = await rpc(cfg, 'emergency_public_target', { p_slug: slug });

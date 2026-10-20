@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { env, sendText, SmsError, smsConfigured, smsProvider } from './sms.mjs';
+import { clientAddress } from './client-address.mjs';
 
 /**
  * The emergency module's server side (migration 029): database calls, the
@@ -78,17 +79,15 @@ export const codeHash = (secret, contactId, code) => hmac(secret, `emergency-ver
 
 /**
  * A visitor, for rate limiting only: an HMAC of the client address the HOST
- * reports (never the spoofable first X-Forwarded-For entry) and the UTC day,
- * so it cannot be reversed or linked across days. Returns null if the host
- * gave no address; the caller then refuses.
+ * reports (clientAddress: only the header TRUSTED_CLIENT_IP_HEADER names) and
+ * the UTC day, so it cannot be reversed or linked across days. Returns null if
+ * the host gave no address or the trusted header is not configured; the
+ * caller then refuses.
  */
 export function visitorDigest(secret, request, day = new Date().toISOString().slice(0, 10)) {
-  const ip =
-    request.headers.get('x-nf-client-connection-ip') ??
-    request.headers.get('x-vercel-forwarded-for') ??
-    request.headers.get('x-real-ip');
-  if (!ip || !String(ip).trim()) return null;
-  return hmac(secret, `emergency-visitor|${day}|${String(ip).split(',')[0].trim()}`);
+  const ip = clientAddress(request);
+  if (!ip) return null;
+  return hmac(secret, `emergency-visitor|${day}|${ip}`);
 }
 
 // ---------------------------------------------------------------------------
