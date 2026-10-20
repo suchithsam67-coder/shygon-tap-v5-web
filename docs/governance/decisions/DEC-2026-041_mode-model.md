@@ -5,214 +5,275 @@
 | Decision ID | DEC-2026-041 |
 | Title | Modes: one owner-chosen public experience per Tap (Business, Info), and the definition of Info |
 | Date opened | 2026-10-20 |
-| Revision | **2, 2026-10-20.** Records the Product Owner's answers to Q0–Q7. Documents the current `/t/<slug>` resolution, contract, caching, migration dependencies and backward compatibility, then revises the recommendation (see "Decision diff"). |
+| Revision | **3, 2026-10-20.** Records the Product Owner's conditional direction on revision 2. Adds production-drift findings from the local evidence file, a compatibility plan for older clients, the status of the seven mandatory checks, and the remaining blockers with their owners. |
 | Domain | Product / Data / Privacy / Commercial |
-| Level | L3 if approved (new tables, a new public read function, a new "returns null" rule on `get_public_profile`) |
+| Level | L3 if approved (new tables, a new public read function, a later change to `get_public_profile`) |
 | **Accountable Owner (A)** | Repository owner (DEC-2026-018 Option B), acting as Product Owner |
-| Responsible (R) | Session A (AAROH backend). The schema needs the Principal Architect's confirmation (owner, Q0.3). |
+| Responsible (R) | Session A (AAROH backend). The schema and reuse path need the **Principal Architect, who is UNASSIGNED** (`docs/DECISIONS.md`). |
 | Informed (I) | Session B (frontend) |
 | Follows | DEC-2026-038 Q7, APPROVED 2026-10-19: "A, then B" |
-| State | **PROPOSED. NOT APPROVED.** The owner's answers are "product direction confirmed for drafting"; the DEC "remains PROPOSED until formally reviewed and approved. No implementation is authorized." Nothing is built: no migration 034, no `/api/modes`, no contract change (AAROH-API stays v0.7), no test for the new behaviour. |
+| State | **PROPOSED. Conditional direction recorded; NOT implementation approval.** The owner: "Do not implement Info yet. Do not merge or deploy. I will review the evidence and approve the implementation scope separately." There is no migration 034 and no `/api/modes`; the public APIs are unchanged, and AAROH-API stays at v0.7. |
 
 ## How to read this record
 
+**Decision status** (each decision item has exactly one):
+
+| Status | Meaning |
+|---|---|
+| **APPROVED** | The owner decided this rule or exclusion on 2026-10-20. **It authorises no implementation.** Most approved items say what Info V1 will not do. |
+| **CONDITIONALLY ACCEPTED** | The owner accepted the direction, subject to the named condition |
+| **BLOCKED** | Cannot proceed until the named dependency is resolved, by the named owner |
+| **PROPOSED** | Session A's recommendation, not yet decided |
+
+**Evidence labels** (facts only):
+
 | Label | Meaning |
 |---|---|
-| **[OBSERVED]** | Verified directly in this repository's code, schema or documents, with a pointer |
-| **[INFERRED]** | Concluded from observed facts, not verified directly |
-| **[OWNER]** | The Product Owner's answer of 2026-10-20: direction for drafting, **not an approval** |
-| **[OWNER, relayed]** | Owner text that reached Session A through Session B, not in this session. Consistent with [OWNER]; **the owner should confirm it** |
-| **[PROPOSED]** | Session A's recommendation, needing approval |
-| **[APPROVED]** | Decided by the owner earlier, with the record |
-| **[UNKNOWN]** | Not knowable from this repository today |
-| **[BLOCKED]** | Cannot proceed until the named dependency is resolved |
+| **OBSERVED** | Verified directly in this repository, a sibling checkout or a local evidence file, with a pointer. **Never** a check against live production: none was made. |
+| **INFERRED** | Concluded from observed facts |
+| **UNKNOWN** | Not knowable from what is on this machine |
+| **OWNER** | The owner's own words (2026-10-20) |
 
-Technical facts are always OBSERVED, INFERRED or UNKNOWN. Product decisions are always OWNER, PROPOSED or APPROVED. **Nothing about Info is APPROVED.**
+**Info as a feature is not approved.** Only the listed rules and exclusions are.
 
 ---
 
-## Decision diff (revision 1 → revision 2)
+## Decision table (revision 3)
 
-| # | Item | Revision 1 | Revision 2 | Why |
-|---|---|---|---|---|
-| D1 | What Info is | OWNER TO DEFINE | A public information page attached to a physical object, product, place or service point. It is not a personal profile and not a replacement for Business. | [OWNER] Q0.1 |
-| D2 | Info's fields | Open | Required: title, short description. Optional: detailed information, image, category, language, action links. Server-controlled: publication status, last updated. | [OWNER] Q0.3 |
-| D3 | Image | (not discussed) | **BLOCKED** on the storage reconciliation (V6-108 / V6-095) | §0.7: no approved storage path on production |
-| D4 | Language | (not discussed) | **Deferred**: the existing content architecture has no content-language field | The owner's condition "if supported by the existing content architecture" is not met (§0.6) |
-| D5 | Action links | "Only if Q0.3 includes any" | Listed by the owner, but **in conflict with the paid `links` add-on**. Commercial question CQ-2. | §0.8: on Business, custom links, website, social and WhatsApp are paid add-ons |
-| D6 | Info's data shape | One row per Tap, keyed by `tap_profile_id` | **Its own addressable record** (its own id; one per account in v1). The Tap's mode state points to it. | Avoids a second model when the planned `locations` arrive (§0.9) and when per-tag pages are decided |
-| D7 | Save and switch limits | 30 saves/hour, 20 switches/hour | **No fixed quota.** Abuse protection without one; the rationale comes from the existing limits (§7) | [OWNER] Q0.6: "Do not invent a fixed save quota without evidence and a documented rationale" |
-| D8 | Fallback when Info is disabled or invalid | Serve Business | **Serve the neutral "unavailable" page, never Business.** The owner is told and can switch to Business themselves. | [OWNER] Q0.7: Business must not become public automatically |
-| D9 | Business name/photo reuse | Referenced, behind `show_name` / `show_photo` | **Removed from v1.** No Business field is read by Info. | [OWNER] Q0.5: "Not automatically"; a reference to a published Business needs a resolver change (§5) |
-| D10 | Business attribution/link | (not discussed) | **Not in v1. Separate decision.** | Under C-1, Business has no public address while Info is active (§5) |
-| D11 | Price | "Available after setup, no charge" (recommended) | Still recommended, but **not approved**, and conditional on CQ-1 and CQ-2 | [OWNER] Q3/Q5; §10 lists conflicts with existing promises |
-| D12 | Card lifecycle on switching | Not addressed | The server enforces **Tap** lifecycle now. **Card** lifecycle is BLOCKED until the card registry exists. | §0.4: the public address is not bound to any card |
-| D13 | Privacy tests | Canaries on API output | Canaries also on **page rendering, metadata, caches and error responses** | [OWNER] Q7 |
-| D14 | Re-authentication for sensitive fields | Proposed for any Q0.4 field | **Dropped.** Info v1 is public-content-only, so no field is sensitive. | [OWNER] Q0.4 |
+| ID | Topic | Owner direction, 2026-10-20 | Status | Condition / blocker | Next-step owner |
+|---|---|---|---|---|---|
+| A0 | Relayed details (120/280 limits, category list) | "Treat … as unconfirmed until I explicitly confirm them" | **PROPOSED** (unconfirmed) | The owner's explicit confirmation | Product Owner |
+| PQ-1 | One Info page per account in V1 | "Accept for V1, subject to the Principal Architect confirming how the current account-level Tap resolver supports it" | **CONDITIONALLY ACCEPTED** | The Principal Architect's confirmation. Note: production has an admin function that creates *additional* Tap pages (§0.11, F-4) | Principal Architect (UNASSIGNED) |
+| PQ-1b | Per-card Info routing | "Do not build per-card Info routing yet" | **APPROVED** (exclusion) | — | — |
+| PQ-2 | Visitor counts on Info | "No visitor counts for Info V1" | **APPROVED** (exclusion) | — | — |
+| PQ-3 | Return-to-Owner, emergency, Connect buttons on Info | "Do not show these buttons on Info V1" | **APPROVED** (exclusion) | — | — |
+| SQ-1 | A separate, structured Info record | "Approve the direction … not migration approval" | **CONDITIONALLY ACCEPTED** | The Principal Architect finalises the schema after reviewing production drift and the planned Locations model | Principal Architect (UNASSIGNED) |
+| SQ-2 | Production `page_template` and card-family features | "Investigate … before any production schema or resolver change" | **BLOCKED** for any production change | Purpose found in local evidence (§0.11). Origin UNKNOWN. A fresh production capture is needed to verify. | Repository owner (capture; origin) + Principal Architect |
+| SQ-2b | Existing production behaviour | "Preserve existing behavior until understood" | **APPROVED** (rule) | — | — |
+| SQ-3 | Image upload | "No Info image upload in V1" until storage is established and verified | **APPROVED** (exclusion) | — | — |
+| SQ-4 | Language field | "No new language field in Info V1" | **APPROVED** (exclusion) | Revisit with a multilingual content model | — |
+| CQ-1 | Does the 14-day Terms rule cover Business only? | "Do not unilaterally change the Terms. Ask the appropriate legal reviewer to clarify" | **BLOCKED** | A legal reviewer's clarification. DEC-2026-017 (counsel) has its Data Owner UNASSIGNED; no counsel is engaged. | Repository owner (engage reviewer) |
+| CQ-1b | Marketing claims | "Until resolved, do not advertise Info as free and unlimited" | **APPROVED** (rule) | — | — |
+| CQ-2 | Action / custom links on Info | "Exclude custom/action links from Info V1 … Revisit through an explicit commercial decision" | **APPROVED** (exclusion) | A later commercial decision | Product Owner |
+| CQ-3 | Compatibility with future SHYGON Locations | "Designed so it can support the future Locations model … do not merge the products or promise organisation-level functionality" | **CONDITIONALLY ACCEPTED** (design) + **APPROVED** (no merge, no org promise) | The Principal Architect documents the reuse path; Session A's draft is in §0.9 | Principal Architect (UNASSIGNED) |
+| AQ-1 | Viewer roles | Anonymous visitors and the authenticated owner only | **APPROVED** (rule) | — | — |
+| AQ-2 | Status validation | Validate the Tap's status server-side; "Do not claim card-level validation exists today" | **APPROVED** (rule). Card-level validation: **BLOCKED** | A real card registry (`/d/<code>`, contract P-4) | Repository owner (card registry decision) |
+| BQ-1 | Changing the legacy `get_public_profile` | "Do not change the production public-profile function until the production schema and current callers have been verified and a compatibility plan is approved" | **BLOCKED** | (1) a fresh production capture; (2) the callers verified; (3) the compatibility plan (§0.12) approved | Repository owner |
+| BQ-2 | Fallback | Neutral **unavailable** page when Info is disabled, missing or invalid; "Never silently expose the Business profile" | **APPROVED** (rule) | — | — |
+| BQ-3 | Business link | "No automatic Business name, photo or link on Info V1" | **APPROVED** (exclusion) | — | — |
+| RQ-1 | Save quota | "Do not invent a fixed quota. Before release, assess abuse risk and implement proportionate server-side protection if needed" | **CONDITIONALLY ACCEPTED** | A pre-release abuse assessment (§7) | Session A (assessment) → owner (acceptance) |
+| M-1 | The mode model (C-1: one active mode per Tap, Business default) | Accepted for V1 through PQ-1 | **PROPOSED** (implementation scope to be approved separately) | Mandatory checks 1–7 | Repository owner |
+| M-2 | Price: Info free, no new SKU | "Keep this recommendation PROPOSED pending … approval" | **PROPOSED** | Commercial approval; CQ-1 | Product Owner |
+| M-3 | New records (`info_pages`, `tap_mode_state`, `tap_mode_catalog`, `tap_mode_audit`), the `get_public_tap` function, `/api/modes` | — | **PROPOSED** | SQ-1 and the Principal Architect | Principal Architect (UNASSIGNED) |
+| M-4 | Implementation (migration 034, API, tests, contract v0.8) | "Do not implement Info yet" | **BLOCKED** | Mandatory checks 1–7 (§0.13), then the owner's implementation-scope approval | Repository owner |
 
----
+**Info V1's content after these decisions** [PROPOSED shape, under SQ-1 / A0]:
+- required: **title**, **short description**;
+- optional: **category**, **detailed information** (plain text);
+- system: **publication status** (server-computed) and **last updated** (server timestamp).
 
-## Product Owner answers, 2026-10-20 (all [OWNER] or [OWNER, relayed]; none approved)
-
-| Q | Answer (condensed) | Label |
-|---|---|---|
-| Q0.1 | Info is a dynamic information page attached to a physical object, product, place, location or service point: classrooms, libraries, exhibits, equipment, product tags, restaurant tables. It is not a second personal profile and not a replacement for Business. | OWNER |
-| Q0.1 (extra) | "Support one public information page per configured Info experience." "Do not assume that the existing database already supports every object or location type; identify what the current schema can actually represent." Info is not "another personal identity, medical profile, student passport or Business profile". | OWNER, relayed |
-| Q0.2 | Someone taps or scans a physical SHYGON tag and at once sees relevant information or instructions in a browser. Authorised owners update it without replacing the tag. It answers "What should I know or do about this thing or place?" No promise of integrations, booking, payments, device control or analytics unless each is implemented and verified. | OWNER (+ relayed wording) |
-| Q0.3 | Required: title, short description. Optional: detailed information, image, category, language, validated action links. System-controlled: publication status, last updated. Validated content, never executable HTML. The Principal Architect confirms the final schema. | OWNER |
-| Q0.3 (extra) | Title plain text, max 120. Short description plain text, max 280. Category one of: place, product, equipment, exhibit, service point, instructions. Detailed information is sanitised text. Image comes through the existing storage architecture. Action links are a label plus a validated URL, with no executable URL schemes. Language only "if supported by the existing content architecture". No maps, bookings, contact databases, file sharing or custom forms without a separate decision. | OWNER, relayed |
-| Q0.4 | Public content only in v1. Never: private medical information, emergency details, children's sensitive information, identity documents, credentials, private files, access codes, internal admin notes. A physical tag grants no permission to disclose unrelated private information. | OWNER |
-| Q0.4 (extra) | Do not use Info to bypass the privacy rules of Emergency Profile, Student Passport, Smart Identity or Business. Location details appear only when deliberately configured for public disclosure. | OWNER, relayed |
-| Q0.5 | Do not copy Business data into Info automatically. An explicit Business attribution or link only if the existing authorization model safely supports it. Info must not bypass Business editing restrictions or paid entitlements. | OWNER |
-| Q0.6 | The owner updates Info whenever necessary, behind authentication, ownership checks, validation and server-side abuse protection. Do not apply the 14-day window automatically. Do not invent a fixed save quota without evidence and a documented rationale. | OWNER |
-| Q0.7 | One active mode at a time. Info shows its own published content. Business must not become public automatically whenever Info is active. Multi-mode display and per-card selection are separate decisions. | OWNER |
-| Q0.7 (extra) | "If that requires a different resolver contract or another mode-composition rule, leave it for a separate decision rather than quietly expanding DEC-2026-041." | OWNER, relayed |
-| Q1 | Staged C: one active mode per account, with Business as the default where no selection exists. No per-card selection until the card registry and ownership model support it. No multi-mode composition. | OWNER |
-| Q2 | Keep Business unchanged. Prefer isolated, structured mode data and a server-authoritative active-mode selection, but mark them PROPOSED. Before recommending tables or `get_public_tap`, document the current resolution, contract, caching, migration dependencies and backward compatibility (done in §0). | OWNER |
-| Q3 | Do not extend the paid Business customization entitlement to Info. Free availability is a recommendation, not an approved commercial decision; first confirm it does not conflict with existing products, promises or entitlements (done in §0.8 and §10). | OWNER |
-| Q4 | Only an authenticated, authorised owner switches. The server enforces ownership, card lifecycle and any applicable entitlement. Switching is auditable and safe against stale or duplicate requests. Nothing is "live" until the server confirms. Define an explicit fallback for disabled or invalid modes and test it before implementation. | OWNER |
-| Q5 | Recommend Info as free in the first release with no new SKU, if existing rules support it. It stays PROPOSED pending product/commercial approval. | OWNER |
-| Q6 | Anonymous visitors see only published public content; owners manage their own. No Friend, School, Organisation or emergency viewer roles until each has a verified server-side authorization model. | OWNER |
-| Q7 | Turn the prohibited-data rules into negative tests with private-field canaries. Verify that no canary appears through public APIs, page rendering, metadata, caches or error responses. | OWNER |
+There is no image, no language field, no links, no Business data, no visitor counts and no capability buttons.
 
 ---
 
-## 0. The current system, verified (answers Q2's prerequisite)
+## Earlier revisions (summary)
 
-### 0.1 How `/t/<slug>` resolves today [OBSERVED]
+- **Revision 1** (`ef2d976`): the model, with Info undefined (Q0).
+- **Revision 2** (`7380a6e`): the owner's Q0–Q7 answers recorded as direction. Facts on `/t/<slug>`, caching, products and Terms. Conflicts CQ-1 to CQ-3. Fallback changed to "unavailable"; no invented quota.
+- **Revision 3** (this one):
+  - the decision table above;
+  - production-drift findings (§0.11);
+  - the Terms and entitlement conflicts, with production evidence (§0.8);
+  - the compatibility plan (§0.12);
+  - the mandatory checks (§0.13);
+  - blockers and owners (§16).
 
-1. **Hosting.** `/t/*` and `/tap/*` are served as the single-page app shell:
-   - `vercel.json:151` and `:155`;
-   - `netlify.toml:249–257`, where `/tap/` is "kept so links shared before the change keep resolving".
-2. **Routes.** `src/App.tsx:39–40` maps `/t/:username` and `/tap/:username` to `PublicTap`.
-3. **The read.** `PublicTap` (`src/pages/PublicTap.tsx:86–105`) calls `fetchPublicProfile(slug)` from `src/lib/publicTapClient.ts`.
-   - That client sends a `fetch` POST to `<SUPABASE_URL>/rest/v1/rpc/get_public_profile` with the anon key, and gives up after 12 s.
+---
+
+## 0. Facts
+
+### 0.1 How `/t/<slug>` resolves today [OBSERVED in this repository]
+
+1. **Hosting.** `/t/*` and `/tap/*` are served as the app shell:
+   - `vercel.json:151, :155`;
+   - `netlify.toml:249–257`, where `/tap/` is kept for old links.
+2. **Routes.** `src/App.tsx:39–40` → `PublicTap`.
+3. **The read.** `PublicTap` (`src/pages/PublicTap.tsx:86–105`) calls `src/lib/publicTapClient.ts`.
+   - That client sends a `fetch` POST to `/rest/v1/rpc/get_public_profile` with the anon key and gives up after 12 s.
    - It returns the payload or null.
-4. **When there is no payload.** On null, `PublicTap` calls `get_public_tap_state`, which answers `active`, `paused` or `unavailable`. Suspended, draft and unknown Taps all read as `unavailable`.
-   - A network failure is shown as "offline" or "couldn't load", never as "not found".
-5. **Analytics.** One `view` per landing, plus `nfc` or `qr` when the URL has `?src=nfc` or `?src=qr`, sent through `record_tap_event` (`PublicTap.tsx:130–138`). Link clicks send `link_click`.
-6. **Refresh.** The page re-resolves every 5 minutes while open (`PublicTap.tsx:116`).
-7. **What resolves.** Only the account's single Tap: there is one `tap_profiles` row per account (`UNIQUE(user_id)`), looked up by slug.
-8. **What does not exist.** No resolver uses a card, a device or a mode.
+4. **When there is no payload.** On null, the page calls `get_public_tap_state` (`active` / `paused` / `unavailable`).
+   - `paused` shows "Temporarily unavailable".
+   - **Every other state, including `active`, shows "Tap not found"** (`PublicTap.tsx:178–191`).
+   - A network failure shows "offline" or "couldn't load".
+5. **Analytics.** One `view` per landing, plus `nfc` / `qr` from `?src=`, through `record_tap_event`. Link clicks send `link_click`.
+6. **Refresh.** The page re-resolves every 5 minutes (`:116`).
+7. **What resolves.** One `tap_profiles` row per account (`UNIQUE(user_id)`, `idx_tap_profiles_user`, baseline line 4795), looked up by slug. No resolver uses a card, a device or a mode.
+8. **Server functions.** None: the public page calls no `/api/*` endpoint on this branch.
+9. **Sharing.** `navigator.share({ title: displayName, url })`, falling back to copying the URL to the clipboard (`:199–210`).
 
 ### 0.2 The public contract today [OBSERVED]
 
-- **P-1 `get_public_profile(p_slug)`** returns the whitelisted Business payload, or null unless the Tap is `active` and not suspended (contract §3).
-  - Each contact and link field is returned only if the owner switched it on in `enabled_customizations`. The keys are `whatsapp`, `website`, `instagram`, `linkedin`, `youtube` and `links` (= `customLinks`) (`000_live_baseline.sql` around line 2770).
-  - `enforce_tap_edit_rules` lets an owner switch on only keys they own as `customization` entitlements, plus the free `phone` and `email`.
-  - P-1 is a frozen contract (doc 12 §2).
-- **P-2 `get_public_tap_state`** and **P-3 `record_tap_event`**: as above.
-- **Definitions in the repository:**
-  - P-1's live definition is the baseline's;
-  - migrations 004, 005, 007 and 009 shaped it before the baseline;
-  - **no migration from 020 to 033 changes it.**
-- **Production has drifted** [OBSERVED, V6-106]. Since the baseline, production's `get_public_profile` and `enforce_tap_edit_rules` have changed, from a source absent from every repository on this machine.
-  - What changed in them: **[UNKNOWN]**.
-- **Frontend (Session B's branch, commit 0ae7e47)** [OBSERVED with `git show`]:
-  - the public page still reads only P-1, P-2 and P-3;
-  - Session B mentioned an automated check in `src/test/contract.test.ts`. That file is **not in 0ae7e47**: [UNKNOWN] until it is committed.
+- **P-1 `get_public_profile`** returns the whitelisted Business payload, or null unless the Tap is `active` and not suspended.
+  - Contact and link fields need the owner's switch plus an owned `customization` add-on (except phone and email).
+  - The repository's live definition is the baseline's (no migration from 020 to 033 changes it).
+- **P-2 `get_public_tap_state`** and **P-3 `record_tap_event`**.
+- **Session B's branch (0ae7e47):**
+  - the public page reads only P-1, P-2 and P-3 [OBSERVED with `git show`];
+  - [OBSERVED with `git show`, commit c0e27a0, not pushed] `src/test/contract.test.ts` asserts that "the public Tap reads only the three published RPCs" (P-1, P-2, P-3), and that every `/api/emergency`, `/api/rescue` and `/api/connect` operation the frontend sends is documented in AAROH-API. Any new public read (for example `get_public_tap`) must update that test.
 
-### 0.3 Caching and metadata [OBSERVED unless marked]
+### 0.3 Caching, metadata, browser storage, errors [OBSERVED unless marked]
 
-- **Response caching.**
-  - Neither host configuration sets `Cache-Control` on any path; both set only security headers (`vercel.json` headers, `netlify.toml:22`).
-  - No service worker is registered: searched `src`, `index.html`, `vite.config.ts` and `public`.
-  - The public reads are POST requests, which browsers and CDNs do not cache by default.
-  - [INFERRED] No shared cache holds a Tap's data. The payload lives only in the open page's memory, and a change shows on the next load or within 5 minutes.
-- **Metadata.** `usePageMeta` sets the tab title, description and share image in the browser, from the payload:
+- **Caching.**
+  - No `Cache-Control` rule on any path in either host configuration.
+  - No service worker.
+  - The public reads are POST requests.
+  - [INFERRED] No shared cache holds Tap data.
+- **Metadata.** Set in the browser by `usePageMeta`:
   - title `<displayName> | SHYGON Tap`;
   - description from headline, bio or role;
-  - image from `avatarUrl` (`PublicTap.tsx:36–47`).
+  - share image `avatarUrl`.
 
-  Unavailable states set fixed text and `noindex` (`:66–77`).
-  - There is no server-side rendering or prerendering for `/t/*`, and Taps are not in the sitemap (`src/seo/build.ts:112`).
-  - [INFERRED] A crawler that does not run JavaScript sees only `index.html`'s default tags.
-- **Error responses.** The client turns every failed read into fixed visitor copy; "a Postgres detail can never reach a stranger" (`publicTapClient.ts:47–51`).
+  Unavailable states use fixed text and `noindex`. There is no prerendering, and Taps are not in the sitemap.
+- **Browser storage.** The public path writes nothing. The only storage access is `public/theme-init.js` *reading* the site's light/dark preference (`shygon_theme`), which is not Tap data.
+- **Errors.** Every failed read becomes fixed visitor copy (`publicTapClient.ts:47–51`).
 
 ### 0.4 Card ownership and lifecycle [OBSERVED]
 
-- **The `cards` table** has `user_id`, `customer_id`, `tap_profile_id`, `status` / `card_status`, activation columns and edition columns (baseline line 3204).
-- **Card operations** (activate, deactivate) need the owner's OTP (contract §7, C-2).
-- **The public address is not bound to a card.** `/t/<slug>` resolves the account's Tap whatever its cards' states, and deactivating a card does not hide the Tap (F3 / V6-034, deferred).
-- **No cards are sold.** The site says "SHYGON NFC cards are coming soon" (`src/data/shygonTapData.ts:449, :465`), and the V6 release is digital-first (DEC-2026-035 D-2 and D-10).
-- **AAROH `/d/<code>` is BLOCKED:** there is no card registry (contract P-4).
+- `cards` rows carry the owner and `tap_profile_id`. Activation and deactivation need an OTP.
+- **The public address is not bound to a card**, and F3 is open: deactivating a card does not hide the Tap.
+- Cards are not sold ("coming soon"); the release is digital-first.
+- `/d/<code>` is BLOCKED: there is no card registry.
 
-### 0.5 Mode behaviour today
+### 0.5 Mode-like behaviour today
 
-- [OBSERVED] No mode entity exists in this repository's schema: no table, column or function.
-- [UNKNOWN] **Production has `tap_profiles.page_template`, `tap_card_features`, `tap_page_edit_state` and `tier_buttons`.** They come from production-only migrations named `card_family_pages` and `admin_create_tap_page_and_page_templates` (V6-106; `codex-handoff/PRODUCTION_DRIFT.md` in commit adf0c06).
-  - Their meaning and provenance are unknown.
-  - **They may already be a page-type mechanism that overlaps this mode model.**
-- [OBSERVED] Session B's showroom (0ae7e47, `src/components/showroom/modes.ts`) uses the word "mode" for **presentational sections** of the one Business payload, several shown at once: identity, business, contact, links, owner, and others.
-  - It already lists **"Places and objects: Information attached to a place or a thing"** as `coming-soon` / `not-implemented`.
-  - [INFERRED] That entry is Info. The showroom's "modes" are not the exclusive modes of this DEC.
+- [OBSERVED] **This repository** has no mode entity.
+- [OBSERVED in the evidence file, §0.11] **Production** has `tap_profiles.page_template` and card-family features, which are mode-like.
+- [OBSERVED] **Session B's showroom** uses "mode" for presentational sections shown together. Its `places` entry ("Information attached to a place or a thing", coming soon) is Info.
 
-### 0.6 What the current schema can represent for Info [OBSERVED]
+### 0.6 What the current repository schema can represent for Info [OBSERVED]
 
-- **Physical objects, places or service points: nothing.** There is no `locations`, object, device-registry or tag table.
-  - `cards` describes a person's card, with an edition and `card_type`.
-  - `tap_event_themes` describes date-bounded themes.
-- **Info content: nowhere.** `tap_profiles` holds a person's profile. Storing Info in it would mean reusing person columns (display name, bio, avatar) for a thing, which the owner rejected (Q0.1, Q0.5).
-- **Content language: no field.** The page language is fixed (`index.html`: `lang="en-IN"`), and no payload carries a language.
+- **No object, place, device-registry or tag table.**
+- **No content-language field;** the page language is fixed at `lang="en-IN"`.
+- `tap_profiles` holds a person's profile.
 
-So Info needs new records. **Every object or place type the owner listed is a category value, not a schema of its own** [PROPOSED].
+Info needs new records.
 
 ### 0.7 Storage for images [OBSERVED]
 
-- The repository's editor uploads to `profile-images`, which **does not exist on production** (V6-108).
-- Production has `shygontap-photos` instead (public, 5 MB, owner-folder writes), of unknown provenance (V6-106).
-- Storage policies can be verified only on live (V6-095), and the storage scanner is an open item.
+- The repository uses `profile-images`, which is missing on production (V6-108).
+- Production has `shygontap-photos`, of unknown provenance.
+- Policies can be verified only on live (V6-095).
 
-**There is no approved storage architecture for an Info image today: BLOCKED.**
+→ SQ-3 (excluded).
 
-### 0.8 Products, promises and entitlements that touch Info [OBSERVED]
+### 0.8 Terms and entitlement conflicts [OBSERVED; production rows from the evidence file]
 
-| Source | What it says or does | Relevance |
+| # | Source | What it says or does | Effect on Info |
+|---|---|---|---|
+| T-1 | Terms (`src/pages/legal/Terms.tsx:94`) | "You can change your Tap's content once every 14 days. The Customization Pass removes that limit…" | Unlimited Info edits on the same Tap contradict this wording → **CQ-1 BLOCKED** (legal reviewer); CQ-1b no "free and unlimited" claims |
+| T-2 | Pass FAQ (`src/data/shygonTapData.ts:406–421, :460`) | "lets you change your Tap as often as you like"; "You can change your profile once every 14 days" | Same as T-1 |
+| T-3 | **Production `card_family_pages`** (2026-10-11) | **Taps with an event or restaurant card are exempt from the 14-day window** ("Purpose-built pages need timely edits to dates, hours, addresses, menus, and RSVP/review links. Keep the normal edit limit for personal/business pages.") | **Production already contradicts the Terms as written** for card-family Taps. For the legal reviewer: precedent for a purpose-built page with no window. |
+| E-1 | Repository: P-1 + `enforce_tap_edit_rules` + `fulfilment.mjs:192–195` | Website, Instagram, LinkedIn, YouTube, WhatsApp and custom links are **paid add-ons per key** (`addon-<key>`); only phone and email are free. Buying a tier grants no add-on. | Action links on Info would give the `links` add-on away → **CQ-2: links excluded** |
+| E-2 | **Production `hide_unsupported_gallery_addon`**: `tier_buttons` | Production grants buttons **by tier**: essential = phone, email, WhatsApp; business = + Instagram, LinkedIn, website; premium and GOAT = + location, YouTube, custom links | **The repository and production disagree on what is paid.** The storefront copy ("Website and social links" in Business) matches production, not the repository. |
+| E-3 | **Production `card_family_pages`**: `tap_card_features` | An event or restaurant card unlocks location, website and custom links **at every tier**; a Google Review card unlocks location and website | Production already gives links free with a purpose card. A precedent for the CQ-2 commercial decision, not a reason to change V1. |
+| E-4 | **Production `admin_create_tap_page_and_page_templates`** | Deactivated products: transparent cards, `plan-pro`, `plan-3d`, `plan-custom`, `plan-lifetime`, `addon-gallery` | The commercial catalogue on production differs from the repository's |
+| P-1 | Storefront: the Restaurant card | "Digital menu ready, Location and hours, Direct reservations" | [INFERRED] There is no reservation backend. Info must not repeat such a promise (OWNER Q0.2). |
+
+**Who decides:**
+- T-1 to T-3: the legal reviewer (CQ-1).
+- E-1 to E-4: the Product Owner, at the rebaseline (which entitlement model is canonical) and at the later links decision (CQ-2).
+
+### 0.9 The planned Locations model, and a draft reuse path
+
+- [OBSERVED] Doc 03 proposes `locations` ("Physical place/object information nodes") and `location_content` (versioned, per-locale content). They are organisation-owned, reached from devices through `tap_routes`, in Phase 4. Doc 10 places them beside `plans` and `subscriptions`.
+- [INFERRED] Info is the same concept, scoped to one account and one page.
+
+**Draft reuse path** [PROPOSED, for the Principal Architect to confirm or replace]:
+1. Info V1's record (`info_pages`) is the **content** of one place or object: title, short description, category, details, status, timestamps. It has its own id and an owner.
+2. A future `locations` decision adds what V1 lacks:
+   - organisation ownership (`org_id`);
+   - a hierarchy (`parent_id`);
+   - per-locale versions;
+   - addressing from devices (`tap_routes` / `/d/<code>`).
+
+   Either `locations` gains a reference to `info_pages`, or `info_pages` is renamed and extended into `location_content`. Either way, no second table holds the same title and description.
+3. Nothing in V1 promises organisations, hierarchies, multiple languages or many pages [APPROVED, CQ-3].
+
+### 0.10 Migration dependencies [OBSERVED / BLOCKED]
+
+- A future 034 depends on the baseline and 020–033 (028, 030, 029/031/032); not on 027.
+- For production it is BLOCKED by V6-106: the schema must be re-captured and the drift understood first (SQ-2, BQ-1).
+
+### 0.11 Production-drift findings (SQ-2 investigation)
+
+**Source:** `docs/governance/evidence/2026-10-18_production-schema-migrations.csv`, in the `shygon-tap-v5-web-rebaseline` checkout (untracked; 35,718 bytes; `version,name,statements`). The drift register (`codex-handoff/PRODUCTION_DRIFT.md`, commit adf0c06) says it was "recorded from production migration history by an earlier investigation".
+
+Everything below is **OBSERVED in that evidence file**, not verified against live production. Nothing here was checked live, and the owner has not authorised live inspection.
+
+| # | Finding | Evidence |
 |---|---|---|
-| `entitlements` | `digital_plan` (essential / business / premium / goat), `customization` (add-on keys), `lifetime` (Customization Pass) | No mode or Info entitlement exists |
-| `netlify/lib/fulfilment.mjs:176–195` | A tier purchase grants only the tier. An `addon-<key>` purchase grants `customization:<key>`. The Pass grants `lifetime`. | Links are add-ons, bought per key |
-| P-1 + `enforce_tap_edit_rules` | Website, Instagram, LinkedIn, YouTube, WhatsApp and custom links (`links`) are paid add-ons; phone and email are free | **Info "action links" are functionally the paid `links` add-on** (CQ-2) |
-| Storefront tiers (`shygonTapData.ts:348–385`) | Essential ₹0 ("Name and profile photo", "Phone and email"); Business ₹299 ("Website and social links", "Business information block"); Premium ₹599; GOAT ₹999 | Free Info must not deliver what these sell |
-| Customization Pass FAQ (`shygonTapData.ts:406–421, :460`) | "lets you change your Tap as often as you like"; "You can change your profile once every 14 days" | Free unlimited Info edits on the same Tap blur what the Pass sells (CQ-1) |
-| **Terms** (`src/pages/legal/Terms.tsx:94`) | "You can change your Tap's content once every 14 days. The Customization Pass removes that limit…" | **Contradicts unlimited free Info edits on the same Tap as written** (CQ-1) |
-| Terms (`Terms.tsx:83`) | "Upgrades and the Customization Pass are one-time payments, not subscriptions." | No conflict with a free Info |
-| Storefront cards (`shygonTapData.ts` ~160–205) | "Shygon Tap Restaurant": "Digital menu ready, Location and hours, Direct reservations"; "Event": "Event schedule, Registration links"; "Google Review" | Overlaps Info's restaurant-table use case. [INFERRED] No reservation backend exists, so "Direct reservations" is an existing promise this DEC must not repeat for Info |
-| DEC-037 (owner, 2026-10-16) | No new AAROH SKUs or prices until approved; ₹999 / ₹1,499 provisional; checkout off | A free Info needs no SKU |
-| Doc 10 Phase 4 (proposal) | "Locations" are an organisation feature next to `plans` and `subscriptions` | [INFERRED] A free Info now may set expectations for a product doc 10 planned as organisational (CQ-3) |
+| F-1 | Seven production-only migrations, 2026-10-11 to 2026-10-15: `card_family_pages`, `hide_unsupported_gallery_addon`, `admin_create_tap_page_and_page_templates`, `rerun_admin_create_tap_page_repeatable`, `shygontap_studio_profiles_v1`, `shygontap_photo_cleanup_policy_v1`, `shygontap_site_content` | CSV rows; also `codex-handoff/PRODUCTION_DRIFT.md` (commit adf0c06) |
+| F-2 | **`tap_profiles.page_template`**: `TEXT`, `NULL` or one of `business`, `restaurant`, `event`, `review`. Comment: "Page families are independent of visual layout and physical card finish." | `admin_create_tap_page_and_page_templates`; repeated in the `rerun…` migration |
+| F-3 | **Production's `get_public_profile` returns an extra key, `pageTemplate`.** It also gates contact and link keys with `tier_buttons(tier)` and `tap_card_features(tap)` as well as owned add-ons, and gates `location` behind the same switch set. Grants: `REVOKE ALL FROM PUBLIC`, `GRANT EXECUTE TO anon`, `REVOKE EXECUTE FROM authenticated`. | Same migrations |
+| F-4 | **`admin_create_tap_page`** (needs `tap.moderate`) creates an *additional* draft Tap page for an existing customer, with a page template, and notifies them. | Same migrations |
+| F-4, can it run? [INFERRED] **Not today.** | (1) It calls `tap_slug_reserved` / `tap_slug_taken`, which exist in no repository (V6-106). (2) The baseline's unique index `idx_tap_profiles_user` allows one Tap per account, and none of the seven migrations drops it, so a second page for an existing customer would be refused. | — |
+| F-5 | **Card families** (`tap_card_features`): event and restaurant cards unlock location, website and links; Google Review cards unlock location and website, at every tier. Card-family Taps are **exempt from the 14-day window**. `tap_page_edit_state` reports `card_family`. | `card_family_pages` |
+| F-6 | `tier_buttons` grants contact and link buttons by tier. The gallery add-on is withdrawn because there is no renderer. | `hide_unsupported_gallery_addon` |
+| F-7 | Products deactivated: transparent cards, `plan-pro`, `plan-3d`, `plan-custom`, `plan-lifetime`, `addon-gallery` | `admin_create_tap_page_and_page_templates` |
+| F-8 | `shygontap_*`: a separate corporate-site profile system (`shygontap_profiles`, photos, site content) | CSV names; V6-107 |
+| F-9 | **Production had 0 Taps** on 2026-10-18 | Backlog V6-109 (a reported read-only finding, re-verify at capture) |
 
-Two observations sit **outside this DEC** and are recorded only, for the owner:
-- [INFERRED] The Business tier's storefront copy promises "Website and social links", but buying the tier grants no link add-on, and the trigger requires one.
-- The Restaurant card promises "Direct reservations", and no reservation backend exists.
+**Purpose** [INFERRED from F-2 to F-6]:
+- `page_template` and card families are a **production-only "page family" mechanism**: purpose-built Tap pages (restaurant, event, review) with their own buttons and edit rules, selected per Tap page and created by administrators.
+- **This is a mode-like concept that overlaps this DEC's model and Info's restaurant-table use case.**
 
-### 0.9 The planned model this must not duplicate [OBSERVED: proposals, not approved]
+**Origin** [UNKNOWN]:
+- The SQL says what the migrations do, not who or what applied them ("owner input only", per the drift register).
 
-- Doc 03 proposes `locations` ("Physical place/object information nodes") and `location_content` (versioned, per-locale content). They are organisation-owned, reached from devices through `tap_routes`, and planned for Phase 4 (doc 10).
-- [INFERRED] **The owner's Info is the same concept.**
-- The AAROH brief says: "Do not create … duplicate core data models."
-- [PROPOSED] Info's record should be shaped so that a later `locations` decision can adopt or extend it rather than build a second table for the same thing (§6).
+**What this means for DEC-2026-041** [PROPOSED]:
+- The Principal Architect must decide, with the owner, whether production's page-family mechanism becomes canonical at the rebaseline or is reverted.
+- If it becomes canonical, **Info should probably be a page family** (e.g. `page_template = 'info'`) **rather than a parallel mode table**: two mechanisms that choose what a Tap page is would be a duplicate model.
+- Until then the mode-state design (M-3) stays PROPOSED and must not be written for production [APPROVED SQ-2b: preserve existing behaviour].
 
-### 0.10 Migration dependencies and backward compatibility [OBSERVED / INFERRED]
+### 0.12 Compatibility plan for older clients (BQ-1) [PROPOSED; approval required]
 
-**Dependencies of a future 034** [OBSERVED]:
-- the baseline and 020–033: the 028 suspension guard, the 030 server-column guard, and the 029/031/032 capabilities;
-- **not** 027, which is held aside (DEC-037).
+**Who calls `get_public_profile`:**
 
-**Production** [BLOCKED]:
-- The P-1 change must be written against production's re-baselined body (V6-106), and the `page_template` family must be understood first.
-- Locally, 034 can be built once approved.
+| Caller | Evidence | Status |
+|---|---|---|
+| This repository's public page (`publicTapClient.ts`) | Code | OBSERVED |
+| Session B's branch (0ae7e47) | `git show` | OBSERVED |
+| The Expo admin app (`../shygon-tap-v5-admin`, local copy) | No reference found | OBSERVED (local copy only; the deployed build is UNKNOWN) |
+| The production corporate site | Reads `shygontap_profiles` (V6-107); whether it also calls P-1 is unknown | UNKNOWN |
+| Anything else on production | — | UNKNOWN until the capture and logs are reviewed (owner) |
 
-**Callers of P-1** [OBSERVED in this repository]:
-- `publicTapClient.ts`;
-- comments in `services/tap.ts`, `Tiers.tsx` and `TapExperience.tsx`;
-- the tests: public-tap, golden, identity, verify, suspension, emergency, admin-contract and `013_live_dry_run.sql`.
+**The plan:**
+1. **Re-pin the contract first.** At the rebaseline, the owner decides whether production's P-1 (with `pageTemplate`, tier buttons and card features) or the repository's P-1 is canonical, and the golden test is re-pinned to it.
+2. **No behaviour change until approved.** Info stays switched off in the mode catalogue in every non-local environment until BQ-1 is approved and the P-1 change is applied.
+   - So no Tap can be on Info while P-1 would still serve its Business payload (BQ-2 holds).
+   - And no older client sees any difference before then.
+3. **The single change, when approved.** P-1 gains one condition: return null when the Tap's active mode is not Business. The shape is unchanged, and every Tap not on Info returns byte-identical payloads (golden test).
+4. **What an older client shows.** For a Tap on Info: P-1 returns null, then P-2 returns `active`, so the page shows the existing **"Tap not found"** (`PublicTap.tsx:186–190`, with `noindex`). Nothing leaks, and no new copy is needed.
+   - Optional: P-2 could answer `unavailable` for Info Taps, which reads the same. Not recommended; it changes a second frozen function.
+5. **New clients** call `get_public_tap` first, and fall back to P-1 only if the function does not exist yet (PostgREST 404). So the frontend can deploy before the backend.
+6. **Rollback.** Switch Info off in the catalogue (Taps on Info show "unavailable", per BQ-2), then remove the P-1 condition. Business payloads are unaffected throughout.
+7. **Tests:**
+   - the golden P-1 for Taps not on Info;
+   - an older-client simulation (P-1 null plus P-2 `active` renders "Tap not found");
+   - the new client's fallback;
+   - the canaries (§13).
 
-**Callers outside this repository** [UNKNOWN]:
-- the Expo admin app (its source is not here);
-- the production corporate site. [INFERRED] It reads `shygontap_profiles` directly, not P-1 (V6-107).
+### 0.13 Mandatory checks before implementation approval (owner §2)
 
-**Effect on existing Tap URLs** [INFERRED]:
-- A Tap with no mode state behaves exactly as today.
-- An owner who activates Info changes what their own `/t/<slug>` shows. Anyone holding that link as the owner's profile then sees the Info page, and **old clients that call P-1 see "unavailable"**. That is intended under C-1, but it is a visible change for that owner's visitors.
+| # | Check | Status | Evidence / gap | Owner |
+|---|---|---|---|---|
+| 1 | Origin and purpose of `page_template` and card-family pages | **Purpose: done** from local evidence (§0.11). **Origin: UNKNOWN.** **Live verification: BLOCKED** (not authorised) | F-1 to F-9 | Repository owner (origin; authorise the capture) |
+| 2 | Capture and verify the current production schema | **Not done: BLOCKED** on the owner's fresh schema dump. The rebaseline validation is prepared on `v6/rebaseline-2026-10-18`. | V6-106 | Repository owner (Data Owner) |
+| 3 | Trace `/t/<slug>` end to end | **Done for this repository and Session B's branch** (§0.1–0.4). **The production site's app is UNKNOWN** (its source is not on this machine, V6-107). | §0.1–0.3 | Session A (done); repository owner (production app source) |
+| 4 | No duplicate of Locations | **Draft reuse path** (§0.9), plus the page-family finding (§0.11). Needs the Principal Architect. | §0.9, §0.11 | Principal Architect (UNASSIGNED) |
+| 5 | Terms and paid-link conflict | Links: **resolved for V1** by exclusion (CQ-2). Terms: **BLOCKED** (CQ-1). Production already exempts card-family Taps (T-3). | §0.8 | Repository owner → legal reviewer |
+| 6 | Negative tests for leaks through API, page, metadata, caches, storage, errors | **Defined** (§13), not written | §13 | Session A (API and DB), Session B (page, metadata, storage) |
+| 7 | Compatibility for older P-1 callers | **Plan drafted** (§0.12), PROPOSED | §0.12 | Repository owner (approve) |
 
 ---
 
@@ -220,428 +281,267 @@ Two observations sit **outside this DEC** and are recorded only, for the owner:
 
 | Item | Statement | Label |
 |---|---|---|
-| The model | A **mode** is a SHYGON-defined public experience. Exactly one is active per Tap (per account in v1). | OWNER (Q0.7, Q1); PROPOSED (wording) |
-| The word | The schema and API say `mode`, never `experience`: P-1's `experience` is the paid UI tier. The showroom's presentational "modes" (§0.5) are not modes in this sense. | OBSERVED (collisions); PROPOSED (wording) |
-| **Business** | The existing public profile at `/t/<slug>`. Default and unchanged. | OBSERVED; OWNER (Q1, Q2) |
-| **Info** | A public information page about a physical object, product, place or service point, which its owner updates without replacing the tag. | OWNER (Q0.1, Q0.2) |
-| Not Info | A personal identity, medical profile, student passport or Business profile | OWNER (Q0.1), OWNER, relayed |
-| Not modes | Emergency (029), Return-to-Owner (031), Connect (032): per-account capabilities | OBSERVED; APPROVED (DEC-038, DEC-039) |
-| Privé | Never on a Tap | APPROVED (DEC-040) |
+| The model | One SHYGON-defined public experience is active per Tap (per account in V1) | PROPOSED (M-1) |
+| The word | `mode` in the schema and API; never `experience` (the paid tier). The showroom's presentational "modes" and production's `page_template` are different things that must be reconciled (§0.5, §0.11). | OBSERVED (collisions); PROPOSED |
+| Business | The existing public profile at `/t/<slug>`: the default, unchanged | OBSERVED; OWNER |
+| Info | A public information page about a physical object, product, place or service point, updated without replacing the tag. Not a personal identity, medical profile, student passport or Business profile. | OWNER (Q0.1, Q0.2) |
+| Not modes | Emergency, Return-to-Owner, Connect, Privé | OBSERVED; APPROVED (DEC-038, 039, 040) |
 
-## 2. The problem Info solves that a phone does not
+## 2. The problem Info solves
 
-- [OWNER] Info connects a physical object or place to its current information, with five properties:
-  - it opens in a browser by NFC or QR;
-  - it sits in the physical context where it is needed;
-  - it is maintained centrally by an authorised owner;
-  - it can be changed after the tag is issued;
-  - it needs no app.
+- [OWNER] It answers "What should I know or do about this thing or place?": opened in a browser by NFC or QR, in the right physical context, maintained centrally, changeable after the tag is issued, with no app.
+- [PROPOSED] It passes the admission test on two criteria:
+  - a stable physical tap point whose content changes on the server;
+  - the server decides what is public.
+- [APPROVED, PQ-2] **No visitor counts.**
+- [OWNER] Integrations, booking, payments, device control and analytics are not promised.
 
-  "A phone's contact card or share sheet is not the primary comparison."
-- [PROPOSED] **Admission test for every mode** (kept from revision 1). A mode is built only if the server does something here that the owner's phone cannot. The four qualifying answers:
-  1. a stable physical tap point whose content the owner changes on the server;
-  2. server-enforced per-field visibility;
-  3. answers decided by server records, never by what a viewer claims;
-  4. reaching the owner without disclosing their contact details.
+## 3. Viewer roles
 
-  **Info passes on 1 and 2.**
-- [OWNER] **What it does not do:** no analytics, booking, payments, device control or external integrations are promised.
-  - [OBSERVED] The existing anonymous tap counts (`record_tap_event`) are Business analytics.
-  - [PROPOSED] Info v1 records no visitor events. An owner-facing Info analytics feature would need its own decision.
+[APPROVED, AQ-1]:
+- **Public visitor:** published Info fields only, while the Tap is active, unsuspended and on Info.
+- **Authenticated owner:** manages their own Info and previews the exact public view.
+- **No other roles.** No Friend, School, Organisation or emergency role exists or is introduced. [OBSERVED] None of them has a server-side authorization model.
 
-## 3. Target users and viewer roles
+[PROPOSED] No role ever comes from a URL, query, header, body field or frontend flag.
 
-| Role | Established by | Info v1 | Label |
-|---|---|---|---|
-| Public visitor | No verified token; the anonymous resolver | Sees only the published Info fields of an active, unsuspended Tap whose active mode is Info | OWNER (Q6); PROPOSED (mechanism) |
-| Authenticated owner | A Supabase token verified with GoTrue `/auth/v1/user` in the function; the caller owns the Tap | Manages their own Info; previews exactly the public view | OBSERVED (mechanism); OWNER (Q6) |
-| Trusted contact, organisation member, emergency context, student roles | Not verified server-side roles. [OBSERVED] Connect grants (032) cover account-profile scopes only; there are no organisation or membership tables; emergency contacts (029) receive SMS and read no page. | **Not introduced.** Treated as public visitors. | OWNER (Q6) |
-| SHYGON admin / support | Audited admin functions | Not a viewer; support reads audit and content through an admin function only | PROPOSED |
+## 4. Journeys [PROPOSED]
 
-**Users** [OWNER]: people and organisations that put a tag on a thing or place (classrooms, libraries, exhibits, equipment, product tags, restaurant tables). [INFERRED] In v1 the "organisation" is an ordinary account, because no organisation model exists (§0.6).
+**Owner:**
+1. Opens Modes, where the server answers `active`, `ready`, `needs_setup` or `not_available` for each mode.
+2. Edits Info in a structured form; "Saved" appears only after the server confirms.
+3. Previews the exact public view.
+4. Activates Info; "Live" appears only after the server confirms.
+5. Can switch back to Business the same way.
 
-[PROPOSED] No role ever comes from a URL, query, header, body field or frontend flag (§13 test 8).
+**Visitor:**
+1. Lands on `/t/<slug>`.
+2. Sees Info (title, short description, optional category and details, "Last updated"), or Business, or the neutral "unavailable" page.
+3. **No capability buttons on Info** [APPROVED, PQ-3].
 
-## 4. Journeys
+## 5. Relationship with Business [CONDITIONALLY ACCEPTED, PQ-1; PROPOSED mechanism]
 
-**Owner** [PROPOSED]:
-1. Signs in to `/shygontap` and opens **Modes**. For each mode the server answers `active`, `ready`, `needs_setup` (with the missing fields) or `not_available` (with a reason).
-2. Opens **Info** and fills the structured form. On save, the server validates and returns the stored version, and only then shows "Saved".
-3. **Preview**: the server returns the exact public view.
-4. **Activate Info**: the checks in §8 run. "Live" appears only after the server confirms [OWNER Q4]. On failure, the reason is shown and the previous mode stays.
-5. Switches back to Business the same way.
+- **C-1:** one active mode per account. Business is the default; with no mode selection, nothing changes.
+- **Per-card routing:** not built [APPROVED, PQ-1b].
+- **Multi-mode display:** not built [OWNER].
+- **While Info is active, the account's Business is not public** [INFERRED consequence; accepted for V1 through PQ-1].
+- **No Business name, photo or link on Info** [APPROVED, BQ-3].
+- [PROPOSED, for the Principal Architect] With production's page families (§0.11), the cleaner V1 may be "Info is a page family of the Tap page" rather than a separate mode switch. The decision belongs to SQ-1 / SQ-2.
 
-**Visitor** [PROPOSED]:
-1. Taps or scans and lands on `/t/<slug>` (unchanged, §0.1).
-2. Gets one of:
-   - the Info page: title, short description, the optional fields, and "last updated";
-   - Business;
-   - the neutral "unavailable" page.
-3. Capability entry points (Return to owner, emergency, Connect) appear according to their own `available` answers on whichever mode is active. [PROPOSED] Whether they belong on an Info page about a thing (for example "Return to owner" on a restaurant table) is a product question: **PQ-3**.
-
-## 5. Relationship with Business
-
-[OWNER] **Staged C: C-1 now.** One active mode per account; Business by default; per-card selection (C-2) and multi-mode display (C-3) are separate decisions.
-
-**The options compared** [PROPOSED analysis, from revision 1]:
+**Options compared** [PROPOSED analysis]:
 
 | Option | Public journey | Privacy | Card configuration | Business behaviour |
 |---|---|---|---|---|
-| A. Info replaces Business while active | The tag lands on Info | One set of fields is public at a time | None | Unchanged when Business is active |
+| A. Info replaces Business while active | The tag lands on Info | One set of fields public at a time | None | Unchanged when Business is active |
 | B. Info alongside Business | The tag lands on Business; Info one link away | Info is public whenever Business is | None | Unchanged |
-| C. The owner chooses per card (optionally several) | Each card can differ | As A, per card | Needs the card registry: BLOCKED | Unchanged |
+| C. Per card (optionally several) | Each card can differ | As A, per card | Needs the card registry: BLOCKED | Unchanged |
+| S2. Info pages with their own addresses (separate decision) | Business untouched; each Info on its own address | Independent | Tag provisioning | Unchanged |
 
-C-1 behaves as A for the two modes. The stored state allows a per-card override later.
+## 6. Content schema [CONDITIONALLY ACCEPTED direction, SQ-1; field details PROPOSED]
 
-**Consequences, stated so they are approved knowingly** [INFERRED unless stated]:
-1. **One Info page per account in v1.** The owner's examples (many tables, exhibits or classrooms) need many pages, each on its own tag. Under C-1 that takes one account per page, or a later decision. **PQ-1.**
-2. **While Info is active, the owner's Business is not public**, because `/t/<slug>` shows Info and P-1 returns null. For a person whose card is their business card, choosing Info hides their profile.
-3. **A "Business attribution or link" has no destination under C-1.** Business has no public address while Info is active. Supporting one needs a second resolver path or a composition rule, which is exactly what the owner said to leave for a separate decision [OWNER, relayed].
-   - [PROPOSED] **Not in v1**, and no Business field is read by Info (D9, D10).
+The Principal Architect finalises this.
 
-**Alternative, recorded and not recommended now** [PROPOSED, separate decision]:
-- **S2: Info pages with their own addresses.** Many pages per account, each with a stable public address of its own; Business stays on `/t/<slug>` untouched, and no switching is needed.
-- It fits the owner's examples better and removes consequences 2 and 3.
-- But it is not a mode of the Tap. It needs a new public route (Session B's routing), a new resolver and tag provisioning, and it is close to doc 03's `tap_routes` / `locations`.
-- [PROPOSED] Revision 2's record shape (§6) keeps S2 possible later without moving data.
-
-## 6. Content schema and source of truth
-
-All of this section is [PROPOSED]. The names and limits are provisional, and **the Principal Architect confirms them** [OWNER Q0.3].
-
-- **Business:** `tap_profiles`, unchanged [OWNER Q2]. No column added.
-- **Info record: `info_pages`.** Its own `id` (uuid) and `owner_user_id`.
-  - [PROPOSED] v1 allows **one per account** (a unique constraint that a later decision can drop).
-  - It is not keyed by `tap_profile_id`, so a future per-tag or `locations` decision can address it directly (D6, §0.9).
-
-| Field | Type and rule | Required | Label |
-|---|---|---|---|
-| `title` | Plain text, 1–120 characters, trimmed; no markup | Yes | OWNER (field); OWNER, relayed (120) |
-| `short_description` | Plain text, 1–280 characters | Yes | OWNER (field); OWNER, relayed (280) |
-| `category` | One of `place`, `product`, `equipment`, `exhibit`, `service_point`, `instructions` | No | OWNER (field); OWNER, relayed (list) |
-| `detailed_information` | Plain text with line breaks; no HTML, no markdown links. The maximum length is **for the Principal Architect to set** (a bounded payload is required, §7). | No | OWNER (field); PROPOSED (plain text) |
-| `action_links` | Array of `{ label (1–40), url }`. The URL is `https://` only, with no credentials in it; `javascript:`, `data:`, `file:` and every other scheme are refused. At most 10, the same bound as `custom_links` (004:580). **Subject to CQ-2.** | No | OWNER (field); PROPOSED (rules) |
-| `image` | **BLOCKED** (§0.7). Not in v1 until storage is reconciled. | No | OWNER (field); BLOCKED |
-| `language` | **Deferred** (§0.6): the existing architecture has no content language. If the owner wants it anyway: a tag from a small allowlist, used only for the page's `lang` attribute. | No | OWNER (field); PROPOSED (defer) |
-| `publication_status` | **Server-computed, never written by the client:** `draft` (required fields missing), `ready` (valid, not shown), `live` (active mode on an active, unsuspended Tap), `unavailable` (Tap paused or suspended, or SHYGON switched Info off). | — | OWNER (server-controlled); PROPOSED (states) |
-| `updated_at` | Server timestamp on each save; shown to visitors as "Last updated" | — | OWNER; PROPOSED (shown) |
-| `version` | Server counter for stale-write detection | — | PROPOSED |
-
-**Rules for the record** [PROPOSED]:
-- **No Business data.** Info never reads or writes `tap_profiles` content fields [OWNER Q0.5].
-- **No contact fields of its own.** Info has no phone, email, WhatsApp, address-book or map fields.
-- **No location field.** A place's address appears only if the owner deliberately types it into the description [OWNER, relayed Q0.4].
-- **Never read by Info:** `profiles.*`, emergency, rescue, Connect and Privé data, and admin notes.
-- **Excluded modules** [OWNER, relayed]: maps, bookings, contact databases, file sharing, custom forms.
-
-## 7. Edit permissions and edit-window rules
-
-**Business today** [OBSERVED]:
-- the 14-day window per account; the Customization Pass (`lifetime`) removes it;
-- visibility changes and publish/pause are not edits;
-- **no other throttle on owner edits.** A Pass holder can save Business without limit.
-
-**Existing server-side limits** [OBSERVED], the evidence the owner asked for. Every one of them protects an action that sends messages, reaches other people or costs money:
-
-| Where | Limit | Protects |
+| Field | Rule | Status |
 |---|---|---|
-| 025:229 | 60 visitor events per hour per visitor per Tap | Visitor analytics inflation |
-| 029 | 5 contacts per owner; verification codes 5 per hour per owner and 3 per day per number; owner alerts 5 per hour and 10 per day; public alerts 50 per hour in total, 3 per day per owner and 3 per day per visitor | Paid SMS; harassment of third parties |
-| 031 | Finder threads 3 per hour and 10 per day per finder, 5 per day per owner; 10 messages per hour; 60 polls per hour | A relay reaching the owner |
-| 032:347–349 | Connect requests per hour per requester; 50 pending per target | Unwanted requests to other people |
-| 033:189 | Privé demo requests 10 per hour, 50 per day | Simulator load |
+| `title` | Required, plain text. **The limit is unconfirmed** (relayed 120). | PROPOSED (A0) |
+| `short_description` | Required, plain text. **The limit is unconfirmed** (relayed 280). | PROPOSED (A0) |
+| `category` | Optional, from an allowlist. **The list is unconfirmed** (relayed: place, product, equipment, exhibit, service point, instructions). | PROPOSED (A0) |
+| `detailed_information` | Optional, plain text with line breaks; no HTML or markup links. The maximum length is the Principal Architect's call. | PROPOSED |
+| `publication_status` | Server-computed: `draft` / `ready` / `live` / `unavailable`. Never written by the client. | PROPOSED (owner: server-controlled) |
+| `updated_at` | Server timestamp, shown as "Last updated" | PROPOSED (owner: system-generated) |
+| Image | **Excluded from V1** | APPROVED (SQ-3) |
+| Language | **Excluded from V1** | APPROVED (SQ-4) |
+| Action / custom links | **Excluded from V1** | APPROVED (CQ-2) |
+| Business name, photo, link | **Excluded** | APPROVED (BQ-3) |
+| Maps, bookings, contact databases, file sharing, forms | Excluded without a separate decision | OWNER (relayed); PROPOSED |
 
-**Edit policy** [PROPOSED]:
+- The record has its own id; **one per account in V1** [CONDITIONALLY ACCEPTED, PQ-1].
+- It reads no `tap_profiles` content, `profiles.*`, emergency, rescue, Connect or Privé data, and no admin notes [PROPOSED].
 
-| Mode | Who edits | Limit | Validation |
-|---|---|---|---|
-| Business | Owner | As today (OBSERVED, unchanged) | As today |
-| Info | The authenticated owner of the Tap | **No 14-day window** [OWNER Q0.6]. **No fixed save quota.** | Per-field SQL validation; bounded payload; `expectedVersion` (stale writes refused); the saved version is returned |
-| Switching | The authenticated owner | **No fixed quota**; every switch audited | The checks in §8 |
+## 7. Editing and abuse protection
 
-**Rationale for no quota** [PROPOSED]:
-- An Info save changes only the owner's own public page. It sends nothing to anyone, costs SHYGON nothing per call, and is already bounded by the payload size and the version check.
-- The closest precedent, a Pass holder's Business saves, has no throttle (OBSERVED).
-- The other abuse controls: authentication, ownership, validation, an audit of field names (never values), and the existing moderation suspension (028).
+**Who edits and when** [OWNER]:
+- the authenticated owner of the Tap only;
+- **no 14-day window** on Info.
 
-**Residual risk** [INFERRED]: scripted save or switch loops by a signed-in owner produce write load and audit rows.
-- [PROPOSED] Add a ceiling **later, from measured use**, with its rationale recorded.
+**No fixed quota** [CONDITIONALLY ACCEPTED, RQ-1]. The rationale (from revision 2) [OBSERVED]:
+- Every existing limit protects something that sends messages, reaches other people or costs money: 025, 029, 031, 032, 033.
+- Owner-only edits have no throttle; Pass holders save Business without limit.
 
-**Commercial guard** [OWNER Q0.5, Q3]: Info must not deliver paid Business customization for free. The open conflicts are CQ-1 (Terms) and CQ-2 (links), in §10.
+**Pre-release abuse assessment** [PROPOSED method, to be run before release]:
+1. Measure save and switch payload sizes and write costs on the local stack.
+2. Model a scripted owner loop: the write rate, the growth of audit rows, and the effect on the public read path.
+3. Review moderation reach: a whole-Tap suspension (028) covers Info.
+4. Record the conclusion: either no limit needed, or a proportionate ceiling with its derivation.
 
-## 8. Switching and card lifecycle
+The owner accepts the result.
 
-**Switching** [PROPOSED] keeps revision 1's mechanism: `POST /api/modes` `owner.activate { mode, expectedVersion, idempotencyKey }`.
-- **The checks run in one transaction:**
-  1. a valid token;
-  2. the caller owns the Tap;
-  3. the Tap is not suspended;
-  4. SHYGON has the mode switched on;
-  5. Info's required fields are valid;
-  6. the entitlement rule passes;
-  7. the version matches.
-- **Then**, in the same transaction: set the active mode, bump the version, write the audit row.
-- **On failure**, nothing changes and the previous mode stays live.
-- **A stale version** returns `stale_version`; **a repeated idempotency key** returns the first result [OWNER Q4].
-- **The frontend shows "Live" only after the server confirms** [OWNER Q4].
+## 8. Switching, lifecycle and fallback
 
-**Card lifecycle** [OWNER Q4: "enforce card lifecycle"]:
-- [OBSERVED] The public address is not bound to any card (§0.4), and cards are not sold.
-- [PROPOSED] The server enforces **Tap** lifecycle now: draft, paused, active, suspended.
-- [BLOCKED] **Card** lifecycle checks wait for the card registry (`/d/<code>`). Until then, card states cannot affect the mode, and F3 is unchanged.
+- **Switching** [PROPOSED]:
+  - owner only, in one transaction;
+  - `expectedVersion` and an idempotency key;
+  - audited (field names only);
+  - "Live" only after the server confirms.
+- **Lifecycle:**
+  - the Tap's status is checked server-side [APPROVED, AQ-2];
+  - card-level checks are BLOCKED until a card registry exists and are never claimed [APPROVED, AQ-2].
+- **Fallback** [APPROVED, BQ-2]. The tests are written first at implementation.
 
-**Explicit fallback** [PROPOSED; replaces revision 1, D8]. The tests are written first at implementation.
+| Situation | Public result | Test |
+|---|---|---|
+| Info switched off by SHYGON while a Tap is on it | Neutral "unavailable"; the owner is told and can switch to Business themselves | F-1 |
+| Info record **missing** (deleted, or never created) while the mode says Info | Neutral "unavailable" | F-2 |
+| Info record **invalid** (fails today's validation, or content removed by moderation) | Neutral "unavailable" | F-3 |
+| Unknown or retired mode value | Neutral "unavailable" | F-4 |
+| Tap paused or suspended | As today | F-5 |
+| Clearing a required field while Info is live | Refused (`mode_active`) | F-6 |
 
-| Situation | Public result | Owner sees | Test |
-|---|---|---|---|
-| SHYGON switches Info off (kill switch) while a Tap is on Info | **Neutral "unavailable"**, never Business | Notice: "Info is switched off by SHYGON; switch to Business to show your profile" | F-1 |
-| Info record fails validation at read time (a stricter rule after a schema change, or moderation removed content) | Neutral "unavailable" | `needs_setup` with the fields | F-2 |
-| Unknown or retired mode value | Neutral "unavailable" | `not_available` | F-3 |
-| Tap paused or suspended | As today: paused / unavailable | As today | F-4 |
-| Clearing a required field while Info is live | Save refused (`mode_active`); the page is unchanged | Must switch to Business first | F-5 |
+**Never** Business as a fallback.
 
-Business becomes public again **only by the owner's own switch** [OWNER Q0.7].
+## 9. Privacy and authorization
 
-## 9. Privacy and authorization matrix
-
-R = read, W = write, — = never. Every role that does not exist (trusted contact, organisation, student, emergency) is treated as a public visitor [OWNER Q6].
+R = read, W = write, — = never. Roles that do not exist are treated as public visitors [APPROVED, AQ-1].
 
 | Data | Public visitor | Owner | Admin / support | Label |
 |---|---|---|---|---|
 | Active mode name | R | R/W | R (audited) | PROPOSED |
-| Info published fields (§6), Tap active, unsuspended and on Info | R | R/W | R (audited) | PROPOSED |
+| Info published fields, Tap active, unsuspended and on Info | R | R/W | R (audited) | PROPOSED |
 | Info draft, or a record while the Tap is not on Info | — | R/W | R (audited) | PROPOSED |
-| Business fields switched on, Business active | R | R/W (window) | R | OBSERVED (today) |
-| Business fields while Info is active | — (P-1 returns null) | R/W | R | PROPOSED |
-| Business fields switched off | — | R/W | R | OBSERVED |
-| Account profile (`profiles.*`) | — | R/W | R | OBSERVED |
-| Emergency, rescue, Connect, Privé data | — (through their own functions only) | R/W (own functions) | Their admin functions | OBSERVED |
-| Internal ids, activation codes, tokens, admin notes | — | Own card rows only | R | OBSERVED |
-| Mode audit (field names only) | — | R (own) | R (support.read) | PROPOSED |
+| Business fields, Business active | R (per switches and entitlements) | R/W | R | OBSERVED |
+| Business fields while Info is active | — | R/W | R | PROPOSED (needs BQ-1) |
+| Account profile, emergency, rescue, Connect, Privé, admin notes, ids, tokens | — | Their own functions | Their admin functions | OBSERVED |
+| Mode audit (field names only) | — | R (own) | R | PROPOSED |
 
-No Info field is sensitive [OWNER Q0.4: public content only].
+Every item on the owner's "must never appear" list is mapped to a negative test (§13).
 
-**Never appears**: the owner's list as negative tests [OWNER Q7; PROPOSED mechanism]:
+## 10. Pricing and entitlement
 
-| Must never appear | Enforcement |
+- **Info is free with no new SKU:** PROPOSED (M-2), pending commercial approval.
+- **Not advertised as "free and unlimited"** until CQ-1 is resolved [APPROVED, CQ-1b].
+- **Links stay a paid Business add-on** and are absent from Info [APPROVED, CQ-2].
+- **The entitlement model differs between the repository and production** (E-1 to E-4). The rebaseline decision fixes which one is canonical before any Info pricing claim.
+
+## 11. Records, APIs, transitions [PROPOSED, M-3; production BLOCKED, BQ-1 / SQ-2]
+
+- **Records:**
+  - `tap_mode_catalog` (the kill switch);
+  - `tap_mode_state` (no row = Business);
+  - `info_pages` (§6);
+  - `tap_mode_audit`.
+
+  All four are closed to client roles (the 029–033 pattern). **May become a `page_template` value instead** (§0.11).
+- **Public read:** a new anonymous function, `get_public_tap(p_slug)`. The P-1 change is BLOCKED (§0.12).
+- **Owner API:** `POST /api/modes`:
+  - `owner.state`, `owner.activate { mode, expectedVersion, idempotencyKey }`;
+  - `owner.info.get`, `owner.info.save { fields, expectedVersion }`, `owner.info.clear`;
+  - `owner.preview { mode }`.
+
+  Errors are `{ error: { code, message } }` with fixed messages: `unauthorized` 401, `no_tap` 404, `tap_suspended` / `mode_unavailable` / `needs_setup` / `stale_version` / `mode_active` 409, `not_entitled` 403, `invalid_field` 422.
+- **Transitions:**
+  - Business → Info needs a valid record;
+  - Info → Business is always allowed;
+  - the kill switch, a missing record or an invalid record makes the Tap unavailable, never Business;
+  - Tap status and suspension always win.
+- **Account deletion:** the runbook removes the rows, proven by a negative control.
+
+## 12. Failure, abuse and recovery [PROPOSED]
+
+| Case | Handling |
 |---|---|
-| Private medical or emergency information; children's sensitive details; identity documents; credentials; access codes | No such field exists in Info. Emergency, Connect, rescue and Privé tables are closed to client roles (OBSERVED 029–033) and never read by a mode resolver. |
-| Private files, storage links | No file field. Image is BLOCKED. The resolver returns no storage path. |
-| Internal ids, tokens, admin notes, unpublished owner data | The resolver allowlist has no id; drafts are never returned publicly |
-| Unverified credentials shown as verified | Info has no "verified" field, and no credential model exists (OBSERVED) |
-| Organisation or student data outside its context | None exists; any such mode needs its own DEC [OWNER Q6] |
-| Privé hotel data | Never read by a mode resolver (APPROVED DEC-040 boundary) |
-| Unapproved location or tracking | No location field; no geolocation; Info v1 records no visitor events (§2) |
-| Bypassing Emergency Profile, Student Passport, Smart Identity or Business privacy rules [OWNER, relayed] | Info reads none of their data. [OBSERVED] Student Passport and Smart Identity do not exist in the backend. |
+| A claimed viewer role in a URL, query, header or body | Ignored; the public answer is returned |
+| Cross-tenant read, save, preview or activate | 0 rows / `no_tap`; the owner check is in SQL |
+| Concurrent or duplicate switches | `stale_version`; idempotent replay |
+| A switch while suspended | Refused |
+| A partial failure during a switch | One transaction; the previous mode stays |
+| Getting around Business's window or paid add-ons through Info | Info has no Business fields, no contact fields and no links (CQ-2) |
+| Scripted save or switch loops | Pre-release assessment (RQ-1); audited |
+| SHYGON must pull Info | Kill switch, which makes the Tap unavailable (BQ-2) |
+| Abusive content | The existing whole-Tap moderation suspension (028) |
+| Production page families collide with modes | BLOCKED until §0.11 is resolved (SQ-2); production behaviour preserved (SQ-2b) |
+| An older client loads a Tap on Info | Shows "Tap not found" (§0.12), no leak |
+| A bad migration | Tested ROLLBACK; idempotent |
+| Account deletion | The runbook, with a negative control |
+| The UI shows a switch that did not happen | "Live" only after the server answers |
 
-**Surfaces under test** [OWNER Q7; PROPOSED, §13 test 14]:
-- public API outputs: `get_public_tap`, P-1 and P-2, plus `record_tap_event` and resolver error bodies;
-- the rendered page DOM (Session B e2e);
-- metadata: tab title, description, share tags, `index.html` defaults;
-- caches: response headers carry no shared-cache directive, and nothing is written to `localStorage`, `sessionStorage` or IndexedDB;
-- error responses for every failure code.
+## 13. Negative tests and acceptance (mandatory check 6) [PROPOSED; defined, not written]
 
-## 10. Pricing and entitlement recommendation
+**Canaries.** Unique strings are placed in:
+- `profiles.*`;
+- Business fields that are switched off;
+- Business fields while the Tap is on Info;
+- an unpublished Info draft;
+- emergency contacts and alerts, rescue threads, Connect grants, Privé requests and admin notes.
 
-[OWNER Q3, Q5]:
-- Do not extend the paid Business customization entitlement to Info.
-- "Free with no new SKU" is a recommendation only, pending product and commercial approval.
-
-**Conflicts found** (§0.8):
-
-| # | Conflict | Options | Session A lean |
-|---|---|---|---|
-| **CQ-1** | The Terms say "You can change your Tap's content once every 14 days", and the Pass is sold as "change your Tap as often as you like". Unlimited free Info edits on the same Tap contradict that wording. | **A:** change the Terms and FAQ so the 14-day rule covers the **Business profile** (owner + counsel; DEC-2026-017 process). **B:** apply a window to Info (the owner declined, Q0.6). **C:** keep Info off until A. | **A**; Info cannot be "free and unlimited" while the Terms say otherwise. [BLOCKED] on owner + counsel. |
-| **CQ-2** | Info "action links" are functionally the paid `links` add-on (and could carry website or social links that Business sells per key). | **A:** free links in Info, accepting the overlap. **B:** Info links require the existing `links` customization entitlement (server-enforced on save and read); Info itself stays free. **C:** no action links in v1. | **B**: it follows "do not provide paid customization for free" literally, reuses an existing entitlement, and needs no new SKU or price. The commercial call is the owner's. |
-| **CQ-3** | Doc 10 (proposal) plans Locations as an organisation feature beside plans and subscriptions. A free Info now may pre-empt that. | Confirm a free Info v1 is intended, or mark it as an introductory scope | Owner's call; not blocking for v1 |
-
-**Recommendation** [PROPOSED]:
-- Info is **"Available after setup"**: no price and no new SKU, activated once the required fields are valid.
-- It is **conditional on CQ-1 = A** and on the owner's CQ-2 choice.
-- It is enforced on the server through the catalogue's entitlement rule, and the page shows the server's `available` / `reason` answer.
-- Not approved [OWNER Q5].
-
-## 11. Backend records, APIs and state transitions
-
-All [PROPOSED], not approved [OWNER Q2]. These are revision 1's records with the changes below. They are written only after approval, and only locally.
-
-- **`tap_mode_catalog`**: the kill switch and per-mode rules.
-- **`tap_mode_state`**:
-  - `tap_profile_id` (primary key), `active_mode`, `info_page_id` (set when the mode is Info), `previous_mode`, `version`, `changed_at`, the last idempotency key and its result;
-  - no row means Business.
-- **`info_pages`**: as in §6.
-- **`tap_mode_audit`**: field names only, never values.
-- **Closed tables**: RLS on, no policies, no client grants (the 029–033 pattern), NONE in the rls-matrix.
-
-**Public read path**:
-- a new anonymous, read-only function, `get_public_tap(p_slug)`, returning `{mode:'business', profile}`, `{mode:'info', info}` or null;
-- **P-1's shape is unchanged, but P-1 returns null while the active mode is not Business**, so Business is never readable through the old path when the owner chose Info.
-
-  That is a semantic change to a frozen contract. It goes in contract v0.8's change note, written against production's re-baselined body (§0.10, BLOCKED for production).
-- **Alternatives considered**:
-  - leave P-1 alone: rejected, because Business would stay public through P-1 while Info is active, which breaks Q0.7;
-  - serve Info through a Netlify function: an extra hop per tap and a second public path to keep in step.
-
-**Owner API `POST /api/modes`** (signed in):
-- `owner.state` → `{ activeMode, version, modes: [{ mode, available, reason, missing? }] }`;
-- `owner.activate { mode, expectedVersion, idempotencyKey }`;
-- `owner.info.get`, `owner.info.save { fields, expectedVersion }`, `owner.info.clear`;
-- `owner.preview { mode }` → exactly the public view.
-
-Errors are `{ error: { code, message } }`. Messages are fixed text and never echo a submitted value:
-
-| Code | HTTP |
-|---|---|
-| `unauthorized` | 401 |
-| `no_tap` | 404 |
-| `tap_suspended` | 409 |
-| `mode_unavailable` | 409 |
-| `needs_setup` (+ `missing`) | 409 |
-| `not_entitled` | 403 |
-| `stale_version` | 409 |
-| `invalid_field` (+ field, reason) | 422 |
-| `mode_active` | 409 |
-
-There is no `rate_limited`: no quota (D7).
-
-**State transitions**: business ⇄ info.
-- Business → Info needs the record to be valid.
-- Info → Business is always allowed.
-- **The kill switch makes the Tap unavailable; it does not switch it to Business** (D8).
-- Tap status and suspension always win.
-
-**Account deletion**: the runbook deletes the four tables' rows, proven by a negative control.
-
-## 12. Failure, abuse and recovery
-
-| Case | Handling | Label |
+| Surface | Test | Writer |
 |---|---|---|
-| A viewer role claimed in a URL, query, header or body | Ignored; the public answer is returned | PROPOSED |
-| Another account reads, saves, previews or activates | 0 rows / `no_tap`; the owner check is in SQL | PROPOSED |
-| Two devices switch at once | The second gets `stale_version` and the current state | PROPOSED |
-| A double click or retry | The idempotency key returns the first result; one audit row | PROPOSED |
-| A switch while suspended | Refused; suspension also wins on every read | PROPOSED |
-| A partial failure during a switch | One transaction; the previous mode stays live | PROPOSED |
-| Using a switch to get around Business's 14-day window | A switch is not a content edit; Info cannot write Business fields | PROPOSED |
-| Rapid switching or save loops | No fixed quota; audited; a ceiling later from measured use (§7) | PROPOSED |
-| SHYGON must pull Info quickly | Kill switch: neutral "unavailable", the owner notified, audited (§8) | PROPOSED |
-| Abusive or phishing content | Existing moderation suspension of the whole Tap (028); https-only validated links | OBSERVED; PROPOSED |
-| Slug enumeration | No new surface: the same slug lookup as P-1 (DEC-2026-011 open) | OBSERVED |
-| A bad migration | 034 ships a tested ROLLBACK block and is idempotent | PROPOSED |
-| Account deletion | The runbook removes the four tables' rows; negative control | PROPOSED |
-| The UI shows a switch that did not happen | "Live" only after the server answers; Session B e2e | PROPOSED |
-| Info used as a free personal profile to avoid Business tiers or add-ons | Info has no person fields, no contact fields and no Business data. Links follow CQ-2. The Terms say Info describes a thing or place, and moderation suspension (028) applies. | PROPOSED |
-| An owner points a tag at someone else's object or place | Out of scope for software. The content is the owner's own public statement, under the Terms and moderation. | INFERRED |
-| Production's unknown `page_template` / `card_family_pages` behaviour collides with modes | Unknown until the rebaseline. 034 is not written for production before V6-106 is resolved. | UNKNOWN; BLOCKED |
-| A visitor holds an old link expecting the owner's profile | Sees Info (an intended C-1 effect) | INFERRED |
+| Public API | No canary in `get_public_tap`, P-1, P-2 or `record_tap_event` responses, for every Tap state and mode | Session A (`test:modes`) |
+| Error responses | No canary and no submitted value in any error body, for each failure code (anonymous and owner) | Session A |
+| Rendered page | No canary in the DOM of `/t/<slug>`, in every mode and state | Session B (e2e) |
+| Metadata | No canary in the title, description or share tags; unavailable states are `noindex` | Session B (e2e) |
+| Caches | No shared-cache directive on any public response; no service worker | Session A (headers) + Session B (e2e) |
+| Browser storage | After a visit, `localStorage`, `sessionStorage` and IndexedDB hold no canary (only the site theme preference) | Session B (e2e) |
 
-## 13. Acceptance criteria and tests
-
-**Before implementation** [PROPOSED]:
-- the owner approves the decision, including PQ-1 to PQ-3, CQ-1 to CQ-3, SQ-1 to SQ-4 and BQ-1 to BQ-3 below;
-- the Principal Architect confirms §6;
-- the owner confirms the relayed answers.
-
-**`test:modes`**, on the local stack under deny-network [PROPOSED]:
-1. A Tap without mode state resolves as Business, and P-1's payload is identical to today's (golden test).
-2. Activating an invalid Info returns `needs_setup` with the fields; the state is unchanged.
-3. Activating a valid Info succeeds: `get_public_tap` returns only allowlisted Info fields, and P-1 returns null.
+**Functional tests:**
+1. Without mode state, P-1's payload is identical (golden).
+2. Activating an invalid Info returns `needs_setup`.
+3. Activating a valid Info shows only the allowlisted fields.
 4. Switching back restores the identical Business payload.
-5. Paused or suspended Taps are unavailable in every mode; activation is refused while suspended.
-6. Cross-tenant: another account cannot read, save, preview or activate.
-7. The anonymous role cannot call owner functions; client roles cannot read the four tables (rls-matrix NONE).
-8. A claimed viewer role in the body, query or headers gets the public answer.
-9. A stale version returns 409; an idempotent replay returns the same result with one audit row.
-10. An Info save leaves `tap_profiles` (including `last_content_edit_at`) untouched.
-11. Clearing a required field while Info is live returns `mode_active`.
-12. The kill switch gives "unavailable" (F-1).
-13. Account deletion removes all four tables' rows (negative control).
-14. Public-leak canaries (see below).
-15. 034's ROLLBACK block works, and the migration re-runs safely.
-16. `admin-contract` lists the new functions as PROPOSED, and as APPROVED only after approval.
+5. Paused or suspended Taps are unavailable in every mode.
+6. Cross-tenant attempts are refused.
+7. The anonymous role cannot call owner functions, and the rls-matrix shows NONE.
+8. A claimed role is ignored.
+9. Stale versions and idempotent replays behave as specified.
+10. An Info save leaves `tap_profiles` untouched.
+11. Clearing a required field while Info is live is refused (`mode_active`).
+12. The fallbacks F-1 to F-6.
+13. Account deletion removes the rows (negative control).
+14. The ROLLBACK works.
+15. The `admin-contract` states are correct.
+16. Field validation: plain text and the unconfirmed limits.
+17. The older-client simulation (§0.12).
 
-Added in revision 2:
-- **F-1 to F-5**: the fallbacks in §8, written first.
-- **Test 14, extended**: canary strings go into `profiles.*`, Business fields that are switched off, an unpublished Info draft, emergency, rescue, Connect, Privé and admin-note tables. None may appear in:
-  - any `get_public_tap` or P-1 / P-2 response;
-  - any error body for each failure code;
-  - the rendered DOM, title, description or share tags (Session B e2e);
-  - browser storage after a visit (Session B e2e).
-- **Field validation**:
-  - title and short-description limits;
-  - category allowlist;
-  - plain text only;
-  - link schemes (`javascript:`, `data:`, `file:`, `http:` and credentials in the URL are refused);
-  - at most 10 links.
-- **CQ-2 B**, if chosen: links refused without the `links` entitlement, and dropped from the public read if the entitlement becomes inactive.
-- **Business unchanged**: the golden P-1 payload is identical for Taps without mode state, and the 14-day window and Pass behaviour are unchanged.
+**Regression:** test:db, public-tap, suspension, emergency, rescue, connect and prive stay green.
 
-**Regression**: test:db, test:public-tap, test:suspension, test:emergency, test:rescue, test:connect and test:prive must stay green.
+## 14. Alternatives and trade-offs
 
-## 14. Alternatives considered and trade-offs
-
-| Decision | Options | Recommended | Trade-off |
+| Decision | Options | Current position | Trade-off |
 |---|---|---|---|
-| Relation to Business | A replace / B alongside / C per card, staged | C-1 [OWNER] | Simple and private; one Info per account; Business hidden while Info is active |
-| Info addressing | C-1 mode on `/t/<slug>` / S2 own addresses | C-1 now [OWNER]; record shaped for S2 [PROPOSED] | S2 fits many-object use better but needs a new route and resolver: a separate decision |
-| Info storage | Columns on `tap_profiles` / jsonb page / row per Tap / **own addressable record** | Own record (D6) [PROPOSED] | One more table; avoids reusing person columns and a later duplicate of `locations` |
-| Public read | Change P-1 + new `get_public_tap` / leave P-1 / function hop | Change P-1 + new function [PROPOSED] | Frozen-contract change; blocked on the rebaseline for production |
-| Fallback | Business / neutral unavailable | Unavailable [PROPOSED, per OWNER Q0.7] | A tap shows nothing until the owner acts |
-| Limits | Invented quota / no quota plus a later measured ceiling | No quota [PROPOSED, per OWNER Q0.6] | Scripted loops are possible but cheap and audited |
-| Links | Free / existing `links` entitlement / none | Entitlement (CQ-2 B) [PROPOSED] | Info is "free" except links |
-| Image | External URL / wait for storage | Wait (BLOCKED) | An external URL leaks visitor addresses to third-party hosts and skips moderation |
-| Language | Add a field / defer | Defer [PROPOSED] | One-language pages until a content-language decision |
-| Business link | Allow now / separate decision | Separate decision [OWNER, relayed] | No attribution in v1 |
+| Relation to Business | A / B / C staged / S2 | C-1, CONDITIONALLY ACCEPTED (PQ-1) | One Info per account; Business hidden while Info is active |
+| Mechanism | A mode table / a production page family (`page_template = 'info'`) | **Open: the Principal Architect, after SQ-2** | A mode table duplicates page families if those become canonical; adopting page families inherits unknown-origin code |
+| Info storage | Own addressable record / `tap_profiles` columns / jsonb | Own record, CONDITIONALLY ACCEPTED (SQ-1) | One more table; a clean reuse path to Locations |
+| Public read | P-1 null rule + `get_public_tap` / leave P-1 / function hop | PROPOSED; P-1 change BLOCKED (BQ-1) | A frozen-contract change, gated by the compatibility plan |
+| Fallback | Business / unavailable | Unavailable, APPROVED (BQ-2) | A tap shows nothing until the owner acts |
+| Limits | An invented quota / an assessed one | Assessed, CONDITIONALLY ACCEPTED (RQ-1) | A pre-release assessment is needed |
+| Links | Free / existing add-on / none | None, APPROVED (CQ-2) | A thinner V1; no paid-feature bypass |
 
-## 15. Recommendation
+## 15. Recommendation [PROPOSED]
 
-[PROPOSED]:
-- **C-1, as the owner directed.** One active mode per Tap; Business is the untouched default.
-- **Info** is its own structured, public-only record: title and short description required; category, plain-text details and links optional.
-  - It is addressable by its own id and limited to one per account in v1.
-  - It reads no Business data, has no image until storage is reconciled, and no language field until a content-language decision.
-- **Switching** is owner-only, server-validated, versioned, idempotent and audited, and the public URL never changes.
-- **Fallback**: a disabled or invalid Info shows a neutral "unavailable", never Business.
-- **Limits**: no invented quota; a ceiling is added later from measured use.
-- **Price**: available after setup at no charge, **only once the Terms are corrected (CQ-1 A)** and with links under the existing entitlement (CQ-2 B).
+**Proceed only to the evidence steps:**
+1. The owner authorises and supplies the fresh production schema capture (check 2), and states the origin of the page-family migrations if known (check 1).
+2. The owner assigns the **Principal Architect**, who decides between "mode table" and "page family" for Info (§0.11), confirms PQ-1 and SQ-1, and documents the Locations reuse path (check 4).
+3. The owner engages the **legal reviewer** for CQ-1 (check 5).
+4. The owner approves the compatibility plan (check 7) or amends it.
 
-**Why:**
-- It follows every owner direction.
-- It keeps Business, its window and its paid add-ons exactly as they are.
-- It makes the privacy rules testable on every public surface.
-- It leaves per-tag and many-page Info (S2), attribution and language to their own decisions without data moves.
+Then Session A brings a final implementation scope (migration, API, tests, contract v0.8) for separate approval. Nothing is implemented until then.
 
-## Remaining approval questions
+## 16. Remaining blockers and owners
 
-| ID | Question | Recommended | Type |
+| # | Blocker | Blocks | Owner |
 |---|---|---|---|
-| **A0** | Confirm the relayed answers (limits 120/280; the category list; "one public information page per configured Info experience"; no maps, bookings, contact databases, file sharing or forms; the Student Passport / Smart Identity rule; "leave it for a separate decision") | Confirm | Product |
-| **PQ-1** | Accept **one Info page per account** in v1, which hides that account's Business while Info is active? (Many-object use needs S2 or C-2 later.) | Accept for v1; open S2 as its own DEC if many-object use is wanted soon | Product |
-| **PQ-2** | Should Info v1 record visitor events at all? | No (§2) | Product / Privacy |
-| **PQ-3** | Should capability entry points (Return to owner, emergency, Connect) appear on an Info page about a thing? | No: an Info page about a thing shows no personal capability | Product / Privacy |
-| **SQ-1** | Approve the record shape (§6) for the Principal Architect to finalise, including the maximum length of detailed information | Approve the direction | Schema |
-| **SQ-2** | Production drift: establish what `page_template`, `card_family_pages` and `tap_card_features` are (V6-106) before 034 is written for production | Required | Schema / Release |
-| **SQ-3** | Ship Info v1 **without an image** until V6-108 / V6-095 are resolved? | Yes | Schema |
-| **SQ-4** | Ship Info v1 **without a language field**? | Yes | Schema |
-| **CQ-1** | Change the Terms and FAQ so the 14-day rule covers the Business profile only (owner + counsel) | A | Commercial / Legal |
-| **CQ-2** | Action links: free / existing `links` entitlement / none | B | Commercial |
-| **CQ-3** | A free Info v1 versus the planned organisational Locations product | Owner's call | Commercial |
-| **AQ-1** | Viewer roles: public visitor + owner only | As directed [OWNER Q6] | Authorization |
-| **AQ-2** | Switching enforces Tap lifecycle now; card lifecycle waits for the registry | Approve | Authorization |
-| **BQ-1** | P-1 returns null while Info is active (frozen-contract semantic change, contract v0.8) | Approve | Backward compatibility |
-| **BQ-2** | Fallback is neutral "unavailable", never Business | Approve | Backward compatibility / Privacy |
-| **BQ-3** | No Business attribution or link in v1; separate decision | Approve | Backward compatibility |
-| **RQ-1** | No fixed save or switch quota; a ceiling later from measured use | Approve | Security |
+| BL-1 | A fresh production schema capture; verify drift F-1 to F-9 and P-1's callers | BQ-1, SQ-2, check 2, any production change | Repository owner (Data Owner) |
+| BL-2 | The origin of the 2026-10-11 to 10-15 production migrations | Check 1 (origin) | Repository owner |
+| BL-3 | **The Principal Architect is UNASSIGNED** | PQ-1, SQ-1, CQ-3, M-3, the mode vs page-family choice | Repository owner (assign, or act in the role) |
+| BL-4 | Legal review of the 14-day Terms wording (DEC-2026-017; Data Owner UNASSIGNED; no counsel engaged) | CQ-1, any "free/unlimited" claim | Repository owner → legal reviewer |
+| BL-5 | Approval of the compatibility plan (§0.12) | BQ-1 | Repository owner |
+| BL-6 | Confirmation of the relayed limits and categories | A0, §6 field limits | Product Owner |
+| BL-7 | Commercial approval of "Info free, no SKU" | M-2 | Product Owner |
+| BL-8 | A card registry (`/d/<code>`) | Card-level validation (AQ-2), per-card routing | Repository owner (card decision) |
+| BL-9 | The pre-release abuse assessment | RQ-1 | Session A, then owner acceptance |
+| BL-10 | The owner's implementation-scope approval | M-4 (034, `/api/modes`, tests, contract v0.8) | Repository owner |
 
-## After approval
-
-[PROPOSED] Session A writes 034, `/api/modes`, `test:modes` (fallback tests first) and contract v0.8, all locally.
-- L3: DEC-2026-018's cool-off and checklist come before any real database.
-- Production waits for V6-106.
-- Nothing is applied, pushed or deployed without the release track.
-
-**Recorded only, outside this DEC** (§0.8):
-- the Business tier's "Website and social links" copy versus fulfilment;
+**Outside this DEC, recorded only:**
+- the Business tier's "Website and social links" copy versus the repository's add-on gating (E-1 / E-2);
 - the Restaurant card's "Direct reservations" promise.
 
 ## Expected result vs observed result
