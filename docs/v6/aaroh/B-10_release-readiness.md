@@ -103,7 +103,7 @@ Run on 2026-10-23, Node v20.18.0, in this worktree, with outbound network denied
 **Negative control** (during the build, 2026-10-23): with the previous `connect.mjs`, `test:connect` → **15 passed, 2 failed** (the switch and `publicAllowed` checks).
 
 **Skipped or not run:**
-- Session B's browser journey for the switch (`e2e/aaroh-server-paths.spec.ts:227–295`, commit `ee5b532`) exists, but no pass result is committed. The result has been requested from Session B. **PENDING.**
+- Session B's browser journey for the switch (`e2e/aaroh-server-paths.spec.ts`, commit `ee5b532`): **run by Session B, 33 passed, 0 failed** (see §10). Not re-run by Session A.
 - The functions-security check that needs Node 22.
 
 ## 6. Documents [OBSERVED]
@@ -147,7 +147,7 @@ Run on 2026-10-23, Node v20.18.0, in this worktree, with outbound network denied
 |---|---|---|
 | P1 | On a preview of each host: the address-header check in `B-9_client-address-plan.md` §6 | Before `EMERGENCY_PUBLIC_ALERTS` or `RESCUE_RELAY` is turned on. Not needed for Connect |
 | P2 | On a preview with 032 applied to a **non-production** database and `CONNECT_PUBLIC` unset: `public.status` false; create, accept and share 404; decline, block, remove and the lists work; `publicAllowed` false. Then set `on`, redeploy, and confirm the behaviour returns | Confirms the default on the real host, and how quickly a change takes effect (§3, R2) |
-| P3 | Session B's e2e at `ee5b532` (the switch journey) | Browser evidence for the B-10 frontend; result pending (§5) |
+| P3 | Session B's e2e at `ee5b532` (the switch journey) | **Done (reported by Session B, 2026-10-23): 33 passed, 0 failed** (§10) |
 | P4 | `npm run test:payments:ci` under Node 22 | Clears the one BLOCKED functions-security check; Netlify builds with Node 22 |
 
 ### 7.3 Remaining security and consent-flow risks
@@ -208,3 +208,25 @@ B-10 itself is a fail-closed lock. Shipping it exposes nothing, but it has nothi
 | D5 | `.env.example`: a new AAROH section lists every setting, all commented out and unset, with pointers to `provider-requirements.md` and the B-9 preview check. No value added |
 
 The recommendation in §8 is unchanged: **READY FOR REVIEW**.
+
+## 10. Follow-up 2026-10-23: Session B's browser e2e at `ee5b532` (P3)
+
+**Reported by Session B** (the frontend session). Not re-run by Session A:
+- **Result:** **33 passed, 0 failed, 0 skipped, 0 flaky**, 19.2 min, desktop and phone projects, Edge, Node 20.18.
+- **Starting state:** the worktree was clean at `ee5b532` (which contains `34a482d` through merge `bd3a85e`). The stack was built fresh on separate ports.
+- **Commands** (from Session B's worktree root):
+  1. `STACK_APP_PORT=4273 STACK_GATEWAY_PORT=54421 STACK_SIM_CLIENT_ADDRESS=1 npm run stack -- --build`
+  2. `STACK_APP_PORT=4273 npx playwright test --reporter=list`
+- **The switch journey:** `e2e/aaroh-server-paths.spec.ts:226`, "connect: a signed-in visitor asks from the Tap, the owner accepts, details are self-reported, removal revokes the grants", passed in 2.0 min.
+  - **Off:** the owner's "not switched on" notice; the requester's `public.status` is `{available:false}`; no "Ask to connect" link; the request page shows "Not accepting requests" with no Send button.
+  - **On** (through `/__sim/switches`): request, accept, self-reported values and removal all work, with the database grants revoked.
+  - **Off again:** the switch is reset.
+- **Also passed:** the other server-path journeys (`:78`, `:111`, `:150`, `:188`).
+
+**Session A checked** [OBSERVED, `git show`]:
+- the test exists at `ee5b532:e2e/aaroh-server-paths.spec.ts:226` with that title;
+- the file sets `CONNECT_PUBLIC` through `/__sim/switches` (4 references).
+
+**Effect on the report:**
+- P3 is closed.
+- The recommendation stays **READY FOR REVIEW**. Release is still blocked by G1–G4 and G7, and by preview checks P1, P2 and P4.
