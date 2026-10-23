@@ -11,7 +11,7 @@
 | Responsible (R) | Session A (AAROH backend): implementation and evidence |
 | Consulted (C) | Data Owner, Security Owner (the same person); counsel through DEC-2026-017 |
 | Informed (I) | Session B (frontend) |
-| State | **PROPOSED: HUMAN DECISION REQUIRED.** The stage itself was approved (DEC-2026-038 Q13 = A). This record asks about the specific choices. Implemented locally (`test:connect` 16/16), listed as PROPOSED, NOT APPROVED in `test:admin-contract`. Not applied, pushed or deployed |
+| State | **APPROVED 2026-10-20, in session:** "Approve DEC-2026-039 Q1–Q7 as recommended in the record". Every recommendation is the behaviour 032 already has, so no code changed; the gates now list 032 as approved. Approval of the design is not approval to apply: 032 is L3, so the DEC-2026-018 24-hour cool-off and checklist review run first, then the release track. Not applied, pushed or deployed |
 
 ## Priority
 
@@ -80,6 +80,16 @@ Counsel review applies (DEC-2026-017).
 
 ## Decision
 
-Q1 ____ Q2 ____ Q3 ____ Q4 ____ Q5 ____ Q6 ____ Q7 ____
+**Approved by:** the repository owner (DEC-2026-018 Option B), in session. **Date:** 2026-10-20. **Words:** "Approve DEC-2026-039 Q1–Q7 as recommended in the record."
 
-**Approved by:** ________ **Date:** ________
+### Recorded decision
+
+| Q | Outcome | What it means now |
+|---|---|---|
+| Q1 | **A**: only signed-in SHYGON accounts may send a request | No guest path. A guest relay would need a new decision |
+| Q2 | **A**: `phone`, `email`, `company`, `job_title` from the sharer's own account profile, read live under an active grant, labelled self-reported | As built |
+| Q3 | **A**: the requester's grant starts with the request; decline, block or expiry revokes it | As built |
+| Q4 | **A**: a block is never revealed (shown to the requester as declined; a new request looks unavailable) | As built |
+| Q5 | **A**: 5 requests/hour and 20/day per requester; 50 open per target; 30-day decline cool-down; 30-day expiry; 180-day deletion of ended connections | As built |
+| Q6 | **A**: owner opt-in (default off); only a published, unsuspended Tap can be asked | As built |
+| Q7 | **A**: account deletion deletes the account's connections in both directions with their grants | As built; counsel review (DEC-2026-017) may revisit it |

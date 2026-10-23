@@ -193,6 +193,20 @@ jobs:
       - name: Connect and the consent ledger (local stack)
         run: npm run test:connect
 
+      # SHYGON Privé, demo only (migration 033): closed tables; every hotel and
+      # request is marked demo; requests, idempotency, limits, the simulator,
+      # cancel; only the demo hotel provider exists; no network call. Outbound
+      # network denied.
+      - name: Privé demo (local stack)
+        run: npm run test:prive
+
+      # B-9 (V6-124): the local host reports the visitor's address from the
+      # connection, never from a header the caller sends; the E2E simulator is
+      # opt-in, loopback-only and limited to RFC 5737 addresses. Outbound
+      # network denied.
+      - name: Local host visitor address (local stack)
+        run: npm run test:local-host
+
       # V6-051 (Stage 4): the admin edge functions' role checks against the
       # real admin tables; a customer cannot reach admin by editing their
       # token or metadata. Outbound network denied.

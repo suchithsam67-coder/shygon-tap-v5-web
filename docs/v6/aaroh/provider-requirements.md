@@ -31,6 +31,7 @@ Set them in the host's environment (Netlify and/or Vercel). **Never prefix them 
 | `SMS_STATUS_CALLBACK_URL` | Twilio delivery receipts | Exactly `https://<production host>/api/sms-status`. The signature is checked against this exact string, so it must match the public URL character for character. Without it, alerts stay `sent` (unconfirmed) |
 | `EMERGENCY_PUBLIC_ALERTS` | visitor-initiated emergency alerts | **Leave unset** (off) until DEC-2026-038 Q2. `on` enables them |
 | `RESCUE_RELAY` | the Return-to-Owner relay's finder side (`/api/rescue`) | **Leave unset** (off) until DEC-2026-038 Q12. `on` enables it. The relay needs no SMS provider: owner notices are in-app |
+| `HOTEL_PROVIDER` | SHYGON Privé (`/api/prive`) | **Leave unset** (or `demo`). Privé is demo-only (DEC-2026-038 Q6 → A); any other value makes `/api/prive` answer 503. No hotel credentials exist or are needed |
 | `CRON_SECRET` | `/api/emergency-dispatch` (it also runs the relay's retention) | A random value of 32 or more characters. The host's scheduler sends it as `Authorization: Bearer …`. Without it the sweep refuses to run, and retries happen only when the owner presses retry |
 
 ## 3. DLT (India): the template wording to register

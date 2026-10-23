@@ -123,6 +123,9 @@ for (const [u, n] of [[A, 1], [B, 2]]) {
     INSERT INTO public.rescue_audit (user_id, actor, action) VALUES ('${u}', 'owner', 'matrix.test');
     INSERT INTO public.connect_settings (user_id, enabled) VALUES ('${u}', true);
     INSERT INTO public.connect_audit (user_id, action) VALUES ('${u}', 'matrix.test');
+    INSERT INTO public.prive_demo_requests (id, user_id, hotel_id, service, idempotency_key)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000d${n}', '${u}', (SELECT id FROM public.prive_demo_hotels WHERE slug = 'demo-residence'), 'housekeeping', 'matrix-prive-key-000${n}');
+    INSERT INTO public.prive_demo_request_events (request_id, status, actor) VALUES ('1${n}000000-0000-4000-8000-0000000000d${n}', 'received', 'guest');
   `);
 }
 
@@ -203,11 +206,16 @@ const MODEL = {
   rescue_messages: { owner: `thread_id IN (SELECT id FROM public.rescue_threads WHERE owner_user_id = auth.uid())`, select: sel(NONE, NONE) },
   rescue_blocks: { owner: OWN('owner_user_id'), select: sel(NONE, NONE) },
   rescue_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
-  // Connect and the consent ledger (032, DEC-2026-039 PROPOSED): closed the same way.
+  // Connect and the consent ledger (032, DEC-2026-039, approved 2026-10-20): closed the same way.
   connect_settings: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   connections: { owner: OWN('requester_user_id'), select: sel(NONE, NONE) },
   consent_grants: { owner: OWN('grantor_user_id'), select: sel(NONE, NONE) },
   connect_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  // Privé, demo only (033, DEC-2026-040, approved 2026-10-20): closed the same way; even the
+  // sample catalogue is read through the server function only.
+  prive_demo_hotels: { owner: NONE, select: sel(NONE, NONE) },
+  prive_demo_requests: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  prive_demo_request_events: { owner: `request_id IN (SELECT id FROM public.prive_demo_requests WHERE user_id = auth.uid())`, select: sel(NONE, NONE) },
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };

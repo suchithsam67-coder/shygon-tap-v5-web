@@ -29,14 +29,14 @@ Nothing here is deployed. Production runs the V5 schema with drift (V6-106).
 | 1c | **Emergency Profile / Emergency Tap information view** | decided Q11 = B (no new backend) | | | | presentation of `public.status`; only action = 1b | hidden while 1b is off; never a contact detail |
 | 2 | **Return-to-Owner / SHYGON Rescue** (protected finder relay) | ✔ (local), APPROVED Q12, off until release | item lifecycle | | | 031, `/api/rescue`, `test:rescue` 18 | lost mode needs the card registry |
 | 3 | **Smart Identity / SHYGON ID** | account identity ✔ | customer-facing ID | | the ID's format | `customers.customer_id` (`CUST-…`), 021 identity contract 69 | D-9 (what the customer-facing ID is) |
-| 4 | **SHYGON Connect** | ✔ (local), 032 PROPOSED (DEC-2026-039) | guest requesters | | | 032, `/api/connect`, `test:connect` 16; stage approved by DEC-2026-038 Q13 | DEC-2026-039 Q1–Q7 |
+| 4 | **SHYGON Connect** | ✔ (local), APPROVED (DEC-2026-039, 2026-10-20) | guest requesters: not built, by decision (Q1 = A) | | | 032, `/api/connect`, `test:connect` 16 | release track; customer wording |
 | 5 | **Student Passport / Student Tap** | | | ✔ | | doc 10 Phase 2; minors' data | legal review DEC-2026-017 (hard gate) |
 | 6 | **SHYGON Verify** | | | ✔ | | doc 03 `credentials`, `verification_records`; doc 10 Phase 3 | issuers (organisations); DEC-037: an AAROH card is not a credential |
 | 7 | **Business Tap / professional profile** | ✔ (local) | | | | `get_public_profile`, Tap editor, add-ons, themes; public-tap 25, golden, identity, matrix | production parity (V6-106) |
 | 8 | **Event Tap** | | seasonal event themes ✔ | event mode | | `tap_event_themes` (admin-managed timed themes) | event-specific profile, attendees: Phase 2 |
 | 9 | **Info Tap / SHYGON Locations** | | | Locations ✔ (Phase 4) | **Info is undefined** | owner 10-16: "Business and Info first" | definition (DEC-038 Q7) |
 | 10 | **Access Tap** | | | gated (Phase 5) | | doc 10: pen-test, SDM hardware, legal | **Unsupported** for AAROH (DEC-037) |
-| 11 | **SHYGON Privé demo** | | | | | Q6 read as B: out of the launch | owner says "Privé demo-only" to change it |
+| 11 | **SHYGON Privé demo** | ✔ (local), demo only; APPROVED (DEC-2026-040, 2026-10-20) | | real hotel integrations: not built, by decision | | 033, `/api/prive`, `test:prive` 12 | release track; customer wording |
 | 12 | **Cloud Storage** | | | ✔ | | showroom Planned; storage bucket gaps V6-095/V6-108 | no design approved |
 
 Card lifecycle sits under every capability that a physical tap starts. It is partial for V5 cards (activation, OTP, replacement request) and BLOCKED for AAROH: no cards are sold, there is no registry, and `/d/` is not built (contract §3 P-4 and §7).
@@ -155,7 +155,7 @@ Undecided: which fields, whether any number is ever shown or only relayed, the t
 - **Tests.** `test:identity` 69.
 - **Gap.** The customer-facing SHYGON ID is undefined (D-9). Nothing new was built.
 
-### 4. SHYGON Connect (IMPLEMENTED locally, 032; choices PROPOSED in DEC-2026-039)
+### 4. SHYGON Connect (IMPLEMENTED locally, 032; APPROVED, DEC-2026-039)
 
 Built as described below, for signed-in accounts only. See contract §10b. The rest of this section is the original design note.
 
@@ -193,7 +193,10 @@ NOT IMPLEMENTED. DEC-038 Q7.
 
 Doc 10 Phase 5 gates: an independent pen-test, SDM hardware in the field, and legal review for physical access. DEC-037: an AAROH card is not an access credential.
 
-### 11. SHYGON Privé demo (BLOCKED: conflicting instructions)
+### 11. SHYGON Privé demo (IMPLEMENTED locally, demo only; 033, APPROVED, DEC-2026-040)
+
+Decided 2026-10-20: demo-only. Built as below, for signed-in accounts; see contract §10c. The rest of this section is the original design note.
+
 
 The conflict is DEC-038 Q6. If the owner chooses demo-only:
 - a `demo_` schema area holding SHYGON-owned sample hotels;
