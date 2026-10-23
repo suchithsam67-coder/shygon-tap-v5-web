@@ -148,7 +148,7 @@ Run on 2026-10-23, Node v20.18.0, in this worktree, with outbound network denied
 | P1 | On a preview of each host: the address-header check in `B-9_client-address-plan.md` §6 | Before `EMERGENCY_PUBLIC_ALERTS` or `RESCUE_RELAY` is turned on. Not needed for Connect. **BLOCKED (§11)** |
 | P2 | **PARTIAL (§11):** the local non-production equivalent passes 18/18; the hosted part is BLOCKED. On a preview with 032 applied to a **non-production** database and `CONNECT_PUBLIC` unset: `public.status` false; create, accept and share 404; decline, block, remove and the lists work; `publicAllowed` false. Then set `on`, redeploy, and confirm the behaviour returns | Confirms the default on the real host, and how quickly a change takes effect (§3, R2) |
 | P3 | Session B's e2e at `ee5b532` (the switch journey) | **Done (reported by Session B, 2026-10-23): 33 passed, 0 failed** (§10) |
-| P4 | `npm run test:payments:ci` under Node 22 | Clears the one BLOCKED functions-security check; Netlify builds with Node 22. **BLOCKED (§11): Node 22 is not installed** |
+| P4 | `npm run test:payments:ci` under Node 22 | Clears the one BLOCKED functions-security check; Netlify builds with Node 22. **Done 2026-10-23 (§11.3): Node v22.23.4, 15/15 and 14/14, 0 blocked** |
 
 ### 7.3 Remaining security and consent-flow risks
 
@@ -178,7 +178,7 @@ Run on 2026-10-23, Node v20.18.0, in this worktree, with outbound network denied
 | G9 | Fixing documentation items D1–D5 | **Done** (§9, `32a4ac9`) |
 | G10 | Migration 027 on the release branch (V6-123): move it to `supabase/proposed/` (Phase 0.5), so no release bundle contains it | Repository owner (who and when) |
 | G11 | The dependency-audit gate: bring in the lockfile fix `d6a0b46` (or an equivalent update) on the release branch, then re-run the audit and the component tests | Repository owner |
-| G12 | Node 22 for P4: permission to download the official `node-v22.23.4-win-x64.zip` (nodejs.org, 36 MB, checksum-verified), or install Node 22 yourself | Repository owner |
+| G12 | Node 22 for P4 | **Done**: the owner permitted the download on 2026-10-23 (§11.3) |
 | G13 | A non-production Supabase project for P2: create it, add it to `supabase/non-production-projects.json` (currently empty), and authorise applying 020–033 to it | Repository owner |
 | G14 | Preview deployments on the intended host(s) for P1 and P2, with their credentials; follows G3 | Repository owner |
 
@@ -304,6 +304,24 @@ Downloading needs the owner's permission (G12).
 
 **Once available:** run `<node22>/node.exe --version`, then `npm run test:payments:ci` with that Node first on `PATH`, and record both outputs.
 
+**Completed 2026-10-23 (P4 CLOSED)**, after the owner's permission: "Yes: download node-v22.23.4-win-x64.zip (36 MB) from nodejs.org into your scratchpad, verify it against SHASUMS256.txt, and run P4 with it. No system install, no PATH change outside that command."
+
+**Download** [OBSERVED]:
+- `https://nodejs.org/dist/latest-v22.x/node-v22.23.4-win-x64.zip` (35,604,229 bytes) and `SHASUMS256.txt`, saved to a new folder in Session A's scratch area;
+- **SHA-256 `cbc74b5e0982c9dbb41525fd8fb5dcd32fbee237863f7829072f4639a1ce5f20`, equal to the `SHASUMS256.txt` entry**;
+- the GPG signature of `SHASUMS256.txt` was not checked: the release keys were not downloaded. Integrity rests on HTTPS from nodejs.org plus the checksum;
+- extracted there. Nothing was installed, and the system Node (v20.18.0) and the user `PATH` are unchanged.
+
+**Runtime:** `node --version` → **v22.23.4**, resolved first on `PATH` for the test command only. `typeof WebSocket` → `function`.
+
+**Command.** The exact body of `npm run test:payments:ci`, run directly, because the archive's `npm` shell wrapper printed nothing under Git Bash:
+
+`node --import ./scripts/ci/deny-network.mjs netlify/tests/payments-and-sms.mjs && node --import ./scripts/ci/deny-network.mjs netlify/tests/functions-security.mjs`
+
+**Results:**
+- payments-and-sms: **15 passed, 0 failed** (exit 0);
+- functions-security: **14 passed, 0 failed, 0 blocked** (exit 0), including **"verify-payment refuses an unauthenticated caller — 401 — no session, no fulfilment"**, the check that was BLOCKED on Node 20.
+
 ### 11.4 Known failures, reconciled (none waived)
 
 **V6-123: `test:admin-contract` and migration 027**
@@ -377,7 +395,7 @@ Downloading needs the owner's permission (G12).
 **Unchanged.**
 - The B-10 change is **READY FOR REVIEW**.
 - Release is **BLOCKED**:
-  - P1 and P4 are blocked, and P2 is only partial (§11.1–11.3);
+  - P1 is blocked and P2 is only partial (§11.1–11.2). P4 is now closed (§11.3);
   - the dependency-audit gate fails (G11);
   - the decisions in §11.5 are open.
-- No gate was marked closed without evidence. P3 remains the only closed preview check.
+- No gate was marked closed without evidence. **P3 and P4 are closed**; P1 is blocked; P2 is partial.
