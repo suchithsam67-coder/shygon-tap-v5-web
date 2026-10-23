@@ -145,10 +145,10 @@ Run on 2026-10-23, Node v20.18.0, in this worktree, with outbound network denied
 
 | # | Check | Why |
 |---|---|---|
-| P1 | On a preview of each host: the address-header check in `B-9_client-address-plan.md` §6 | Before `EMERGENCY_PUBLIC_ALERTS` or `RESCUE_RELAY` is turned on. Not needed for Connect |
-| P2 | On a preview with 032 applied to a **non-production** database and `CONNECT_PUBLIC` unset: `public.status` false; create, accept and share 404; decline, block, remove and the lists work; `publicAllowed` false. Then set `on`, redeploy, and confirm the behaviour returns | Confirms the default on the real host, and how quickly a change takes effect (§3, R2) |
+| P1 | On a preview of each host: the address-header check in `B-9_client-address-plan.md` §6 | Before `EMERGENCY_PUBLIC_ALERTS` or `RESCUE_RELAY` is turned on. Not needed for Connect. **BLOCKED (§11)** |
+| P2 | **PARTIAL (§11):** the local non-production equivalent passes 18/18; the hosted part is BLOCKED. On a preview with 032 applied to a **non-production** database and `CONNECT_PUBLIC` unset: `public.status` false; create, accept and share 404; decline, block, remove and the lists work; `publicAllowed` false. Then set `on`, redeploy, and confirm the behaviour returns | Confirms the default on the real host, and how quickly a change takes effect (§3, R2) |
 | P3 | Session B's e2e at `ee5b532` (the switch journey) | **Done (reported by Session B, 2026-10-23): 33 passed, 0 failed** (§10) |
-| P4 | `npm run test:payments:ci` under Node 22 | Clears the one BLOCKED functions-security check; Netlify builds with Node 22 |
+| P4 | `npm run test:payments:ci` under Node 22 | Clears the one BLOCKED functions-security check; Netlify builds with Node 22. **BLOCKED (§11): Node 22 is not installed** |
 
 ### 7.3 Remaining security and consent-flow risks
 
@@ -175,7 +175,12 @@ Run on 2026-10-23, Node v20.18.0, in this worktree, with outbound network denied
 | G6 | Counsel review (DEC-2026-017; may revisit DEC-2026-039 Q7) | Repository owner → counsel |
 | G7 | Creating the remote and pushing; CI has never run remotely (B-4). Merge approvals for Session B's branch | Repository owner |
 | G8 | Optional: an emergency `publicAlertsAllowed` setting for symmetry (proposed in B-10 §1, not approved) | Repository owner |
-| G9 | Fixing documentation items D1–D5 | Repository owner (or Session A, on request) |
+| G9 | Fixing documentation items D1–D5 | **Done** (§9, `32a4ac9`) |
+| G10 | Migration 027 on the release branch (V6-123): move it to `supabase/proposed/` (Phase 0.5), so no release bundle contains it | Repository owner (who and when) |
+| G11 | The dependency-audit gate: bring in the lockfile fix `d6a0b46` (or an equivalent update) on the release branch, then re-run the audit and the component tests | Repository owner |
+| G12 | Node 22 for P4: permission to download the official `node-v22.23.4-win-x64.zip` (nodejs.org, 36 MB, checksum-verified), or install Node 22 yourself | Repository owner |
+| G13 | A non-production Supabase project for P2: create it, add it to `supabase/non-production-projects.json` (currently empty), and authorise applying 020–033 to it | Repository owner |
+| G14 | Preview deployments on the intended host(s) for P1 and P2, with their credentials; follows G3 | Repository owner |
 
 ## 8. Recommendation
 
@@ -196,6 +201,8 @@ Run on 2026-10-23, Node v20.18.0, in this worktree, with outbound network denied
 - the release-track items G4 and G7 are open.
 
 B-10 itself is a fail-closed lock. Shipping it exposes nothing, but it has nothing to protect until 032 is deployed.
+
+**Correction (2026-10-23, §11):** "every suite passes" above did not cover `npm audit --audit-level=high`, which was not run on 2026-10-23 before §11. It **fails** on this branch (§11.4). The recommendation is unchanged.
 
 ## 9. Follow-up 2026-10-23: documentation items D1–D5 fixed (owner request; docs only)
 
@@ -230,3 +237,147 @@ The recommendation in §8 is unchanged: **READY FOR REVIEW**.
 **Effect on the report:**
 - P3 is closed.
 - The recommendation stays **READY FOR REVIEW**. Release is still blocked by G1–G4 and G7, and by preview checks P1, P2 and P4.
+
+## 11. Gate-completion attempt (2026-10-23, owner request "Complete Remaining B-10 Release Gates")
+
+**State checked** [OBSERVED]:
+- branch `v6/aaroh-backend`, HEAD `398d40d`, working tree clean, no git remote;
+- P3's evidence is in §10.
+
+Nothing was pushed or deployed. No switch was enabled outside local test processes. No production system or database was used.
+
+### 11.1 P1: address header on host previews: **BLOCKED**
+
+[OBSERVED] The procedure (B-9 §6) needs a preview deployment on each host. This request excludes deploying, and on this machine:
+- no Netlify, Vercel or Supabase CLI is installed;
+- the branch has no remote;
+- the deploy target is undecided (V6-043);
+- no non-production database is registered (§11.2).
+
+**Needs:** G3, G13, G14. Then the owner, or Session A with explicit deploy authorisation, runs B-9 §6 on each host.
+
+### 11.2 P2: Connect on a non-production database: **PARTIAL (not closed)**
+
+**Local equivalent: done.** Session A, Node v20.18.0, outbound network denied. A walkthrough through the real `/api/connect` on the local stack, which is PGlite: a throwaway, non-production database.
+
+Command: `node --import ./scripts/ci/deny-network.mjs <scratch>/p2-local-walkthrough.mjs <repo>`. The script is in Session A's scratch area, not committed; its checks extend `test:connect`.
+
+Result: **18 passed, 0 failed**.
+
+| Phase | Check | Result |
+|---|---|---|
+| off | The owner turns Connect on; settings report it | `enabled=true publicAllowed=false` |
+| off | `public.status` | `available=false` |
+| off | A request | 404 `unavailable` |
+| on | Owner settings | `enabled=true publicAllowed=true` |
+| on | `public.status` | `available=true` |
+| on | A request shares exactly the chosen field | 201, `iShare=["company"]` |
+| on | The owner accepts, sharing back exactly the chosen field | `accepted` |
+| on | The requester reads the granted field live, self-reported | `email`, `self_reported` |
+| on | Consent ledger: one active grant from the owner | scope `["email"]` |
+| off | Widening the sharing | 404 `unavailable` |
+| off | Accepting a pending request | 404 `unavailable` |
+| off | No grant added by the refused calls | ledger rows unchanged (3) |
+| off | The existing grant stays readable until withdrawn (as approved, R3) | `email` |
+| off | Decline | `declined` |
+| off | Withdrawal (remove) | `removed`, `grantsRevoked=2` |
+| off | After withdrawal | `removed`, nothing readable |
+| off | Every grant on that connection, both directions | 0 active |
+| off | Owner settings report the host switch off | `publicAllowed=false` |
+
+**Hosted part: BLOCKED** [OBSERVED]:
+- `supabase/non-production-projects.json` lists **no** project, so there is no non-production Supabase database to apply 032 to;
+- applying 020–033 to one needs the owner's authorisation (DEC-2026-018);
+- a preview deployment is needed (G14);
+- the effect of switching on a real host (R2) cannot be measured locally.
+
+**Needs:** G13, G14. **P2 is not closed.**
+
+### 11.3 P4: functions-security under Node 22: **BLOCKED**
+
+[OBSERVED]
+- The only Node on this machine is `C:\Users\Suchith s\AppData\Local\Programs\node\node.exe`, **v20.18.0**. There is no nvm, Volta, fnm or nvs, and no other `node.exe` under Program Files or AppData\Local\Programs.
+- The blocked check is "verify-payment refuses an unauthenticated caller" (`netlify/tests/functions-security.mjs:152–156`). It needs native `WebSocket` for supabase-js, which is Node ≥ 22; `netlify.toml` pins Node 22.
+- The official build available is `node-v22.23.4-win-x64.zip`, 36 MB, from `https://nodejs.org/dist/latest-v22.x/` (listing dated 21-Oct-2026), with `SHASUMS256.txt` for verification.
+
+Downloading needs the owner's permission (G12).
+
+**Once available:** run `<node22>/node.exe --version`, then `npm run test:payments:ci` with that Node first on `PATH`, and record both outputs.
+
+### 11.4 Known failures, reconciled (none waived)
+
+**V6-123: `test:admin-contract` and migration 027**
+- **Evidence** [OBSERVED]:
+  - **This branch** has no 027 in `supabase/migrations/` or `supabase/proposed/`, and `test:admin-contract` passes **15/15** here (`npm run test:db`, §5).
+  - **Session B's `ee5b532`** has `supabase/migrations/027_aaroh_catalog.sql`, added by `99110f7` (the store lineage). Session B reports 14/15 there, reproduced on the unmodified store base `f0b771c`.
+  - B-10 (`34a482d`) does not touch 027.
+- **Recorded disposition** [OBSERVED]:
+  - DEC-2026-037 (owner, 2026-10-16): 027 is held aside, not applied or deployed until reviewed, and no contract approval may be recorded for it.
+  - Phase 0.5 moves it to `supabase/proposed/`.
+  - V6-123 says "Not waived".
+- **Still open:** G10. The release branch must not carry 027 in `migrations/`.
+
+**V6-014: the gitleaks history finding `9c8caa7`**
+- **Evidence** [OBSERVED]: `npm run test:secrets` (pinned gitleaks) → 1 finding, `src/components/ProjectConsultation.tsx:75`, value redacted (§5).
+- **Recorded disposition** [OBSERVED]:
+  - DEC-2026-020 was APPROVED by the owner on 2026-09-30 as a Web3Forms public-key exception.
+  - On 2026-10-02 the owner classified `9c8caa7` as an approved public-key reuse.
+  - `.gitleaksignore` is unchanged on purpose, so "the full-history scan stays red and visible".
+  - The release decision on the gate is DEC-2026-035 **D-7**, still **OPEN**.
+- **Still open:** D-7 (G4).
+
+**Dependency audit (`npm audit --audit-level=high`, part of `npm run ci`)**
+- **Evidence** [OBSERVED]: run on 2026-10-23 on this branch with npm 10.8.2 → **exit 1**. Totals: 1 high, 2 moderate, 1 low, 0 critical.
+
+  | Package | Severity | Direct? | Advisory |
+  |---|---|---|---|
+  | vite | high | direct | launch-editor advisories, incl. GHSA-698v-4r3x-3vcv |
+  | vitest | moderate | direct | via `@vitest/mocker` |
+  | @vitest/mocker | moderate | indirect | GHSA-qxg6-89mg-rqv8 and a Windows path traversal |
+  | esbuild | low | indirect | GHSA-g7r4-m6w7-qqqr, dev server on Windows |
+
+  All have fixes available.
+- [INFERRED] All four are build, dev-server or test tooling, not code in the production bundle.
+- **Fix available, not merged:** `d6a0b46` on `claude/eloquent-yonath-5ffadc` (parent `9fd7a89`; another session).
+  - It is lockfile-only: vite 7.3.7, vitest 4.1.12, esbuild 0.28.2.
+  - **Neither `v6/aaroh-backend` nor Session B's branch contains it.**
+  - That session's notes record an npm 10.8.2/10.9.9 install crash, the lockfile-safe workaround, and a pre-existing component-test timeout flake under load.
+- **Recorded disposition:** none; no waiver exists.
+- **Still open:** G11.
+
+### 11.5 Outstanding release-track decisions (complete list)
+
+| # | Decision |
+|---|---|
+| G1 | DEC-2026-018 review of 020–033 |
+| G2 | Production capture and rebaseline (V6-106), including the page-template drift |
+| G3 | Deploy target (V6-043) |
+| G4 | B-1 rotation and D-7 (the secret-scan gate) |
+| G5 | Verifying the Connect workflows, setting `CONNECT_PUBLIC=on`, and the customer wording |
+| G6 | Counsel review (DEC-2026-017) |
+| G7 | Remote, push, the first remote CI run, and merge approvals (including which branch is the release candidate) |
+| G8 | Optional emergency `publicAlertsAllowed` |
+| G10 | 027 off the release branch |
+| G11 | Dependency-audit fix |
+| G12 | Node 22 |
+| G13 | A non-production Supabase project |
+| G14 | Preview deployments |
+
+**Broader V6 release items** recorded elsewhere, beyond B-10:
+- live payments (B-3);
+- the SMS provider, DLT templates and sender ID (DEC-2026-038 Q3), with the supervised smoke test;
+- the sweep schedule and `CRON_SECRET`;
+- showroom wording (Q10);
+- DEC-2026-035 D-3, D-8, D-9, D-11, D-12;
+- the corporate site's future (V6-107);
+- the mode model (DEC-2026-041, PROPOSED).
+
+### 11.6 Verdict
+
+**Unchanged.**
+- The B-10 change is **READY FOR REVIEW**.
+- Release is **BLOCKED**:
+  - P1 and P4 are blocked, and P2 is only partial (§11.1–11.3);
+  - the dependency-audit gate fails (G11);
+  - the decisions in §11.5 are open.
+- No gate was marked closed without evidence. P3 remains the only closed preview check.
