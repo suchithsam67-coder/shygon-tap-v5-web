@@ -29,7 +29,7 @@ Nothing here is deployed. Production runs the V5 schema with drift (V6-106).
 | 1c | **Emergency Profile / Emergency Tap information view** | decided Q11 = B (no new backend) | | | | presentation of `public.status`; only action = 1b | hidden while 1b is off; never a contact detail |
 | 2 | **Return-to-Owner / SHYGON Rescue** (protected finder relay) | ✔ (local), APPROVED Q12, off until release | item lifecycle | | | 031, `/api/rescue`, `test:rescue` 18 | lost mode needs the card registry |
 | 3 | **Smart Identity / SHYGON ID** | account identity ✔ | customer-facing ID | | the ID's format | `customers.customer_id` (`CUST-…`), 021 identity contract 69 | D-9 (what the customer-facing ID is) |
-| 4 | **SHYGON Connect** | ✔ (local), APPROVED (DEC-2026-039, 2026-10-20) | guest requesters: not built, by decision (Q1 = A) | | | 032, `/api/connect`, `test:connect` 16 | release track; customer wording |
+| 4 | **SHYGON Connect** | ✔ (local), APPROVED (DEC-2026-039, 2026-10-20); **off by host switch** `CONNECT_PUBLIC` (amendment A-1, built 2026-10-23) | guest requesters: not built, by decision (Q1 = A) | | | 032, `/api/connect`, `test:connect` 17 | release track; customer wording; the owner sets `CONNECT_PUBLIC=on` only after verifying the connection and consent workflows |
 | 5 | **Student Passport / Student Tap** | | | ✔ | | doc 10 Phase 2; minors' data | legal review DEC-2026-017 (hard gate) |
 | 6 | **SHYGON Verify** | | | ✔ | | doc 03 `credentials`, `verification_records`; doc 10 Phase 3 | issuers (organisations); DEC-037: an AAROH card is not a credential |
 | 7 | **Business Tap / professional profile** | ✔ (local) | | | | `get_public_profile`, Tap editor, add-ons, themes; public-tap 25, golden, identity, matrix | production parity (V6-106) |
@@ -157,7 +157,16 @@ Undecided: which fields, whether any number is ever shown or only relayed, the t
 
 ### 4. SHYGON Connect (IMPLEMENTED locally, 032; APPROVED, DEC-2026-039)
 
-Built as described below, for signed-in accounts only. See contract §10b. The rest of this section is the original design note.
+Built as described below, for signed-in accounts only. See contract §10b.
+
+**Since 2026-10-23 (B-10, DEC-2026-039 amendment A-1):** Connect is public only where the host sets `CONNECT_PUBLIC=on`; it is unset everywhere by default.
+- While off, `public.status` is false and creating, accepting or widening a connection answers 404 `unavailable` before any database call.
+- Decline, block, remove and the lists always work.
+- Settings report `publicAllowed`.
+
+Evidence: `test:connect` 17 and `docs/v6/aaroh/B-10_release-readiness.md`.
+
+The rest of this section is the original design note.
 
 
 - **Actor · Trigger.** A visitor (signed in, or a guest who enters details voluntarily) requests to connect from `/t/<slug>`. The owner accepts or declines; either side may revoke.

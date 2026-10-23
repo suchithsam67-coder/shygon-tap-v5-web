@@ -1,8 +1,8 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.7.1
+# SHYGON AAROH backend API contract — AAROH-API v0.7.2
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.7.1** (2026-10-23). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`; changes in §13. v0.8 is reserved for the mode model (DEC-2026-041), which is not approved. DEC-2026-038, -039 and -040 are **APPROVED**. |
+| Contract version | **AAROH-API v0.7.2** (2026-10-23, editorial). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`; changes in §13. v0.8 is reserved for the mode model (DEC-2026-041), which is not approved. DEC-2026-038, -039 and -040 are **APPROVED**. |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
 | Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040); none applied anywhere. 027 is held aside (DEC-2026-037). |
@@ -455,7 +455,10 @@ Two **signed-in** SHYGON accounts connect. Each side chooses what it shares from
   - `requests.create`, `requests.accept` and `connections.share` answer **404 `unavailable`**, before sign-in is checked (so an anonymous `requests.create` gets 404 rather than 401);
   - `requests.decline`, `requests.block`, `connections.remove`, `connections.list`, `consents.list` and the settings always work, so consent can always be withdrawn;
   - `settings.get` / `settings.set` report `publicAllowed: false`.
-- **Status:** LIVE-LOCAL, **APPROVED** (DEC-2026-038 Q13; DEC-2026-039 Q1–Q7 as built, 2026-10-20). A Connect control may ship with the first production release that contains 032. Its customer wording is the owner's to approve, as for Q10.
+- **Status:** LIVE-LOCAL, **APPROVED** (DEC-2026-038 Q13; DEC-2026-039 Q1–Q7 as built, 2026-10-20; amendment A-1 approved 2026-10-20).
+  - A Connect control may ship with the first production release that contains 032.
+  - Connect becomes visible to visitors only when the owner, after verifying the connection and consent workflows, has the host set `CONNECT_PUBLIC=on` (A-1). Until then it stays off.
+  - Its customer wording is the owner's to approve, as for Q10.
 
 | op | Auth | Request | Success | Errors |
 |---|---|---|---|---|
@@ -604,6 +607,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.7.2 | 2026-10-23 | Editorial: §10b's **Status** line now says what its host-switch bullet already said. Connect is visible to visitors only once the owner has `CONNECT_PUBLIC=on` set (A-1). No operation, request or response changed. | None. |
 | v0.7.1 | 2026-10-23 | **B-10** (owner-approved, DEC-2026-039 amendment A-1): §10b host switch `CONNECT_PUBLIC`. While off, `public.status` is false and `requests.create` / `requests.accept` / `connections.share` answer 404 `unavailable` (create also for an anonymous caller). Decline, block, remove and the lists always work. `settings` gain `publicAllowed`. **B-9:** visitor emergency alerts and finder starts use only the header named by `TRUSTED_CLIENT_IP_HEADER` (no shape change). The local host sets the visitor address itself and offers the opt-in `x-shygon-sim-client` hook. `/__sim/switches` accepts `CONNECT_PUBLIC`. | Show the Connect card only when `public.status` is true (already the case). On the signed-in request page, check `public.status` before offering the form. Show "not yet available" when `publicAllowed` is false. A 404 on accept or share is a refusal, never success. E2E: a browser-sent `x-nf-client-connection-ip` no longer has any effect on the stack; use the sim header with `STACK_SIM_CLIENT_ADDRESS=1` for distinct visitors, and switch `CONNECT_PUBLIC` on through `/__sim/switches` for Connect journeys. |
 | v0.7 | 2026-10-20 | DEC-2026-040 approved: every Privé demo choice as built; 033 listed as approved. No operation, request or response changed. | None beyond v0.6: the public walkthrough stays client-only (Q1 = A); signed-in demo requests use §10c; show the notice. |
 | v0.6 | 2026-10-20 | Privé demo-only (owner's word, DEC-2026-038 Q6 → A): §10c `/api/prive` (migration 033, PROPOSED in DEC-2026-040); the sweep also runs the demo desk and its retention. No earlier operation changed. | Your demo may switch on and use §10c for signed-in accounts. Keep the public showroom walkthrough client-only (DEC-2026-040 Q1). Show the `notice` with every Privé result; never write "the hotel" for the simulator. |

@@ -140,7 +140,7 @@ The rules enforced by this design:
 
 ## 8. Required provider configuration
 
-`docs/v6/aaroh/provider-requirements.md`: `SMS_PROVIDER` plus credentials, three DLT templates for MSG91, `SMS_STATUS_CALLBACK_URL` for Twilio receipts, `CRON_SECRET` and a schedule, and `EMERGENCY_PUBLIC_ALERTS` (keep it unset). **BLOCKED** until a human provides them.
+`docs/v6/aaroh/provider-requirements.md`: `SMS_PROVIDER` plus credentials, three DLT templates for MSG91, `SMS_STATUS_CALLBACK_URL` for Twilio receipts, `CRON_SECRET` and a schedule, and `EMERGENCY_PUBLIC_ALERTS` (keep it unset). Since 2026-10-20/23 it also lists `RESCUE_RELAY` and `CONNECT_PUBLIC` (both unset), and `TRUSTED_CLIENT_IP_HEADER` (per host; set before either visitor switch). **BLOCKED** until a human provides them.
 
 ## 9. Code and schema changes (completed on this branch, uncommitted until the gate)
 
@@ -242,3 +242,16 @@ Three problems found during the runs were real and are fixed, not worked around:
 **After that, the release track.** None of it is Session A's to do: B-1 rotation, the rebaseline with the owner's fresh dump, the DEC-2026-018 review of 020–032, the deploy target and the sweep schedule, then `scripts/release/emergency-smoke.mjs` on production.
 
 Nothing touches production until that track has cleared its own gate.
+
+## 15. Update 2026-10-23: B-9 and B-10 (local; nothing pushed or deployed)
+
+Sections 9, 10, 13 and 14 above record the state on 2026-10-20 and are kept as written.
+
+| Item | State | Evidence |
+|---|---|---|
+| B-9 Part A: the local host reports the visitor address | Built `f1a2548` (owner-approved) | `test:local-host` 9; negative control in the B-9 doc §5 |
+| B-9 Part B: only the host's own address header (`TRUSTED_CLIENT_IP_HEADER`, fail-closed) | Built `298667a` (owner-approved, 2026-10-20) | `test:emergency` 49 (A2); negative control in the B-9 doc §6. **Preview check on each host: the owner's action** |
+| B-10: Connect host switch `CONNECT_PUBLIC` (DEC-2026-039 amendment A-1) | Built `34a482d` (approved 2026-10-20, built 2026-10-23) | `test:connect` **17**; negative control (2 checks fail against the previous function) |
+| Contract | AAROH-API v0.7.1, then v0.7.2 (editorial) | `api-contract.md` §13 |
+| Release readiness of B-10 | **READY FOR REVIEW**; release blocked by the release track | `docs/v6/aaroh/B-10_release-readiness.md` (`40247c5`) |
+| Modes / Info | DEC-2026-041 revision 3, PROPOSED (conditional direction; not implementation approval) | DEC-2026-041 |

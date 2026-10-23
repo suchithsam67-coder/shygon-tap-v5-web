@@ -196,3 +196,15 @@ Run on 2026-10-23, Node v20.18.0, in this worktree, with outbound network denied
 - the release-track items G4 and G7 are open.
 
 B-10 itself is a fail-closed lock. Shipping it exposes nothing, but it has nothing to protect until 032 is deployed.
+
+## 9. Follow-up 2026-10-23: documentation items D1–D5 fixed (owner request; docs only)
+
+| # | Fix |
+|---|---|
+| D1 | `capability-matrix.md` row 4 and §4: the host switch and `test:connect` 17. `backend-audit.md`: §8 lists the new settings; a dated §15 records B-9 and B-10, leaving the 2026-10-20 sections as written |
+| D2 | `api-contract.md` §10b Status line names the switch. Published as **AAROH-API v0.7.2 (editorial)**: no operation, request or response changed |
+| D3 | `B-10_connect-switch-proposal.md` §3: "published as AAROH-API v0.7.1" |
+| D4 | DEC-2026-039 A-1, `DECISIONS.md` and the B-10 status: approved **2026-10-20 15:46 UTC (21:16 IST)**, per the session transcript; built 2026-10-23 |
+| D5 | `.env.example`: a new AAROH section lists every setting, all commented out and unset, with pointers to `provider-requirements.md` and the B-9 preview check. No value added |
+
+The recommendation in §8 is unchanged: **READY FOR REVIEW**.
