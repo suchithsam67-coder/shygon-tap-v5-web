@@ -6,7 +6,7 @@ import Connections from './Connections';
 import ConnectRequest from './ConnectRequest';
 import { DEFAULT_THEME } from '../lib/database.types';
 
-/** SHYGON Connect pages against AAROH-API v0.4 §10b response shapes, with the network replaced at `fetch`. */
+/** SHYGON Connect pages against AAROH-API v0.7.1 §10b response shapes, with the network replaced at `fetch`. */
 
 vi.mock('../lib/supabase', () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'me' } } }) } },
@@ -28,7 +28,14 @@ type Reply = { status: number; body: unknown };
 let handler: (op: string, body: Record<string, unknown>) => Reply;
 const calls: Record<string, unknown>[] = [];
 
-const settings = { enabled: true, publicTapPublished: true, pendingIncoming: 1, connections: 1, shareableFields: ['phone', 'email', 'company', 'job_title'] };
+const settings = {
+  enabled: true,
+  publicTapPublished: true,
+  pendingIncoming: 1,
+  connections: 1,
+  shareableFields: ['phone', 'email', 'company', 'job_title'],
+  publicAllowed: true,
+};
 const conn = (over = {}) => ({
   id: 'k1',
   direction: 'incoming',
@@ -43,13 +50,15 @@ const conn = (over = {}) => ({
   ...over,
 });
 const base = (op: string): Reply =>
-  op === 'settings.get'
-    ? { status: 200, body: { settings } }
-    : op === 'connections.list'
-      ? { status: 200, body: { connections: [conn(), conn({ id: 'k2', status: 'accepted', direction: 'outgoing', other: { name: 'Meera', tapSlug: null }, iShare: ['email'], theyShare: { phone: { value: '+91 98000 00002', provenance: 'self_reported' } } })] } }
-      : op === 'consents.list'
-        ? { status: 200, body: { consents: [] } }
-        : { status: 500, body: { error: { code: 'unexpected', message: `unexpected ${op}` } } };
+  op === 'public.status'
+    ? { status: 200, body: { available: true } }
+    : op === 'settings.get'
+      ? { status: 200, body: { settings } }
+      : op === 'connections.list'
+        ? { status: 200, body: { connections: [conn(), conn({ id: 'k2', status: 'accepted', direction: 'outgoing', other: { name: 'Meera', tapSlug: null }, iShare: ['email'], theyShare: { phone: { value: '+91 98000 00002', provenance: 'self_reported' } } })] } }
+        : op === 'consents.list'
+          ? { status: 200, body: { consents: [] } }
+          : { status: 500, body: { error: { code: 'unexpected', message: `unexpected ${op}` } } };
 
 beforeEach(() => {
   calls.length = 0;
@@ -127,6 +136,27 @@ describe('asking to connect', () => {
     expect(await screen.findByText('This Tap is not available.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Send request/ })).toBeNull();
   });
+
+  it('Connect switched off (SHYGON or the owner): reached by its address, the page offers no form and sends nothing', async () => {
+    handler = (op) => (op === 'public.status' ? { status: 200, body: { available: false } } : base(op));
+    ask();
+    expect(await screen.findByRole('heading', { name: 'Not accepting requests' })).toBeTruthy();
+    expect(screen.getByText('Asha Rao is not accepting connection requests right now. Nothing was sent.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Back to Asha Rao’s Tap' }).getAttribute('href')).toBe('/t/asha');
+    expect(screen.queryByRole('button', { name: /Send request/ })).toBeNull();
+    expect(calls.filter((c) => c.op === 'public.status')).toEqual([{ op: 'public.status', slug: 'asha' }]);
+    expect(calls.filter((c) => c.op === 'requests.create')).toHaveLength(0);
+  });
+
+  it('switched off between the check and the press: the 404 is a refusal, never "Request sent"', async () => {
+    handler = (op) =>
+      op === 'requests.create' ? { status: 404, body: { error: { code: 'unavailable', message: 'Connecting is not available for this profile.' } } } : base(op);
+    ask();
+    await screen.findByRole('heading', { level: 1, name: 'Connect with Asha Rao' });
+    fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
+    expect(await screen.findByText('Asha Rao is not accepting connection requests right now.')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Request sent' })).toBeNull();
+  });
 });
 
 describe('the connections page', () => {
@@ -171,6 +201,40 @@ describe('the connections page', () => {
     inbox();
     expect(await screen.findByText('Your session has expired. Sign in again.')).toBeTruthy();
     expect(screen.queryByText('No connections yet.')).toBeNull();
+  });
+
+  it('while SHYGON has Connect switched off, the page says so; an accept or a share change it refuses is shown as refused', async () => {
+    handler = (op) =>
+      op === 'settings.get'
+        ? { status: 200, body: { settings: { ...settings, publicAllowed: false } } }
+        : op === 'requests.accept' || op === 'connections.share'
+          ? { status: 404, body: { error: { code: 'unavailable', message: 'Connecting is not available for this profile.' } } }
+          : base(op);
+    inbox();
+    expect(await screen.findByTestId('connect-not-switched-on')).toBeTruthy();
+    expect(screen.getByTestId('connect-not-switched-on').textContent).toMatch(/SHYGON has not switched Connect on yet/);
+
+    const request = screen.getByText('Ravi Kumar').closest('div')!.parentElement as HTMLElement;
+    fireEvent.click(within(request).getByRole('button', { name: /Accept/ }));
+    const refused = 'SHYGON has not switched Connect on yet, so nothing new can be shared. You can still decline, block or remove.';
+    expect((await screen.findByRole('alert')).textContent).toBe(refused);
+    // Still waiting for an answer: nothing was accepted.
+    expect(within(request).getByRole('button', { name: /Accept/ })).toBeTruthy();
+    expect(calls.filter((c) => c.op === 'requests.accept')).toHaveLength(1);
+
+    // Sharing more with someone already connected is refused the same way, and nothing is shown as saved.
+    const card = screen.getByText('Meera').closest('div')!.parentElement as HTMLElement;
+    fireEvent.click(within(card).getByLabelText('Mobile number'));
+    fireEvent.click(within(card).getByRole('button', { name: 'Save what you share' }));
+    await waitFor(() => expect(calls.filter((c) => c.op === 'connections.share')).toHaveLength(1));
+    expect((await screen.findByRole('alert')).textContent).toBe(refused);
+    expect(within(card).getByRole('button', { name: 'Save what you share' })).toBeTruthy();
+  });
+
+  it('once SHYGON has switched Connect on, there is no such notice', async () => {
+    inbox();
+    await screen.findByText('Ravi Kumar');
+    expect(screen.queryByTestId('connect-not-switched-on')).toBeNull();
   });
 
   it('expired: a request nobody answered in 30 days is listed as expired, with nothing shared', async () => {

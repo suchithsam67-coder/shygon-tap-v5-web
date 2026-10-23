@@ -2,7 +2,12 @@ import { supabase } from '../lib/supabase';
 
 /**
  * SHYGON Connect and the consent ledger, `POST /api/connect`
- * (AAROH-API v0.4 §10b; choices approved in DEC-2026-039).
+ * (AAROH-API v0.7.1 §10b; choices approved in DEC-2026-039).
+ *
+ * Connect is public only where SHYGON's host switch is on (amendment A-1).
+ * While it is off, nobody can ask, and accepting or sharing more is refused
+ * (404 `unavailable`); declining, blocking, removing and the lists always work,
+ * so consent can always be withdrawn. `settings.publicAllowed` says which.
  *
  * Two signed-in accounts connect. Each side chooses what it shares from its
  * own account (phone, email, company, job title). The other side reads those
@@ -44,6 +49,8 @@ export interface ConnectSettings {
   pendingIncoming: number;
   connections: number;
   shareableFields: ShareField[];
+  /** Whether SHYGON has switched Connect on for this host (v0.7.1); anything but true reads as off. */
+  publicAllowed?: boolean;
 }
 
 export interface Consent {

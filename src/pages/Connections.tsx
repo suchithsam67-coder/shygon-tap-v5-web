@@ -27,15 +27,25 @@ import {
 } from '../services/connect';
 
 /**
- * SHYGON Connect for the signed-in owner (AAROH-API v0.4 §10b): the opt-in,
+ * SHYGON Connect for the signed-in owner (AAROH-API v0.7.1 §10b): the opt-in,
  * requests to answer, the people connected and what each side shares, and the
  * consent record. `/shygontap/connections` is where `connect` notifications
  * point. Every list is the server's; nothing changes on screen until the
  * server confirms it. Shared details are always marked self-reported.
+ * While SHYGON has not switched Connect on (`publicAllowed`), the page says so;
+ * an accept or a share change the server refuses for that reason is shown as a
+ * refusal, never as done.
  */
 
 const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
-const messageOf = (error: unknown) => (error instanceof ConnectError ? error.message : 'Something went wrong. Please try again.');
+/** Accept and share are the only operations here that answer `unavailable`: the host switch is off. */
+const NOT_SWITCHED_ON = 'SHYGON has not switched Connect on yet, so nothing new can be shared. You can still decline, block or remove.';
+const messageOf = (error: unknown) =>
+  error instanceof ConnectError
+    ? error.code === 'unavailable'
+      ? NOT_SWITCHED_ON
+      : error.message
+    : 'Something went wrong. Please try again.';
 
 type Load =
   | { kind: 'loading' }
@@ -124,6 +134,12 @@ export default function Connections() {
                 choose what to share back, if anything.
                 {!settings.publicTapPublished && ' Your Tap is not published, so nobody can ask yet.'}
               </p>
+              {settings.publicAllowed !== true && (
+                <p data-testid="connect-not-switched-on">
+                  SHYGON has not switched Connect on yet, so nobody can ask, even while this is on. Accepting a request or sharing
+                  more also waits until then; declining, blocking and removing always work.
+                </p>
+              )}
             </div>
           </div>
           <div className="panel-body">

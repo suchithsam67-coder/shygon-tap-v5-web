@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Handshake } from 'lucide-react';
 import { AppShell } from '../components/app/AppShell';
 import { ErrorState, Skeleton } from '../components/app/States';
+import { fetchConnectAvailable } from '../lib/publicConnectClient';
 import { fetchPublicProfile } from '../lib/publicTapClient';
 import {
   ALL_FIELDS,
@@ -16,10 +17,15 @@ import {
 } from '../services/connect';
 
 /**
- * Asking to connect with the owner of a Tap (AAROH-API v0.4 §10b
+ * Asking to connect with the owner of a Tap (AAROH-API v0.7.1 §10b
  * `requests.create`). The requester is signed in; they choose exactly which of
  * their own account details to share, and nothing is shared until they press
  * Send. The owner decides what, if anything, to share back.
+ *
+ * The form is offered only when `public.status` says the owner can be asked:
+ * reached by its address while Connect is off (SHYGON's switch or the owner's),
+ * the page says the owner is not accepting requests, the same answer whatever
+ * the reason. The server refuses a request either way.
  */
 
 function refusal(error: ConnectError, name: string): string {
@@ -44,6 +50,7 @@ export default function ConnectRequest() {
   const [name, setName] = useState<string | null>(null);
   const [mine, setMine] = useState<ShareField[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [closed, setClosed] = useState(false);
   const [share, setShare] = useState<ShareField[]>([]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -53,14 +60,15 @@ export default function ConnectRequest() {
 
   useEffect(() => {
     let live = true;
-    Promise.all([fetchPublicProfile(slug), getConnectSettings()]).then(
-      ([profile, { settings }]) => {
+    Promise.all([fetchPublicProfile(slug), getConnectSettings(), fetchConnectAvailable(slug)]).then(
+      ([profile, { settings }, available]) => {
         if (!live) return;
         if (!profile) {
           setLoadError('This Tap is not available.');
           return;
         }
         setName(profile.displayName?.trim() || 'the owner');
+        setClosed(!available);
         setMine(settings.shareableFields ?? []);
       },
       (failure) => live && setLoadError(failure instanceof ConnectError ? failure.message : 'We could not load this page.'),
@@ -102,6 +110,21 @@ export default function ConnectRequest() {
           <div className="panel" style={{ padding: 24 }}>
             <Skeleton height={140} radius={18} />
           </div>
+        ) : closed ? (
+          <section className="panel" aria-live="polite">
+            <div className="panel-head">
+              <Handshake size={19} aria-hidden="true" />
+              <div>
+                <h2>Not accepting requests</h2>
+                <p>{name} is not accepting connection requests right now. Nothing was sent.</p>
+              </div>
+            </div>
+            <div className="panel-body">
+              <Link className="btn btn-ghost btn-sm" to={`/t/${slug}`}>
+                Back to {name}’s Tap
+              </Link>
+            </div>
+          </section>
         ) : sent ? (
           <section className="panel" aria-live="polite">
             <div className="panel-head">

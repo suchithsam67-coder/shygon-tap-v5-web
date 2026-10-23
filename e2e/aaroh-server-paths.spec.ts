@@ -223,23 +223,44 @@ test('return to owner: a finder writes, the owner replies in the inbox, the find
   await finder.close();
 });
 
-test('connect: a signed-in visitor asks from the Tap, the owner accepts, details are self-reported, removal revokes the grants', async ({ page, browser }) => {
+test('connect: a signed-in visitor asks from the Tap, the owner accepts, details are self-reported, removal revokes the grants', async ({ page, browser, request: sim }) => {
+  // SHYGON's host switch (B-10, CONNECT_PUBLIC) starts off, as on every deployment.
+  await sim.post('/__sim/switches', { data: { CONNECT_PUBLIC: false } });
   const { owner, slug } = await publishedOwner('Connect Owner');
   const requester = await apiCustomer('Connect Requester');
   const db = server();
 
-  // The owner opts in (default off).
+  // The owner opts in (default off). SHYGON has not switched Connect on, and the page says so.
   await signIn(page, owner.email, owner.password);
   await page.goto('/shygontap/connections');
   await expect(page.getByText(/Off\. Only signed-in SHYGON accounts can ask/)).toBeVisible();
   await page.getByRole('button', { name: 'Turn on' }).click();
   await expect(page.getByText(/^On\. Only signed-in SHYGON accounts can ask/)).toBeVisible();
+  await expect(page.getByTestId('connect-not-switched-on')).toBeVisible();
 
-  // The requester, signed in, taps the owner's card and asks, sharing their email.
+  // While it is off, the owner's opt-in alone exposes nothing: no card on the Tap,
+  // and the request page, reached by its address, offers no form.
   const context = await browser.newContext();
   await stayLocal(context);
   const other = await context.newPage();
   await signIn(other, requester.email, requester.password);
+  const offStatus = other.waitForResponse((r) => r.url().endsWith('/api/connect') && (r.request().postData() ?? '').includes('public.status'));
+  await other.goto(`/t/${slug}`);
+  expect(await (await offStatus).json()).toEqual({ available: false });
+  await other.keyboard.press('Escape');
+  await expect(other.getByRole('heading', { level: 1, name: 'Connect Owner' })).toBeVisible();
+  await expect(other.getByRole('link', { name: /Ask to connect/ })).toHaveCount(0);
+  await other.goto(`/shygontap/connect/${slug}`);
+  await expect(other.getByRole('heading', { name: 'Not accepting requests' })).toBeVisible();
+  await expect(other.getByRole('button', { name: /Send request/ })).toHaveCount(0);
+
+  // SHYGON switches Connect on: the notice goes, and the requester can ask from the Tap.
+  await sim.post('/__sim/switches', { data: { CONNECT_PUBLIC: true } });
+  await page.reload();
+  await expect(page.getByText(/^On\. Only signed-in SHYGON accounts can ask/)).toBeVisible();
+  await expect(page.getByTestId('connect-not-switched-on')).toHaveCount(0);
+
+  // The requester, signed in, taps the owner's card and asks, sharing their email.
   await other.goto(`/t/${slug}`);
   await other.keyboard.press('Escape');
   await other.getByRole('link', { name: /Ask to connect/ }).click();
@@ -271,4 +292,5 @@ test('connect: a signed-in visitor asks from the Tap, the owner accepts, details
   const { data: grants } = await db.from('consent_grants').select('revoked_at').eq('grantor_user_id', requester.userId);
   expect(grants!.length).toBeGreaterThan(0);
   expect(grants!.every((g) => g.revoked_at !== null)).toBe(true);
+  await sim.post('/__sim/switches', { data: { CONNECT_PUBLIC: false } });
 });

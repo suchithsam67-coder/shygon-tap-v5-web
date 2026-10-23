@@ -1,9 +1,11 @@
 /**
- * Whether a Tap's owner accepts SHYGON Connect requests (AAROH-API v0.4 §10b
- * `public.status`). Anonymous: that is the only Connect operation a visitor
- * can call. Sending a request needs a signed-in SHYGON account, so the public
- * Tap only links to the signed-in page that does it. Plain fetch, like the
- * other public clients; any failure reads as "not available".
+ * Whether a Tap's owner accepts SHYGON Connect requests (AAROH-API v0.7.1 §10b
+ * `public.status`): false while SHYGON's host switch is off, whatever the owner
+ * chose. Anonymous: that is the only Connect operation a visitor can call.
+ * Sending a request needs a signed-in SHYGON account, so the public Tap only
+ * links to the signed-in page that does it, and that page asks again before
+ * offering its form. Plain fetch, like the other public clients; any failure
+ * reads as "not available".
  */
 export async function fetchConnectAvailable(slug: string): Promise<boolean> {
   try {

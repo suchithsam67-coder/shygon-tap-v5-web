@@ -1,6 +1,6 @@
 # SHYGON AAROH V6: frontend ↔ backend integration map
 
-Session B (frontend), 2026-10-19/20. This maps every visible control on the AAROH surfaces to the backend operation behind it. Contract: Session A's `docs/v6/aaroh/api-contract.md`, **AAROH-API v0.7**, from `v6/aaroh-backend`. `d1ff25d` (v0.4) was merged in `8358495`; `26eecd9` (v0.5–v0.7: Connect approved, the Privé demo 033, B-9 Part A) was merged in `3adf1f5`. No frontend page calls `/api/prive` yet: the Privé demo stays off.
+Session B (frontend), 2026-10-19/20. This maps every visible control on the AAROH surfaces to the backend operation behind it. Contract: Session A's `docs/v6/aaroh/api-contract.md`, **AAROH-API v0.7.1**, from `v6/aaroh-backend`. `d1ff25d` (v0.4) was merged in `8358495`; `26eecd9` (v0.5–v0.7: Connect approved, the Privé demo 033, B-9 Part A) was merged in `3adf1f5`; `34a482d` (v0.7.1: B-9 Part B, the B-10 Connect host switch) was merged in `bd3a85e`. No frontend page calls `/api/prive` yet: the Privé demo stays off.
 
 Two vocabularies, kept apart:
 - **Engineering status** (this file and the reports only):
@@ -63,7 +63,7 @@ None in this app. The admin UI is the external Expo app. `admin_list_emergency_e
 
 | # | Need | From | State, 2026-10-19 |
 |---|---|---|---|
-| B-1 | AAROH-API committed | Session A | **Done**: v0.1 `c8b869d` → v0.4 `d1ff25d` (merged, `8358495`) → v0.7 at `26eecd9` (merged, `3adf1f5`) |
+| B-1 | AAROH-API committed | Session A | **Done**: v0.1 `c8b869d` → v0.4 `d1ff25d` (merged, `8358495`) → v0.7 at `26eecd9` (merged, `3adf1f5`) → v0.7.1 at `34a482d` (merged, `bd3a85e`) |
 | B-2 | SPA rewrites in `netlify.toml` / `vercel.json` | Session A | **Done**: page routing is Session B's; four rewrites added |
 | B-3 | `public.status` once per page view | Session A | **Confirmed** |
 | B-4 | A way for browser e2e to turn on the SMS stand-in and the two host switches on the running stack | Session A | **Done** in v0.4 (`/__sim/sms/*`, `/__sim/switches`); used by `e2e/aaroh-server-paths.spec.ts` |
@@ -71,5 +71,5 @@ None in this app. The admin UI is the external Expo app. `admin_list_emergency_e
 | B-6 | Which Privé instruction stands (FE-D5 vs Q6) | Owner | **Decided:** demo only (Q6 → A, DEC-2026-040 approved; 033 merged). Still off (`PRIVE_DEMO`) until its wording is approved |
 | B-7 | Connect, consent ledger | Session A | **Done** (v0.4; DEC-2026-039 approved); UI built; wording approved; "Coming soon" until verified |
 | B-9 | The local app host should add the client-address header the real hosts add (`x-nf-client-connection-ip`), or visitor `public.alert` and `public.start` fail closed in a browser | Session A (`supabase/local/app-host.mjs`) | **Done locally** (Part A, `f1a2548`, owner-approved): the host sets the address from the connection and drops any address header a browser sends. The e2e visitors now use `x-shygon-sim-client` with `STACK_SIM_CLIENT_ADDRESS=1`. Part B (which header production trusts, V6-126) is not approved |
-| B-10 | `/api/connect` has no host switch, so on any host with 032 an owner can expose Connect while it reads "Coming soon" | Session A (`CONNECT_PUBLIC`) | **Proposed** (`docs/v6/aaroh/B-10_connect-switch-proposal.md`, V6-125); audit approved, implementation not. Frontend after approval: show `publicAllowed`; the request page checks `public.status` first |
+| B-10 | `/api/connect` had no host switch, so on any host with 032 an owner could expose Connect while it reads "Coming soon" | Session A (`CONNECT_PUBLIC`) | **Done** (v0.7.1, `34a482d`; DEC-2026-039 amendment A-1, owner-approved). Off by default: `public.status` false; create, accept and share 404 `unavailable`; decline, block, remove and the lists always work; `settings.publicAllowed`. Frontend: the request page asks `public.status` before offering its form; Connections says when SHYGON has not switched Connect on; a refused accept or share reads as refused. The Connect e2e checks it off, then switches it on |
 | B-8 | SMS provider credentials and DLT templates; the host switches in production | Owner / operator | BLOCKED |
