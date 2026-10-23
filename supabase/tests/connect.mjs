@@ -77,6 +77,8 @@ await db.close();
 // ---------------------------------------------------------------------------
 t.section('B. Over HTTP on the local stack');
 const stack = await startStack();
+// The host switch (B-10) is on for these checks; one check below turns it off.
+process.env.CONNECT_PUBLIC = 'on';
 const bodies = [];
 const call = async (body, token) => {
   const r = await callFunction(stack, 'connect', { token, body });
@@ -106,9 +108,53 @@ await t.check('Connect is off by default; anon may only ask whether it is availa
   const off = await call({ op: 'requests.create', slug: SLUG, idempotencyKey: key(), share: [] }, ben.token);
   assertEqual([off.status, codeOf(off)], [404, 'unavailable'], 'owner has Connect off');
   const on = await call({ op: 'settings.set', enabled: true }, asha.token);
-  assertEqual(on.body.settings.enabled, true, 'enabled');
+  assertEqual([on.body.settings.enabled, on.body.settings.publicAllowed], [true, true], 'enabled; the host allows it');
   assertEqual((await call({ op: 'public.status', slug: SLUG })).body.available, true, 'available');
   return 'opt-in';
+});
+
+await t.check('host switch off (CONNECT_PUBLIC unset): nothing starts or widens; decline, block, remove and the lists still work', async () => {
+  const fay = await signUp(stack, { name: 'Fay Owner' });
+  const gus = await signUp(stack, { name: 'Gus Requester' });
+  const hal = await signUp(stack, { name: 'Hal Requester' });
+  const jo = await signUp(stack, { name: 'Jo Requester' });
+  const ivy = await signUp(stack, { name: 'Ivy Requester' });
+  await stack.query(`INSERT INTO public.tap_profiles (user_id, customer_id, slug, username, display_name, status)
+    VALUES ($1, (SELECT id FROM public.customers WHERE user_id = $1), 'fay-connect', 'fay-connect', 'Fay Owner', 'active')`, [fay.userId]);
+  await call({ op: 'settings.set', enabled: true }, fay.token);
+  const ask = async (u) => (await call({ op: 'requests.create', slug: 'fay-connect', idempotencyKey: key(), share: ['company'] }, u.token)).body.connection.id;
+  const pendingGus = await ask(gus);
+  const pendingJo = await ask(jo);
+  const accepted = await ask(hal);
+  assertEqual((await call({ op: 'requests.accept', connectionId: accepted, share: ['email'] }, fay.token)).status, 200, 'accepted while public');
+  delete process.env.CONNECT_PUBLIC;
+  try {
+    assertEqual((await call({ op: 'public.status', slug: 'fay-connect' })).body.available, false, 'status, though the owner has Connect on');
+    const settings = (await call({ op: 'settings.get' }, fay.token)).body.settings;
+    assertEqual([settings.enabled, settings.publicAllowed], [true, false], 'the owner can see why');
+    const ledger = async () => (await call({ op: 'consents.list' }, fay.token)).body.consents.length;
+    const before = await ledger();
+    const locked = [
+      ['create', { op: 'requests.create', slug: 'fay-connect', idempotencyKey: key(), share: [] }, ivy.token],
+      ['create, anonymous', { op: 'requests.create', slug: 'fay-connect', idempotencyKey: key(), share: [] }, undefined],
+      ['accept', { op: 'requests.accept', connectionId: pendingGus, share: ['phone'] }, fay.token],
+      ['share', { op: 'connections.share', connectionId: accepted, share: ['phone', 'email'] }, fay.token],
+    ];
+    for (const [label, body, token] of locked) {
+      const r = await call(body, token);
+      assertEqual([r.status, codeOf(r)], [404, 'unavailable'], label);
+    }
+    assertEqual(await ledger(), before, 'no grant was added');
+    const list = (await call({ op: 'connections.list' }, fay.token)).body.connections;
+    assertEqual(list.find((c) => c.id === pendingGus).status, 'requested', 'the refused accept changed nothing');
+    assertEqual((await call({ op: 'requests.decline', connectionId: pendingGus }, fay.token)).body.connection.status, 'declined', 'decline');
+    assertEqual((await call({ op: 'requests.block', connectionId: pendingJo }, fay.token)).status, 200, 'block');
+    const removed = await call({ op: 'connections.remove', connectionId: accepted }, hal.token);
+    assertEqual([removed.status, removed.body.removed], [200, true], 'remove (withdrawal is never blocked)');
+  } finally {
+    process.env.CONNECT_PUBLIC = 'on';
+  }
+  return 'fail-closed (B-10, DEC-2026-039 A-1)';
 });
 
 let conn;

@@ -86,7 +86,7 @@ const PROVIDER_SETTINGS = [
   'TWILIO_AUTH_TOKEN', 'TWILIO_FROM', 'TWILIO_MESSAGING_SERVICE_SID', 'SHIPROCKET_EMAIL', 'SHIPROCKET_PASSWORD',
   'OTP_DEV_MODE', 'ALLOW_LIVE_PAYMENTS_LOCALLY', 'VITE_SUPABASE_URL', 'SMS_STATUS_CALLBACK_URL', 'CRON_SECRET',
   'MSG91_EMERGENCY_VERIFY_TEMPLATE_ID', 'MSG91_EMERGENCY_OWNER_TEMPLATE_ID', 'MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID',
-  'EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY', 'MSG91_DLR_SECRET', 'HOTEL_PROVIDER',
+  'EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY', 'CONNECT_PUBLIC', 'MSG91_DLR_SECRET', 'HOTEL_PROVIDER',
 ];
 
 /**
@@ -120,6 +120,9 @@ export async function startStack({
   };
   setEnv('SUPABASE_URL', gatewayUrl);
   setEnv('SUPABASE_SERVICE_ROLE_KEY', secrets.serviceRoleKey);
+  // The app host plays Netlify's edge (B-9 Part A), so the functions trust
+  // Netlify's address header here, as a Netlify deploy must be told to (Part B).
+  setEnv('TRUSTED_CLIENT_IP_HEADER', 'x-nf-client-connection-ip');
   setEnv('RAZORPAY_KEY_ID', secrets.razorpayKeyId);
   setEnv('RAZORPAY_KEY_SECRET', secrets.razorpayKeySecret);
   setEnv('RAZORPAY_WEBHOOK_SECRET', secrets.razorpayWebhookSecret);
@@ -141,7 +144,7 @@ export async function startStack({
   });
   const restoreFetch = installFetchRouter(sim, sms);
   // Browser E2E control (/__sim/sms/*, /__sim/switches): the host switches only.
-  const SWITCHES = ['EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY'];
+  const SWITCHES = ['EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY', 'CONNECT_PUBLIC'];
   const control = {
     sms,
     useSms: (provider, options) => useSms(provider, options),

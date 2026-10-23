@@ -16,6 +16,8 @@
 import { createLiveDb, createMigratedDb, newMigrations } from './lib/live-db.mjs';
 import { startStack } from '../local/stack.mjs';
 import { assert, assertEqual, callFunction, createHarness, signUp, supabaseClient } from '../local/testkit.mjs';
+import { clientAddress, TRUSTED_CLIENT_IP_HEADERS } from '../../netlify/lib/client-address.mjs';
+import { visitorDigest } from '../../netlify/lib/emergency.mjs';
 
 const t = createHarness('Emergency contacts and alerts (029) and the Tap column guard (030)');
 
@@ -421,6 +423,38 @@ await after030.close();
 await db.close();
 
 // ---------------------------------------------------------------------------
+t.section('A2. The trusted client address (B-9 Part B, V6-126)');
+
+await t.check('clientAddress: only the header TRUSTED_CLIENT_IP_HEADER names; no fallback; unset or anything else refuses', async () => {
+  const saved = process.env.TRUSTED_CLIENT_IP_HEADER;
+  const req = (headers) => new Request('https://shygon.example/api/emergency', { headers });
+  const all = { 'x-nf-client-connection-ip': '192.0.2.1', 'x-vercel-forwarded-for': '192.0.2.2', 'x-real-ip': '192.0.2.3', 'x-forwarded-for': '192.0.2.4' };
+  const at = (setting, headers) => {
+    if (setting === undefined) delete process.env.TRUSTED_CLIENT_IP_HEADER;
+    else process.env.TRUSTED_CLIENT_IP_HEADER = setting;
+    return clientAddress(req(headers));
+  };
+  try {
+    assertEqual(at('x-nf-client-connection-ip', all), '192.0.2.1', 'Netlify');
+    assertEqual(at('x-vercel-forwarded-for', all), '192.0.2.2', 'Vercel: a visitor-sent Netlify header is ignored');
+    assertEqual(at('X-Vercel-Forwarded-For', { 'x-vercel-forwarded-for': '192.0.2.9, 10.0.0.1' }), '192.0.2.9', 'name case; first entry');
+    assertEqual(at('x-nf-client-connection-ip', { 'x-vercel-forwarded-for': '192.0.2.2', 'x-real-ip': '192.0.2.3', 'x-forwarded-for': '192.0.2.4' }),
+      null, 'no fallback to another header');
+    for (const setting of [undefined, '', 'x-forwarded-for', 'x-real-ip', 'on']) assertEqual(at(setting, all), null, `refused: ${JSON.stringify(setting)}`);
+    assertEqual(at('x-nf-client-connection-ip', { 'x-nf-client-connection-ip': '  ' }), null, 'blank');
+    process.env.TRUSTED_CLIENT_IP_HEADER = 'x-vercel-forwarded-for';
+    const visitor = (forged) => visitorDigest('s', req({ 'x-vercel-forwarded-for': '192.0.2.2', 'x-nf-client-connection-ip': forged }), '2026-10-20');
+    assert(typeof visitor('192.0.2.50') === 'string' && visitor('192.0.2.50') === visitor('192.0.2.51'), 'a forged Netlify header changes the visitor on Vercel');
+    delete process.env.TRUSTED_CLIENT_IP_HEADER;
+    assertEqual(visitorDigest('s', req(all), '2026-10-20'), null, 'unset: no visitor, so the caller refuses');
+  } finally {
+    if (saved === undefined) delete process.env.TRUSTED_CLIENT_IP_HEADER;
+    else process.env.TRUSTED_CLIENT_IP_HEADER = saved;
+  }
+  return `${TRUSTED_CLIENT_IP_HEADERS.join(' or ')}; fail-closed`;
+});
+
+// ---------------------------------------------------------------------------
 t.section('B. Over HTTP on the local stack (real functions, SMS stand-in)');
 
 const stack = await startStack();
@@ -739,6 +773,13 @@ await t.check('visitor alert: relay only, owner told in-app, 15-minute and per-v
   assertEqual(codeOf(noConfirm), 'confirm_required', 'without confirmation');
   const noIp = await api({ op: 'public.alert', slug: 'asha-rao', idempotencyKey: newKey(), confirm: true }, { ip: '' });
   assertEqual(codeOf(noIp), 'unavailable', 'no client address from the host');
+  delete process.env.TRUSTED_CLIENT_IP_HEADER;
+  try {
+    const unconfigured = await api({ op: 'public.alert', slug: 'asha-rao', idempotencyKey: newKey(), confirm: true }, { ip: '198.51.100.23' });
+    assertEqual([unconfigured.status, codeOf(unconfigured)], [404, 'unavailable'], 'a host without TRUSTED_CLIENT_IP_HEADER (B-9 Part B)');
+  } finally {
+    process.env.TRUSTED_CLIENT_IP_HEADER = 'x-nf-client-connection-ip';
+  }
   const before = sms.messages.length;
   const r = await call({ op: 'public.alert', slug: 'asha-rao', idempotencyKey: newKey(), confirm: true }, { ip: '198.51.100.20' });
   assertEqual([r.status, r.body.outcome], [202, 'sent'], JSON.stringify(r.body));
@@ -882,8 +923,9 @@ await t.check('B-4: the /__sim control routes drive the running stack the way a 
   const got = await call({ op: 'alerts.get', eventId: alert.body.event.id }, { token: owner.token });
   assertEqual(got.body.event.status, 'delivered', 'delivered through the route');
   const before = (await sim('POST', '/__sim/switches', {})).body;
+  assertEqual(Object.keys(before).sort(), ['CONNECT_PUBLIC', 'EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY'], 'the host switches');
   const on = (await sim('POST', '/__sim/switches', { RESCUE_RELAY: true, SOMETHING_ELSE: true })).body;
-  assertEqual(on, { ...before, RESCUE_RELAY: true }, 'only the two named switches exist');
+  assertEqual(on, { ...before, RESCUE_RELAY: true }, 'only the named switches exist');
   await sim('POST', '/__sim/switches', { RESCUE_RELAY: before.RESCUE_RELAY });
   return 'provider, scenarios, code, receipt, switches';
 });
