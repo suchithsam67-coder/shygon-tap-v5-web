@@ -29,6 +29,10 @@ export default defineConfig({
   },
   webServer: {
     command: 'node supabase/local/serve.mjs',
+    // The local host reports the visitor's address from the connection (B-9);
+    // journeys that need distinct visitors name them with x-shygon-sim-client,
+    // which the host honours only with this flag (documentation addresses only).
+    env: { STACK_SIM_CLIENT_ADDRESS: '1' },
     url: `${APP}/shygontap`,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,

@@ -1,6 +1,6 @@
 # SHYGON AAROH V6: frontend ↔ backend integration map
 
-Session B (frontend), 2026-10-19/20. This maps every visible control on the AAROH surfaces to the backend operation behind it. Contract: Session A's `docs/v6/aaroh/api-contract.md`, **AAROH-API v0.5**, merged here (uncommitted) from `v6/aaroh-backend` @ `d1ff25d` (v0.4; v0.5 `f1d2af1` changed no shapes, only decision records).
+Session B (frontend), 2026-10-19/20. This maps every visible control on the AAROH surfaces to the backend operation behind it. Contract: Session A's `docs/v6/aaroh/api-contract.md`, **AAROH-API v0.7**, from `v6/aaroh-backend`. `d1ff25d` (v0.4) was merged in `8358495`; `26eecd9` (v0.5–v0.7: Connect approved, the Privé demo 033, B-9 Part A) was merged in `3adf1f5`. No frontend page calls `/api/prive` yet: the Privé demo stays off.
 
 Two vocabularies, kept apart:
 - **Engineering status** (this file and the reports only):
@@ -63,12 +63,13 @@ None in this app. The admin UI is the external Expo app. `admin_list_emergency_e
 
 | # | Need | From | State, 2026-10-19 |
 |---|---|---|---|
-| B-1 | AAROH-API committed | Session A | **Done**: v0.1 `c8b869d` → v0.4 `d1ff25d` merged here, uncommitted; v0.5 `f1d2af1` is records only |
+| B-1 | AAROH-API committed | Session A | **Done**: v0.1 `c8b869d` → v0.4 `d1ff25d` (merged, `8358495`) → v0.7 at `26eecd9` (merged, `3adf1f5`) |
 | B-2 | SPA rewrites in `netlify.toml` / `vercel.json` | Session A | **Done**: page routing is Session B's; four rewrites added |
 | B-3 | `public.status` once per page view | Session A | **Confirmed** |
 | B-4 | A way for browser e2e to turn on the SMS stand-in and the two host switches on the running stack | Session A | **Done** in v0.4 (`/__sim/sms/*`, `/__sim/switches`); used by `e2e/aaroh-server-paths.spec.ts` |
-| B-5 | Owner approval of the Q10 customer wording | Owner | Draft: `docs/v6/aaroh/showroom-copy-Q10-draft.md` |
-| B-6 | Which Privé instruction stands (FE-D5 vs Q6) | Owner | Open; the demo is built and switched off |
-| B-7 | Connect, consent ledger | Session A | **Done** (v0.4); UI built; wording in the Q10 draft §2a awaits the owner |
-| B-9 | The local app host should add the client-address header the real hosts add (`x-nf-client-connection-ip`), or visitor `public.alert` and `public.start` fail closed in a browser | Session A (`supabase/local/app-host.mjs`) | **Open.** Found 2026-10-20; the message could not be delivered (Session A not running). Workaround in the e2e: the test sets the header on the visitor's context, as the CDN would |
+| B-5 | Owner approval of the Q10 customer wording | Owner | **Approved 2026-10-20** for Emergency Profile, Return to Owner and SHYGON Connect: `docs/v6/aaroh/showroom-copy-Q10-draft.md` |
+| B-6 | Which Privé instruction stands (FE-D5 vs Q6) | Owner | **Decided:** demo only (Q6 → A, DEC-2026-040 approved; 033 merged). Still off (`PRIVE_DEMO`) until its wording is approved |
+| B-7 | Connect, consent ledger | Session A | **Done** (v0.4; DEC-2026-039 approved); UI built; wording approved; "Coming soon" until verified |
+| B-9 | The local app host should add the client-address header the real hosts add (`x-nf-client-connection-ip`), or visitor `public.alert` and `public.start` fail closed in a browser | Session A (`supabase/local/app-host.mjs`) | **Done locally** (Part A, `f1a2548`, owner-approved): the host sets the address from the connection and drops any address header a browser sends. The e2e visitors now use `x-shygon-sim-client` with `STACK_SIM_CLIENT_ADDRESS=1`. Part B (which header production trusts, V6-126) is not approved |
+| B-10 | `/api/connect` has no host switch, so on any host with 032 an owner can expose Connect while it reads "Coming soon" | Session A (`CONNECT_PUBLIC`) | **Proposed** (`docs/v6/aaroh/B-10_connect-switch-proposal.md`, V6-125); audit approved, implementation not. Frontend after approval: show `publicAllowed`; the request page checks `public.status` first |
 | B-8 | SMS provider credentials and DLT templates; the host switches in production | Owner / operator | BLOCKED |

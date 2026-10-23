@@ -165,9 +165,10 @@ test('visitor relay: with the host switch on and the owner opted in, a visitor a
   await stayLocal(visitor.context());
   // The host (Netlify, Vercel) tells the function the visitor's address; the
   // server keys its per-visitor limits on it and refuses without it. The local
-  // app host does not add it yet (asked of Session A), so the test supplies it,
-  // as the CDN would.
-  await visitor.context().setExtraHTTPHeaders({ 'x-nf-client-connection-ip': '203.0.113.21' });
+  // host sets it from the connection and drops any address header a browser
+  // sends (B-9); this visitor gets its own documentation address through the
+  // stack's opt-in simulator (STACK_SIM_CLIENT_ADDRESS=1, playwright.config.ts).
+  await visitor.context().setExtraHTTPHeaders({ 'x-shygon-sim-client': '203.0.113.21' });
   await visitor.goto(`/t/${slug}`);
   await visitor.getByRole('button', { name: /Alert their contacts/ }).click();
   await expect(visitor.getByRole('heading', { level: 1, name: 'Emergency Profile' })).toBeVisible();
@@ -195,8 +196,8 @@ test('return to owner: a finder writes, the owner replies in the inbox, the find
 
   const finder = await browser.newPage();
   await stayLocal(finder.context());
-  // The host's client-address header, as in the visitor relay above.
-  await finder.context().setExtraHTTPHeaders({ 'x-nf-client-connection-ip': '203.0.113.22' });
+  // The finder's own simulated address, as for the visitor relay above.
+  await finder.context().setExtraHTTPHeaders({ 'x-shygon-sim-client': '203.0.113.22' });
   await finder.goto(`/t/${slug}`);
   await finder.getByRole('button', { name: /Message the owner/ }).click();
   await expect(finder.getByText('The owner’s note: “A reward is offered”')).toBeVisible();
