@@ -399,3 +399,90 @@ Downloading needs the owner's permission (G12).
   - the dependency-audit gate fails (G11);
   - the decisions in §11.5 are open.
 - No gate was marked closed without evidence. **P3 and P4 are closed**; P1 is blocked; P2 is partial.
+
+## 12. Gate-closure directive (2026-10-23): baseline, G11, previews, decision register
+
+**Baseline** [OBSERVED]:
+- `v6/aaroh-backend` at `0d1f223`; working tree clean; no git remote.
+- No `CLAUDE.md` or `AGENTS.md` in the repository. Governance is `docs/DECISIONS.md` and the DEC records. Under DEC-2026-018 Option B the repository owner holds every governance role, and L3 changes need a 24-hour cool-off plus a checklist.
+- `node_modules` is a real directory in this worktree, not shared with other sessions.
+- **Contract:** AAROH-API v0.7.2 (editorial). `git diff 34a482d 0d1f223` touches no code (`netlify/`, `api/`, `supabase/`, `src/`, `scripts/`, manifests), so **no implementation change is required**.
+- **Attribution:** P3 is Session B's run (§10). P4 is Session A's run (§11.3).
+
+**Nothing was pushed, deployed, installed or enabled.** No production system, database or credential was used.
+
+### 12.1 G11 (dependency audit): **frontend branch fixed (reported); this branch open, DEC-2026-042 PROPOSED**
+
+- **Before:** `npm audit --audit-level=high` on this branch → exit 1 (1 high, 2 moderate, 1 low), recorded in §11.4.
+  - `package-lock.json` is unchanged since then (clean tree), so that evidence still applies.
+  - **Not re-run in this pass.**
+- **Fix:** `d6a0b46` (lockfile only): vite 7.3.5→7.3.7, vitest and `@vitest/*` 4.1.11→4.1.12, esbuild and 26 platform packages 0.27.7→0.28.2.
+  - All inside the declared ranges. vite 7.3.7 itself declares `esbuild ^0.27.0 || ^0.28.0`.
+  - **This branch's lockfile is identical to `d6a0b46`'s parent** [OBSERVED], so it applies unchanged.
+- **Frontend branch:** merged as `1e7e07d`, lockfile identical to `d6a0b46` [OBSERVED].
+  - [REPORTED] Owner approval and after-fix evidence, from the commit messages: audit 0; vitest 98/98; e2e 33/33; every gate except V6-123 and V6-014.
+- **This branch:** not changed. Following the DEC-2026-021 precedent, Session A wrote **DEC-2026-042** (option A: cherry-pick `d6a0b46`, then run the full regression here) and stopped for approval.
+
+### 12.2 Previews, P1 and P2: **BLOCKED on approvals AP-1–AP-6**
+
+`docs/v6/aaroh/preview-infrastructure-plan.md` holds:
+- the hosts (Netlify and Vercel until V6-043 is decided);
+- what exists (no remote, no CLIs, no non-production project);
+- the configuration matrix, with `CONNECT_PUBLIC` and `TRUSTED_CLIENT_IP_HEADER` per host;
+- the isolation checks and the execution outline;
+- approval requests AP-1–AP-6.
+
+Creating a project or an externally reachable preview needs those approvals, so **P1 has no host result and P2 has no hosted result.** Both stay open. P2's local equivalent (18/18, §11.2) does not close it.
+
+### 12.3 Decision register
+
+The approver is always the repository owner, in the role shown (DEC-2026-018 Option B).
+
+| # | Decision required | Options (evidence) | Main risk | Role | Blocks |
+|---|---|---|---|---|---|
+| G1 | DEC-2026-018 cool-off and checklist for migrations 020–033 | Run it now, or after the rebaseline (G2) | Unreviewed L3 schema reaching a real database | Data Owner / Security Owner | Any real database, including AP-3 unless you exempt non-production |
+| G2 | Fresh production capture and rebaseline (V6-106), including the page-family drift | Provide the dump; then adopt or revert the drift | Migrations written against a stale schema | Data Owner | Production schema work; DEC-2026-041 BQ-1 |
+| G3 | Deploy target (V6-043) | Netlify or Vercel (both configured) | P1 must run on both until chosen | Release Owner | P1 scope; AP-4 |
+| G4 | B-1 rotation; DEC-2026-035 **D-7** (secret-scan gate) | Keep the gate red under DEC-2026-020's approved exception, or add the single fingerprint to `.gitleaksignore` (a gate change, which needs approval); history rewrite is not allowed | A red gate masking a new finding, or an ignore list growing | Security Owner | Release |
+| G5 | Whether and when to set `CONNECT_PUBLIC=on`; the customer wording | After the hosted P2 and the workflow review | Exposing Connect before the hosted proof | Product Owner | Enabling Connect |
+| G6 | Counsel review (DEC-2026-017) | Engage counsel | Third-party contact data (emergency, Connect) | Data Owner | Launch of those features |
+| G7 | Remote, push, first CI run; merge plan; **which branch is the release candidate** | The frontend branch (contains the backend up to `34a482d` plus the audit fix) or a merge of both tips | CI has never run remotely | Release Owner | Git-linked previews (AP-4); remote CI |
+| G8 | Optional emergency `publicAlertsAllowed` | Approve or drop | None; cosmetic symmetry | Product Owner | Nothing |
+| G10 | 027 off the release branch (V6-123) | Move it to `supabase/proposed/` (Phase 0.5) on the frontend branch | 027 entering a release bundle | Data Owner / Engineering Owner | The release bundle |
+| G11 | DEC-2026-042 | A (recommended), B or C | A red CI gate on this branch | Engineering Owner | A green `npm run ci` here |
+| G13 | Non-production Supabase project (AP-2, AP-3) | Create and allowlist it | Accidental production use; prevented by the allowlist and ref check | Data Owner | P2 hosted |
+| G14 | Previews and protection (AP-4–AP-6) | Per host, with access protection | An exposed preview; prevented by protection and test data only | Release Owner / Security Owner | P1; P2 hosted |
+| Done | G9 (D1–D5), G12 (Node 22) | — | — | — | — |
+
+### 12.4 Known findings, re-verified 2026-10-23 [OBSERVED]
+
+- **V6-123 / 027:**
+  - absent on this branch (`migrations/` and `proposed/`: 0);
+  - **present at the frontend tip `1e7e07d`** (`supabase/migrations/027_aaroh_catalog.sql`);
+  - disposition: DEC-2026-037 hold-aside, **not waived**; G10 open.
+- **V6-014:**
+  - pinned gitleaks: 80 commits scanned, **1 finding**, `9c8caa7` `src/components/ProjectConsultation.tsx:75` (redacted);
+  - disposition: DEC-2026-020's approved exception, with the gate red by design;
+  - **D-7 open (G4)**; not waived.
+
+### 12.5 Final checks
+
+| Check | Result |
+|---|---|
+| P3 / P4 attributed to the session that ran them | Yes (§10, §11.3) |
+| G11 has an evidence-backed disposition | Yes: fixed on the frontend branch (reported); DEC-2026-042 proposed for this branch |
+| P1 has a result per intended host | **No: blocked** (G3, G14) |
+| P2 has a hosted non-production result | **No: blocked** (G13, G14) |
+| 027 and secret findings have dispositions | Yes (§12.4) |
+| Contract and implementation consistent | Yes: no code change since `34a482d`; v0.7.2 is editorial |
+| Production configuration or data changed | No |
+| Secrets or test artifacts committed | No: this pass commits only documents (`.e2e`, `playwright-report`, `test-results`, `dist` are ignored; scratch files stay outside the repository) |
+
+### 12.6 Verdict
+
+**B-10: READY FOR REVIEW. Release: BLOCKED.**
+- P1 is blocked and P2 hosted is blocked, on approvals AP-1–AP-6;
+- G11 is open on this branch, pending DEC-2026-042;
+- G1–G7, G10, G13 and G14 are open.
+
+No release approval is claimed.
