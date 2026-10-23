@@ -1,4 +1,5 @@
 import { requestLog } from '../lib/log.mjs';
+import { env } from '../lib/sms.mjs';
 import { config, currentUser, DbError, isUuid, rpc } from '../lib/emergency.mjs';
 
 /**
@@ -21,7 +22,16 @@ import { config, currentUser, DbError, isUuid, rpc } from '../lib/emergency.mjs'
  *
  * Shared values are self-reported account fields: nothing verifies them.
  * Errors: { error: { code, message, retryAfter? } }.
+ *
+ * Connect is public only where the host sets CONNECT_PUBLIC=on (B-10,
+ * DEC-2026-039 amendment A-1). Unset, as everywhere by default: public.status
+ * answers false, and requests.create, requests.accept and connections.share
+ * answer 404 unavailable, so no connection starts and no sharing widens. Decline,
+ * block, remove and the lists always work, so consent can always be withdrawn;
+ * settings report publicAllowed.
  */
+const publicAllowed = () => env('CONNECT_PUBLIC') === 'on';
+const LOCKED_WHILE_NOT_PUBLIC = new Set(['requests.create', 'requests.accept', 'connections.share']);
 
 const ERRORS = {
   unauthenticated: [401, 'Please sign in to connect.'],
@@ -76,10 +86,12 @@ async function connectionOf(cfg, userId, id) {
 }
 
 const OPS = {
-  'settings.get': async (cfg, user) => json({ settings: await rpc(cfg, 'connect_settings_for', { p_user: user.id }) }),
+  'settings.get': async (cfg, user) =>
+    json({ settings: { ...(await rpc(cfg, 'connect_settings_for', { p_user: user.id })), publicAllowed: publicAllowed() } }),
   'settings.set': async (cfg, user, body) => {
     if (typeof body.enabled !== 'boolean') return fail('invalid_setting');
-    return json({ settings: await rpc(cfg, 'connect_settings_set', { p_user: user.id, p_enabled: body.enabled }) });
+    const settings = await rpc(cfg, 'connect_settings_set', { p_user: user.id, p_enabled: body.enabled });
+    return json({ settings: { ...settings, publicAllowed: publicAllowed() } });
   },
   'requests.create': async (cfg, user, body, log) => {
     if (typeof body.idempotencyKey !== 'string' || !KEY.test(body.idempotencyKey)) return fail('invalid_idempotency_key');
@@ -140,11 +152,12 @@ async function handle(request, log) {
   try {
     if (body.op === 'public.status') {
       const slug = String(body.slug ?? '').trim();
-      if (!SLUG.test(slug)) return json({ available: false });
+      if (!publicAllowed() || !SLUG.test(slug)) return json({ available: false });
       return json({ available: Boolean(await rpc(cfg, 'connect_public_target', { p_slug: slug })) });
     }
     const op = OPS[body.op];
     if (!op) return fail('unknown_op');
+    if (LOCKED_WHILE_NOT_PUBLIC.has(body.op) && !publicAllowed()) return fail('unavailable');
     const user = await currentUser(cfg, request);
     if (!user) {
       log.warn('security.session-refused', { op: body.op });

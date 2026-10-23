@@ -923,8 +923,9 @@ await t.check('B-4: the /__sim control routes drive the running stack the way a 
   const got = await call({ op: 'alerts.get', eventId: alert.body.event.id }, { token: owner.token });
   assertEqual(got.body.event.status, 'delivered', 'delivered through the route');
   const before = (await sim('POST', '/__sim/switches', {})).body;
+  assertEqual(Object.keys(before).sort(), ['CONNECT_PUBLIC', 'EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY'], 'the host switches');
   const on = (await sim('POST', '/__sim/switches', { RESCUE_RELAY: true, SOMETHING_ELSE: true })).body;
-  assertEqual(on, { ...before, RESCUE_RELAY: true }, 'only the two named switches exist');
+  assertEqual(on, { ...before, RESCUE_RELAY: true }, 'only the named switches exist');
   await sim('POST', '/__sim/switches', { RESCUE_RELAY: before.RESCUE_RELAY });
   return 'provider, scenarios, code, receipt, switches';
 });

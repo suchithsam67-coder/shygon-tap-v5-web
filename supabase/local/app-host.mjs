@@ -242,7 +242,7 @@ export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, control 
    *   GET  /__sim/sms/last-code?to=<E.164>   the latest verification code texted to that number
    *   GET  /__sim/sms/messages   provider, to, sid and scenario of every message (no bodies)
    *   POST /__sim/sms/deliver    { sid, status }  a signed receipt (Twilio status, or an MSG91 code)
-   *   POST /__sim/switches       { EMERGENCY_PUBLIC_ALERTS?: boolean, RESCUE_RELAY?: boolean }
+   *   POST /__sim/switches       { EMERGENCY_PUBLIC_ALERTS?, RESCUE_RELAY?, CONNECT_PUBLIC?: boolean }
    */
   async function controlRoute(request, body, url, send) {
     const remote = request.socket.remoteAddress ?? '';
@@ -279,7 +279,7 @@ export function createAppHost({ root, distDir, appUrl, gatewayUrl, sim, control 
       return send(200, result);
     }
     if (url.pathname === '/__sim/switches' && request.method === 'POST') {
-      for (const name of ['EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY']) {
+      for (const name of ['EMERGENCY_PUBLIC_ALERTS', 'RESCUE_RELAY', 'CONNECT_PUBLIC']) {
         if (typeof input[name] === 'boolean') control.setSwitch(name, input[name]);
       }
       return send(200, control.switches());

@@ -11,7 +11,7 @@
 | Responsible (R) | Session A (AAROH backend): implementation and evidence |
 | Consulted (C) | Data Owner, Security Owner (the same person); counsel through DEC-2026-017 |
 | Informed (I) | Session B (frontend) |
-| State | **APPROVED 2026-10-20, in session:** "Approve DEC-2026-039 Q1–Q7 as recommended in the record". Every recommendation is the behaviour 032 already has, so no code changed; the gates now list 032 as approved. Approval of the design is not approval to apply: 032 is L3, so the DEC-2026-018 24-hour cool-off and checklist review run first, then the release track. Not applied, pushed or deployed |
+| State | **APPROVED 2026-10-20, in session:** "Approve DEC-2026-039 Q1–Q7 as recommended in the record". Every recommendation is the behaviour 032 already has, so no code changed; the gates now list 032 as approved. Approval of the design is not approval to apply: 032 is L3, so the DEC-2026-018 24-hour cool-off and checklist review run first, then the release track. Not applied, pushed or deployed. **Amendment A-1 (Q8), the Connect host switch `CONNECT_PUBLIC`: APPROVED in session; built locally 2026-10-23** (see the end of this record) |
 
 ## Priority
 
@@ -93,3 +93,31 @@ Counsel review applies (DEC-2026-017).
 | Q5 | **A**: 5 requests/hour and 20/day per requester; 50 open per target; 30-day decline cool-down; 30-day expiry; 180-day deletion of ended connections | As built |
 | Q6 | **A**: owner opt-in (default off); only a published, unsuspended Tap can be asked | As built |
 | Q7 | **A**: account deletion deletes the account's connections in both directions with their grants | As built; counsel review (DEC-2026-017) may revisit it |
+
+## Amendment A-1 (Q8): the Connect host switch (B-10)
+
+**State: APPROVED in session** (approved before the 2026-10-23 resume; built and verified locally 2026-10-23). The owner's words:
+
+> "Approve the B-10 Connect switch as proposed (CONNECT_PUBLIC off by default; create, accept and share blocked while off; decline, block, remove and lists always work; publicAllowed reported), as a DEC-2026-039 amendment, built locally with tests. No deploy."
+
+**Why** [OBSERVED]:
+- Before A-1, on any host with 032 applied, an owner who switched Connect on exposed it to signed-in visitors at once. There was no SHYGON-level lock like `EMERGENCY_PUBLIC_ALERTS` or `RESCUE_RELAY`.
+
+**What it changes** (the `/api/connect` function only; no migration, because every Connect table and function is reachable only by `service_role`):
+- `CONNECT_PUBLIC=on` makes Connect public. It is unset everywhere by default.
+- **While off:**
+  - `public.status` answers `{ available: false }`;
+  - `requests.create`, `requests.accept` and `connections.share` answer 404 `unavailable` before any database call. An anonymous create gets 404 rather than 401;
+  - `requests.decline`, `requests.block`, `connections.remove`, `connections.list`, `consents.list` and the settings always work, so consent can always be withdrawn;
+  - `settings.get` / `settings.set` report `publicAllowed`.
+- Q1–Q7 are unchanged. This switch is applied on top of the owner's opt-in (Q6).
+- Contract: AAROH-API v0.7.1 (§10b, §13).
+
+**Verified** [OBSERVED, local]:
+- `test:connect` 17/17, with the new check "host switch off (CONNECT_PUBLIC unset): nothing starts or widens; decline, block, remove and the lists still work";
+- the existing checks run with the switch on;
+- **negative control:** against the previous function, 2 checks fail;
+- `test:emergency` 49 (the switch list now has three names);
+- every other suite passes.
+
+**Release:** `CONNECT_PUBLIC` stays unset on production until the owner verifies the connection and consent workflows. Nothing is applied, pushed or deployed.

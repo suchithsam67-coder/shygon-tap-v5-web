@@ -1,8 +1,8 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.2
+# SHYGON AAROH backend API contract — AAROH-API v0.7.1
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.7** (2026-10-20). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**. |
+| Contract version | **AAROH-API v0.7.1** (2026-10-23). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`; changes in §13. v0.8 is reserved for the mode model (DEC-2026-041), which is not approved. DEC-2026-038, -039 and -040 are **APPROVED**. |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
 | Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040); none applied anywhere. 027 is held aside (DEC-2026-037). |
@@ -56,7 +56,8 @@ No operation is labelled LIVE: nothing is deployed.
     - `GET /__sim/sms/last-code?to=<E.164>`: the latest verification code texted to that number
     - `GET /__sim/sms/messages`: provider, to, sid and scenario, never bodies
     - `POST /__sim/sms/deliver` `{ sid, status }`: a signed receipt (a Twilio status, or an MSG91 code)
-    - `POST /__sim/switches` `{ EMERGENCY_PUBLIC_ALERTS?, RESCUE_RELAY? }` (booleans): only those two switches
+    - `POST /__sim/switches` `{ EMERGENCY_PUBLIC_ALERTS?, RESCUE_RELAY?, CONNECT_PUBLIC? }` (booleans): only those three switches (`CONNECT_PUBLIC` since v0.7.1)
+    - **Visitor address (v0.7.1, B-9).** The local host gives every `/api/*` call the connection's address and drops any address header the caller sends. For distinct visitors, start the stack with `STACK_SIM_CLIENT_ADDRESS=1` and send `x-shygon-sim-client: <192.0.2.x | 198.51.100.x | 203.0.113.x | none>` (`none` = a host that reports no address). Loopback only; other values get 400 from the host.
 
 ---
 
@@ -265,6 +266,7 @@ Rules:
   - 1 per visitor per Tap and 3 per visitor per 24 h (visitor = HMAC of the host-reported client IP and the day);
   - 50 per hour platform-wide.
 - **Host switch.** Visitor alerts run only where the host sets `EMERGENCY_PUBLIC_ALERTS=on`. It is unset (off) everywhere by default, so `public.status` answers `false` and `public.alert` answers `unavailable`, whatever the owner chose.
+- **Visitor address (v0.7.1, B-9 Part B).** The visitor limits use only the address header named by the host setting `TRUSTED_CLIENT_IP_HEADER`. Unset, and `public.alert` answers `unavailable`. No request or response changed.
 - **Status: LIVE-LOCAL; OFF by decision (DEC-2026-038 Q2 = B)** until supervised owner alerts have run in production. Build the visitor control so that it appears only when `available === true`.
 
 ### 10.4 Alerts (owner)
@@ -376,6 +378,7 @@ A finder sends a protected message to a Tap's owner and they talk through SHYGON
 
 **Availability.**
 - **Host switch.** Finder operations run only where the host sets `RESCUE_RELAY=on`. It is unset everywhere: `public.status` returns `available:false`, and the other finder operations return `404 unavailable`.
+- **Visitor address (v0.7.1, B-9 Part B).** Finder limits and blocks use only the address header named by `TRUSTED_CLIENT_IP_HEADER`. Unset, and `public.start` answers `unavailable`. No request or response changed.
 - **Owner opt-in.** The owner must also turn it on (default off).
 - **Tap state.** The Tap must be published, and neither the Tap nor the account may be suspended.
 - Approved (DEC-2026-038 Q12). The switch goes on with the first production release containing 031.
@@ -447,18 +450,23 @@ Two **signed-in** SHYGON accounts connect. Each side chooses what it shares from
 - **Self-reported.** Every shared value is marked `provenance: 'self_reported'`; nothing verifies it.
 - **Revocation.** Revoking stops future reads at once. Something already copied off the screen cannot be un-shared, and the UI must say so (doc 04).
 - **Opt-in.** The owner of the Tap being asked must switch Connect on (default off).
+- **Host switch (v0.7.1, B-10; DEC-2026-039 amendment A-1).** Connect is public only where the host sets `CONNECT_PUBLIC=on`. It is unset everywhere by default. While it is off:
+  - `public.status` answers `{ available: false }`, whatever the owner chose;
+  - `requests.create`, `requests.accept` and `connections.share` answer **404 `unavailable`**, before sign-in is checked (so an anonymous `requests.create` gets 404 rather than 401);
+  - `requests.decline`, `requests.block`, `connections.remove`, `connections.list`, `consents.list` and the settings always work, so consent can always be withdrawn;
+  - `settings.get` / `settings.set` report `publicAllowed: false`.
 - **Status:** LIVE-LOCAL, **APPROVED** (DEC-2026-038 Q13; DEC-2026-039 Q1–Q7 as built, 2026-10-20). A Connect control may ship with the first production release that contains 032. Its customer wording is the owner's to approve, as for Q10.
 
 | op | Auth | Request | Success | Errors |
 |---|---|---|---|---|
 | `public.status` | none | `{ op, slug }` | 200 `{ available }` | none |
-| `settings.get` | Bearer | `{ op }` | 200 `{ settings: { enabled, publicTapPublished, pendingIncoming, connections, shareableFields } }` | 401 |
-| `settings.set` | Bearer | `{ op, enabled: boolean }` | 200 `{ settings }` | 400 `invalid_setting`; 401 |
-| `requests.create` | Bearer | `{ op, slug, idempotencyKey, share: Field[], note?: string(≤200) }` | **201** `{ connection, replayed: false }`; the same key again → 200 with the same connection, `replayed: true` | 400 `invalid_share` `invalid_note` `invalid_idempotency_key` `self`; 404 `unavailable` (Connect off, Tap not published or suspended, a suspended requester, or **blocked**: indistinguishable); 409 `already_connected` `target_busy`; 429 `recently_declined` `rate_limited` (+`retryAfter`); 401 |
-| `requests.accept` | Bearer (target) | `{ op, connectionId, share: Field[] }` | 200 `{ connection }` | 400; 404 `connection_not_found` (also for the requester or a third account); 409 `already_decided`; 401 |
+| `settings.get` | Bearer | `{ op }` | 200 `{ settings: { enabled, publicTapPublished, pendingIncoming, connections, shareableFields, publicAllowed } }` (`publicAllowed` since v0.7.1) | 401 |
+| `settings.set` | Bearer | `{ op, enabled: boolean }` | 200 `{ settings }` (with `publicAllowed`) | 400 `invalid_setting`; 401 |
+| `requests.create` | Bearer | `{ op, slug, idempotencyKey, share: Field[], note?: string(≤200) }` | **201** `{ connection, replayed: false }`; the same key again → 200 with the same connection, `replayed: true` | 400 `invalid_share` `invalid_note` `invalid_idempotency_key` `self`; 404 `unavailable` (Connect off, the host switch off, Tap not published or suspended, a suspended requester, or **blocked**: indistinguishable); 409 `already_connected` `target_busy`; 429 `recently_declined` `rate_limited` (+`retryAfter`); 401 |
+| `requests.accept` | Bearer (target) | `{ op, connectionId, share: Field[] }` | 200 `{ connection }` | 400; 404 `connection_not_found` (also for the requester or a third account); 404 `unavailable` (host switch off); 409 `already_decided`; 401 |
 | `requests.decline` · `requests.block` | Bearer (target) | `{ op, connectionId }` | 200 `{ connection }` | as accept |
 | `connections.list` | Bearer | `{ op, status?: 'requested' \| 'accepted' \| 'declined' \| 'blocked' \| 'expired' \| 'removed' }` | 200 `{ connections: Connection[] }` | 400; 401 |
-| `connections.share` | Bearer (either side, while open; the requester may change it before the decision) | `{ op, connectionId, share: Field[] }` | 200 `{ connection }` | 400 `invalid_share`; 404; 409 `not_open`; 401 |
+| `connections.share` | Bearer (either side, while open; the requester may change it before the decision) | `{ op, connectionId, share: Field[] }` | 200 `{ connection }` | 400 `invalid_share`; 404; 404 `unavailable` (host switch off); 409 `not_open`; 401 |
 | `connections.remove` | Bearer (either side; also withdraws a request) | `{ op, connectionId }` | 200 `{ removed: true, grantsRevoked, connection }` | 404; 409 `not_open`; 401 |
 | `consents.list` | Bearer | `{ op }` | 200 `{ consents: [{ id, connectionId, direction: 'given' \| 'received', other, scope, purpose, version, grantedAt, revokedAt, revokeReason }] }`, revoked grants included | 401 |
 
@@ -576,7 +584,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Card activation and lost cards | BLOCKED | §7 |
 | Emergency information / alerts | LIVE-LOCAL logic, **APPROVED** (Q1); real delivery **BLOCKED** (§10.7) | Showroom wording changes per Q10 = A: Session B drafts it and the owner approves the text. Until then the customer-facing status stays "Coming soon" |
 | Return to owner | LIVE-LOCAL, **APPROVED** (Q12), off (`RESCUE_RELAY`) until the first production release with 031 | §10a. Customer copy per Q10: Session B drafts, owner approves |
-| Connect | LIVE-LOCAL, **APPROVED** (DEC-2026-039) | §10b. Customer-facing: "Coming soon" until it is deployed, with wording the owner approves |
+| Connect | LIVE-LOCAL, **APPROVED** (DEC-2026-039); **off by host switch** (`CONNECT_PUBLIC` unset) everywhere until the owner verifies the connection and consent workflows (amendment A-1) | §10b. Customer-facing: "Coming soon" until it is deployed, with wording the owner approves |
 | Verify | NOT IMPLEMENTED | §11 |
 | Privé | LIVE-LOCAL, **demo only**, **APPROVED** (DEC-2026-038 Q6 → A; DEC-2026-040) | §10c. Always labelled demo; customer wording is the owner's to approve |
 | Student, Event, Places, Cloud | NOT IMPLEMENTED | §11 |
@@ -596,6 +604,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.7.1 | 2026-10-23 | **B-10** (owner-approved, DEC-2026-039 amendment A-1): §10b host switch `CONNECT_PUBLIC`. While off, `public.status` is false and `requests.create` / `requests.accept` / `connections.share` answer 404 `unavailable` (create also for an anonymous caller). Decline, block, remove and the lists always work. `settings` gain `publicAllowed`. **B-9:** visitor emergency alerts and finder starts use only the header named by `TRUSTED_CLIENT_IP_HEADER` (no shape change). The local host sets the visitor address itself and offers the opt-in `x-shygon-sim-client` hook. `/__sim/switches` accepts `CONNECT_PUBLIC`. | Show the Connect card only when `public.status` is true (already the case). On the signed-in request page, check `public.status` before offering the form. Show "not yet available" when `publicAllowed` is false. A 404 on accept or share is a refusal, never success. E2E: a browser-sent `x-nf-client-connection-ip` no longer has any effect on the stack; use the sim header with `STACK_SIM_CLIENT_ADDRESS=1` for distinct visitors, and switch `CONNECT_PUBLIC` on through `/__sim/switches` for Connect journeys. |
 | v0.7 | 2026-10-20 | DEC-2026-040 approved: every Privé demo choice as built; 033 listed as approved. No operation, request or response changed. | None beyond v0.6: the public walkthrough stays client-only (Q1 = A); signed-in demo requests use §10c; show the notice. |
 | v0.6 | 2026-10-20 | Privé demo-only (owner's word, DEC-2026-038 Q6 → A): §10c `/api/prive` (migration 033, PROPOSED in DEC-2026-040); the sweep also runs the demo desk and its retention. No earlier operation changed. | Your demo may switch on and use §10c for signed-in accounts. Keep the public showroom walkthrough client-only (DEC-2026-040 Q1). Show the `notice` with every Privé result; never write "the hotel" for the simulator. |
 | v0.5 | 2026-10-20 | DEC-2026-039 approved: every Connect choice as built; 032 listed as approved. No operation, request or response changed. | The Connect control may ship with the first release containing 032; its wording needs the owner's approval. No guest connect (Q1 = A). |
