@@ -543,3 +543,19 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
   - P1 and P2 hosted, on approvals AP-1–AP-6;
   - BQ-1;
   - G1–G7, G10, G13 and G14.
+
+## 16. 2026-10-24: BQ-1 built (migration 035, contract v0.9)
+
+- **Change:** `get_public_profile` returns null while a Tap is on Info. It is one guard, generated from the exact current body, pinned by the admin-contract gate.
+- **Evidence:**
+  - golden 17/17: every other Tap is byte-identical;
+  - rollbacks 16/16;
+  - `test:modes` 17/17, including older clients falling back to "Tap not found".
+  - full regression on Node 20.18 [OBSERVED]: every step exit 0 (lint, build, bundle, bundle-secrets, seo, push-guard, test:db with rls-matrix 1565, payments:ci, all 13 stack suites, components 23/23); `npm audit --audit-level=high` 0 vulnerabilities;
+  - Node 22.23.4: payments 15/0 and functions-security 14/0/0 (the Node-20-only BLOCKED check passes);
+  - browser e2e was not re-run for this change: Info is off by default and golden shows every other Tap is byte-identical.
+- **BQ-1 is closed locally.** Info is still OFF in the catalogue: switching it on per environment is the owner's decision.
+- **Production:** 035 must be re-based on the fresh capture (V6-106 / G2) before any production use.
+- **Verdict unchanged:** B-10 READY FOR REVIEW. Release BLOCKED:
+  - P1 and P2 hosted (AP-1–AP-6);
+  - G1–G7, G10, G13 and G14.
