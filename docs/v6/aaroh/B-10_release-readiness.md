@@ -507,3 +507,28 @@ No release approval is claimed.
 - G1–G7, G10, G13 and G14 are open.
 
 G11 is no longer a blocker on any AAROH branch: here, and on the frontend branch, per Session B's `1e7e07d`.
+
+## 14. 2026-10-24: Info mode built; a new audit advisory (G15)
+
+**Info mode (DEC-2026-041).** The owner approved the implementation scope ("Info mode (Recommended)"), and it is built locally:
+- migration 034;
+- `/api/modes`;
+- the public reader `get_public_tap_mode`;
+- contract **AAROH-API v0.8**;
+- `test:modes` **17/17**.
+
+Info is **off in the catalogue**, because `get_public_profile` is unchanged (BQ-1).
+
+**Full suite** on Node 20.18, every step 0 failed:
+- lint, build, bundle, bundle-secrets, SEO, push-guard;
+- vitest 23;
+- `test:db` (rls-matrix 1565 / 55 tables, golden 16, rollbacks 15, admin-contract 15, account-deletion 9);
+- payments 15; functions-security 13 + 1 BLOCKED on Node 20 (known), "14 functions clean";
+- modes 17, connect 17, emergency 49, rescue 18, prive 12, public-tap 25, suspension 46, payment-chain 30, local-host 9, admin-edge 11, observability 10, security 11.
+
+Browser e2e was not re-run: no frontend or app-host change since the 14/14 run this morning (`vite.config.ts` gained only the dev-server allowlist entry).
+
+**G15, new:** `npm audit --audit-level=high` turned red again, with the lockfile **unchanged** since `3fdfd11`.
+- **The advisory:** zod < 4.6.6, high, GHSA-mrhx-c7xc-m3w5 (memory exhaustion validating oversized constrained collections). It was published after this morning's green run.
+- **Exposure:** zod 4.4.3 is a **transitive dev dependency**, and nothing in `src/`, `netlify/` or `api/` imports it.
+- **Not changed** (DEC-2026-021/042 precedent): it needs the owner's approval for a lockfile-only bump. Release stays BLOCKED.

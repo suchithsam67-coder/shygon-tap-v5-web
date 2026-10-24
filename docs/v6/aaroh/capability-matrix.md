@@ -34,7 +34,7 @@ Nothing here is deployed. Production runs the V5 schema with drift (V6-106).
 | 6 | **SHYGON Verify** | | | ✔ | | doc 03 `credentials`, `verification_records`; doc 10 Phase 3 | issuers (organisations); DEC-037: an AAROH card is not a credential |
 | 7 | **Business Tap / professional profile** | ✔ (local) | | | | `get_public_profile`, Tap editor, add-ons, themes; public-tap 25, golden, identity, matrix | production parity (V6-106) |
 | 8 | **Event Tap** | | seasonal event themes ✔ | event mode | | `tap_event_themes` (admin-managed timed themes) | event-specific profile, attendees: Phase 2 |
-| 9 | **Info Tap / SHYGON Locations** | | | Locations ✔ (Phase 4) | **Info is undefined** | owner 10-16: "Business and Info first" | definition (DEC-038 Q7) |
+| 9 | **Info** (a public page about a thing or place) / SHYGON Locations | ✔ (local), implementation approved 2026-10-24 (DEC-2026-041); **off in the catalogue** until BQ-1 | Locations ✔ (Phase 4); multiple pages, images, languages and links: not in v1 | | | 034, `/api/modes`, `get_public_tap_mode`, `test:modes` 17 | BQ-1; P1/P2 previews; release track |
 | 10 | **Access Tap** | | | gated (Phase 5) | | doc 10: pen-test, SDM hardware, legal | **Unsupported** for AAROH (DEC-037) |
 | 11 | **SHYGON Privé demo** | ✔ (local), demo only; APPROVED (DEC-2026-040, 2026-10-20) | | real hotel integrations: not built, by decision | | 033, `/api/prive`, `test:prive` 12 | release track; customer wording |
 | 12 | **Cloud Storage** | | | ✔ | | showroom Planned; storage bucket gaps V6-095/V6-108 | no design approved |
@@ -191,7 +191,10 @@ The contract's §3 and §5: `get_public_profile`, `get_public_tap_state` and `re
 
 `tap_event_themes` are admin-defined, date-bounded theme overrides applied in `get_public_profile` (`activeEvent`). An event-specific profile, attendees and check-in are not built (doc 10 Phase 2; "ticketing and check-in are not part of AAROH" in the showroom).
 
-### 9. Info Tap / SHYGON Locations (PLANNED / UNDEFINED)
+### 9. Info (IMPLEMENTED locally, 034; implementation approved 2026-10-24, DEC-2026-041; OFF in the catalogue) / SHYGON Locations (PLANNED)
+
+Built as contract §6: one Info page per account, plain text (title, short description, category, details), switched by the owner through `/api/modes` and read by visitors through `get_public_tap_mode`. Info stays off in `tap_mode_catalog` until BQ-1. The notes below are the earlier state.
+
 
 - "Info" is named by the owner (2026-10-16) but defined nowhere.
 - Locations (doc 03 `locations`, `location_content`) is Phase 4.

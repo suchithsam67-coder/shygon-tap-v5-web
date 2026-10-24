@@ -97,6 +97,12 @@ BEGIN
   IF to_regclass('public.prive_demo_requests') IS NOT NULL THEN
     DELETE FROM public.prive_demo_requests WHERE user_id = target;
   END IF;
+  -- Modes and Info (migration 034), only where they exist.
+  IF to_regclass('public.info_pages') IS NOT NULL THEN
+    DELETE FROM public.tap_mode_state WHERE user_id = target;
+    DELETE FROM public.info_pages WHERE owner_user_id = target;
+    DELETE FROM public.tap_mode_audit WHERE user_id = target;
+  END IF;
 
   -- The Tap; its visit statistics (tap_events) go with it.
   DELETE FROM public.tap_profiles

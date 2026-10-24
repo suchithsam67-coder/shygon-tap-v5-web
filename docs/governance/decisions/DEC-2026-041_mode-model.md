@@ -12,7 +12,7 @@
 | Responsible (R) | Session A (AAROH backend). The schema and reuse path need the **Principal Architect, who is UNASSIGNED** (`docs/DECISIONS.md`). |
 | Informed (I) | Session B (frontend) |
 | Follows | DEC-2026-038 Q7, APPROVED 2026-10-19: "A, then B" |
-| State | **PROPOSED. Conditional direction recorded; NOT implementation approval.** The owner: "Do not implement Info yet. Do not merge or deploy. I will review the evidence and approve the implementation scope separately." There is no migration 034 and no `/api/modes`; the public APIs are unchanged, and AAROH-API stays at v0.7. |
+| State | **Implementation scope APPROVED by the owner on 2026-10-24** (the build-scope question "What should I build now?", answer **"Info mode (Recommended)"**, whose text read: "Treat this as your implementation-scope approval for DEC-2026-041. Migration 034 (Info record + mode state, closed tables), /api/modes, new get_public_tap, 'unavailable' fallback, privacy canary tests, contract v0.8. Title 120 / description 280 and the relayed category list as proposed. Production get_public_profile left untouched."). **Built locally**, see "Implementation (2026-10-24)" at the end. Still open: BQ-1 (the change to `get_public_profile`), so **Info is OFF in the catalogue**; P1 and P2 hosted; release decisions. Nothing applied, pushed or deployed. |
 
 ## How to read this record
 
@@ -550,3 +550,20 @@ Then Session A brings a final implementation scope (migration, API, tests, contr
 ## Expected result vs observed result
 
 To be filled at verification.
+
+## Implementation (2026-10-24)
+
+**Approved scope:** see State.
+- Approving the relayed limits and categories closes **A0**.
+- Choosing the separate structured record closes **SQ-1** (direction as proposed; the owner holds the Principal Architect role under DEC-2026-018 Option B).
+
+| Item | Built |
+|---|---|
+| Migration `034_modes_and_info.sql` | Four closed tables: `tap_mode_catalog` (Business on, **Info off**), `info_pages` (one per account), `tap_mode_state` (no row = Business), `tap_mode_audit` (append-only, field names only). Owner functions `modes_*` (service_role only), the public reader `get_public_tap_mode(p_slug)` (anon). VERIFY ON LIVE queries and a tested ROLLBACK block. Idempotent |
+| Naming | The reader is `get_public_tap_mode`, not `get_public_tap`: that name is a frozen legacy reader made uncallable by 025 (admin-contract `FROZEN_NAMES`) |
+| `/api/modes` | `netlify/functions/modes.mjs` + `api/modes.mjs`: `owner.state`, `owner.activate`, `owner.info.get`, `owner.info.save`, `owner.info.clear`, `owner.preview`. Errors use fixed messages; body ≤ 16 KB |
+| BQ-1 | **Not changed:** `get_public_profile` is untouched (golden 16/16). Because it would still serve Business for a Tap on Info, Info ships **off** and may be switched on only after BQ-1 |
+| Fallback (BQ-2) | `get_public_tap_mode` returns null (neutral unavailable) when Info is off, missing or invalid, or the Tap is paused or suspended. Never Business |
+| Contract | AAROH-API **v0.8** (§6, §13) |
+| Gates | rls-matrix (55 tables × 7 callers), admin-contract (four relations approved under this DEC), account deletion (runbook and test), rollbacks, golden, the bundle |
+| Tests | `test:modes` **17/17** (in `ci` and the CI workflow) |

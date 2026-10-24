@@ -132,6 +132,8 @@ const APPROVED_NEW_RELATIONS = {
     .map((t) => [t, 'DEC-2026-039 Q1-Q7, approved 2026-10-20 (migration 032)'])),
   ...Object.fromEntries(['prive_demo_hotels', 'prive_demo_requests', 'prive_demo_request_events']
     .map((t) => [t, 'DEC-2026-040 Q1-Q5, approved 2026-10-20 (migration 033)'])),
+  ...Object.fromEntries(['tap_mode_catalog', 'info_pages', 'tap_mode_state', 'tap_mode_audit']
+    .map((t) => [t, 'DEC-2026-041 implementation scope, approved 2026-10-24 (migration 034)'])),
 };
 
 // New admin_* functions (new names, not overloads), with their decision.

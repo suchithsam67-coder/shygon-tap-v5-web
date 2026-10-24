@@ -126,6 +126,9 @@ for (const [u, n] of [[A, 1], [B, 2]]) {
     INSERT INTO public.prive_demo_requests (id, user_id, hotel_id, service, idempotency_key)
     VALUES ('1${n}000000-0000-4000-8000-0000000000d${n}', '${u}', (SELECT id FROM public.prive_demo_hotels WHERE slug = 'demo-residence'), 'housekeeping', 'matrix-prive-key-000${n}');
     INSERT INTO public.prive_demo_request_events (request_id, status, actor) VALUES ('1${n}000000-0000-4000-8000-0000000000d${n}', 'received', 'guest');
+    INSERT INTO public.info_pages (owner_user_id, title, short_description) VALUES ('${u}', 'Matrix info ${n}', 'Matrix description ${n}');
+    INSERT INTO public.tap_mode_state (tap_profile_id, user_id) VALUES ('0${n}000000-0000-4000-8000-0000000000c${n}', '${u}');
+    INSERT INTO public.tap_mode_audit (user_id, action) VALUES ('${u}', 'info_save');
   `);
 }
 
@@ -216,6 +219,12 @@ const MODEL = {
   prive_demo_hotels: { owner: NONE, select: sel(NONE, NONE) },
   prive_demo_requests: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   prive_demo_request_events: { owner: `request_id IN (SELECT id FROM public.prive_demo_requests WHERE user_id = auth.uid())`, select: sel(NONE, NONE) },
+  // Modes and Info (034, DEC-2026-041, implementation approved 2026-10-24): closed the same way; visitors read
+  // through get_public_tap_mode only, owners through /api/modes.
+  tap_mode_catalog: { owner: NONE, select: sel(NONE, NONE) },
+  info_pages: { owner: OWN('owner_user_id'), select: sel(NONE, NONE) },
+  tap_mode_state: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  tap_mode_audit: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };
