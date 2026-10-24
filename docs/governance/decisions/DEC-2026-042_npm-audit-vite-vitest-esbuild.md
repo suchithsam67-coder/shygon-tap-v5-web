@@ -108,3 +108,27 @@ Labels: **OBSERVED** (seen in the repository or in command output), **REPORTED**
 - **G11 is closed on `v6/aaroh-backend`.** The audit gate is green, and every regression step passes except the documented pre-existing items (V6-014, and the Node 20 BLOCKED check, which passes on Node 22).
 - No dependency other than the 36 lockfile entries of `d6a0b46` changed.
 - Logs are kept in Session A's scratch area (`g11-logs/`, `node22-download/`), not committed.
+
+## Amendment A-1 (2026-10-24): zod (G15)
+
+**Approved by the owner in session:** "Yes: apply a lockfile-only update of zod to a patched version (>=4.6.6), re-run the audit and the full suite, and commit locally. No push."
+
+**Why** [OBSERVED]:
+- `npm audit --audit-level=high` turned red again, with the lockfile unchanged since `3fdfd11`: **zod < 4.6.6, high, GHSA-mrhx-c7xc-m3w5** (memory exhaustion validating oversized constrained collections), published after the morning's green run.
+- zod 4.4.3 is a **transitive dev dependency**, used by `eslint-plugin-react-hooks` and `zod-validation-error`, which both allow `^3.25.0 || ^4.0.0`.
+- Nothing in `src/`, `netlify/` or `api/` imports it.
+
+**Change** [OBSERVED]:
+- `npm update zod --package-lock-only` (npm 10.8.2, Node 20.18.0) set zod to **4.6.7**.
+- npm also added six unrelated optional `@tailwindcss/oxide-wasm32-wasi/node_modules/*` entries (the known npm behaviour on this tree), which were removed.
+- **The final diff is the zod entry only: version, resolved, integrity (3 lines).** `package.json` is unchanged.
+
+**Verified** [OBSERVED]:
+- `npm ci` exit 0, with zod 4.6.7 installed.
+- `npm audit --audit-level=high` → **exit 0, "found 0 vulnerabilities"**.
+- Lint, build, bundle, bundle-secrets, SEO and push-guard pass; vitest 23/23.
+- `test:db` green (rls-matrix 1565, golden 16, rollbacks 15, admin-contract 15, account-deletion 9).
+- Payments 15; functions-security 13 + 1 BLOCKED on Node 20 (known).
+- Stack suites, all 0 failed: modes 17, connect 17, emergency 49, rescue 18, prive 12, public-tap 25, suspension 46, payment-chain 30, local-host 9, admin-edge 11, observability 10, security 11.
+- **e2e 14/14.**
+- gitleaks: 85 commits, only the known `9c8caa7` (V6-014).
