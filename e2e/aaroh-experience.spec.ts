@@ -136,7 +136,7 @@ test('public: nothing private reaches the page, and an unavailable mode cannot b
   }
 });
 
-test('demo: the AAROH demo showroom is labelled, sends nothing to the backend, and the emergency walkthrough sends nothing', async ({ page }) => {
+test('demo: the AAROH demo showroom is labelled, sends nothing to the backend, and the emergency and Privé walkthroughs send nothing', async ({ page }) => {
   const { gatewayUrl } = stack();
   const backend: string[] = [];
   page.on('request', (request) => {
@@ -163,6 +163,16 @@ test('demo: the AAROH demo showroom is labelled, sends nothing to the backend, a
   await review.click();
   await expect(page.getByRole('heading', { name: 'Demo finished. No alert was sent.' })).toBeVisible();
   await expect(review).toHaveCount(0);
+
+  // Privé: a labelled demo with a sample hotel; a request stays on the page (Q-F).
+  await page.getByRole('button', { name: 'Showroom' }).click();
+  await expect(slide(page, 'SHYGON Privé')).toContainText('Demo');
+  await slide(page, 'SHYGON Privé').getByRole('button', { name: 'Try the demo' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'SHYGON Privé' })).toBeVisible();
+  await expect(page.getByText('Not connected to any real hotel, booking, room or door.')).toBeVisible();
+  await page.getByRole('button', { name: 'Late check-out' }).click();
+  await expect(page.getByRole('heading', { name: 'Not sent: this is a demo' })).toBeVisible();
+  await expect(page.getByText(/No hotel received it/)).toBeVisible();
 
   expect(backend).toEqual([]);
 });

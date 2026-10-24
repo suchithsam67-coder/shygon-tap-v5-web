@@ -6,9 +6,9 @@
 |---|---|
 | Worktree | `.claude/worktrees/shygon-aaroh-v6-frontend-c7fab7` |
 | Branch | `claude/shygon-aaroh-v6-frontend-c7fab7`, local only, never pushed |
-| Committed (owner's word, 2026-10-20) | `8358495`: the merge of `v6/aaroh-backend` @ `d1ff25d` (AAROH-API v0.4). `0ae7e47`: the frontend |
-| Uncommitted | The gate-decision changes, 25 files (§2). They await the owner's word to commit |
-| Not merged | AAROH-API v0.5–v0.7 (`f1d2af1` … `ef2d976`, `7380a6e`: Privé 033, DEC-040, DEC-041). Per §6, nothing newer is merged and no mode is enabled before this review |
+| Committed (owner's word, 2026-10-20) | `8358495`: the merge of `v6/aaroh-backend` @ `d1ff25d` (AAROH-API v0.4). `0ae7e47`: the frontend. `c0e27a0`: the gate-decision changes of §2 (Q-A) |
+| Since (owner's word each time, 2026-10-23) | `3adf1f5` + `9fd7a89`: the backend up to `26eecd9` (v0.7, B-9 Part A). `bd3a85e` + `ee5b532`: up to `34a482d` (v0.7.1, B-9 Part B, the B-10 Connect switch) and its frontend side. `1e7e07d`: the npm audit fix |
+| Update 2026-10-23 | The owner answered Q-B to Q-F (§5). Evidence and options: `frontend-decision-pack-2026-10-23.md`. §1–§4 below are the 2026-10-20 record, except where marked |
 | Evidence labels | OBSERVED (seen in code or a run), CONFIRMED (a test run recorded here), PROPOSED (needs approval) |
 
 Nothing is pushed, applied to a real database, deployed or switched on.
@@ -132,27 +132,29 @@ The other conditions in the brief: reduced motion (U, E), mobile and NFC/QR (U `
 
 | # | Blocker | Blocks | Owner of the next step |
 |---|---|---|---|
-| 1 | **B-10:** `CONNECT_PUBLIC` host switch | Enabling Connect anywhere 032 is applied | Owner (approve), then Session A |
-| 2 | B-9: the local host's client-address header (the e2e sets it itself) | Tooling only | Owner, then Session A |
+| 1 | **B-10:** `CONNECT_PUBLIC` host switch | Enabling Connect anywhere 032 is applied | **Done 2026-10-23**: DEC-2026-039 amendment A-1, `34a482d`; frontend `ee5b532` |
+| 2 | B-9: the local host's client-address header (the e2e sets it itself) | Tooling only | **Done locally 2026-10-23** (Parts A and B, `f1a2548`, `298667a`; e2e on `x-shygon-sim-client`, `9fd7a89`). Host previews (P1) still the owner's |
 | 3 | V6-123 (027) and V6-014 (D-7) | Release gates | Phase 0.5 / owner |
 | 4 | SMS provider (MSG91 + DLT templates) | Any real verification or alert | Owner (DEC-038 Q3) |
 | 5 | Host switches stay off until supervised owner alerts | Visitor relay, Return relay | Owner (Q2 = B, Q12) |
 | 6 | Card registry (P-4) | Showing the card edition (§3) and card-level lifecycle | Card release |
-| 7 | Privé wording | `PRIVE_DEMO`, merging v0.6/v0.7 | Owner |
+| 7 | Privé wording | `PRIVE_DEMO`, merging v0.6/v0.7 | **Approved 2026-10-23 (Q-F)**; v0.7 merged; the demo is on in the demo showroom only |
 | 8 | DEC-2026-041 (Info, mode model) PROPOSED | Any mode switching. Also: the showroom calls its sections "modes", the server's `mode` is one exclusive experience per Tap, and `places` is close to Info. The words need reconciling once approved | Owner |
 | 9 | V6 release blockers: secret rotation, migrations unapplied, the live site is a second app | Production | Owner |
 | 10 | Node 20.18 is below the `>=22.12` engine | The known payments check | Environment |
 
 ## 5. Questions for the owner
 
-| ID | Question | Recommended |
-|---|---|---|
-| Q-A | Commit the gate-decision changes (25 files) locally as one commit? Nothing pushed | Yes |
-| Q-B | Should the store's other roadmap items read "Coming soon" instead of "Planned"? | Yes, one vocabulary |
-| Q-C | Hide the unreleased owner pages in production builds (redirect to the AAROH experience page), keeping them on test builds? | Yes, together with B-10 |
-| Q-D | The notes under the three features on a real Tap ("Found this card? Message the owner through SHYGON…"): keep, or use the approved description alone? | Use the approved description alone |
-| Q-E | Approve B-10 and B-9 for Session A? | Yes |
-| Q-F | Privé demo wording (sample hotel, "SHYGON's demo desk", the demo notice) | Owner's text |
+| ID | Question | Recommended | Answer |
+|---|---|---|---|
+| Q-A | Commit the gate-decision changes (25 files) locally as one commit? Nothing pushed | Yes | **Yes** (2026-10-20): `c0e27a0` |
+| Q-B | Should the store's other roadmap items read "Coming soon" instead of "Planned"? | Yes, one vocabulary | **Approved** (2026-10-23): "Coming soon" |
+| Q-C | Hide the unreleased owner pages in production builds (redirect to the AAROH experience page), keeping them on test builds? | Yes, together with B-10 | **Approved** (2026-10-23): "with a build flag", `VITE_AAROH_PREVIEW_PAGES=on` |
+| Q-D | The notes under the three features on a real Tap ("Found this card? Message the owner through SHYGON…"): keep, or use the approved description alone? | Use the approved description alone; revised on 2026-10-23 to "keep" (decision pack) | **Keep the notes** (2026-10-23) |
+| Q-E | Approve B-10 and B-9 for Session A? | Yes | **Closed** (2026-10-23): answered by the recorded approvals (B-9 Parts A and B; DEC-2026-039 A-1) |
+| Q-F | Privé demo wording (sample hotel, "SHYGON's demo desk", the demo notice) | Owner's text | **Approved as drafted** (2026-10-23): the strings in the decision pack. `PRIVE_DEMO` on |
+
+The owner's words (2026-10-23): "Approve Q-B (Coming soon), Q-C (hide unreleased owner pages in production, with a build flag), Q-D (keep the notes), Q-E (closed) and Q-F (Privé text as drafted). Implement locally with tests and report before committing. No push."
 
 ## 6. Previous gate (2026-10-19 brief, Phase K)
 

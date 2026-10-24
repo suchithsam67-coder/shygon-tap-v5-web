@@ -202,14 +202,12 @@ export const MODES: Record<ModeId, ModeDefinition> = {
 };
 
 /**
- * The Privé demo, off. Two owner instructions conflict (FE-D5): the master
- * brief of 2026-10-19 asks for a "demo-only Privé", while DEC-2026-038 Q6, as
- * recorded on 2026-10-19, keeps Privé out of the launch with no demo (the
- * 2026-10-16 decision). The demo is built and tested; turning this on shows it
- * in the demo showroom only, never on a real Tap. It stays off until the owner
- * says which instruction stands.
+ * The Privé demo, on, in the demo showroom only (owner, Q-F 2026-10-23: the
+ * wording as drafted). Privé is demo-only (DEC-2026-038 Q6 → A, DEC-2026-040):
+ * a sample hotel, never connected to a real hotel, booking, room or door, and
+ * never on a real Tap, where only "available" modes appear (`liveModesFor`).
  */
-export const PRIVE_DEMO = false;
+export const PRIVE_DEMO = true;
 
 /**
  * Showroom order: what works first, then what is coming, then what the demo
@@ -298,8 +296,7 @@ export type ServerFeature = 'emergency' | 'return' | 'connect';
  * linked from the account menu and from "Your AAROH experience". While a
  * feature is not released, customers see it as "Coming soon" (owner,
  * 2026-10-20 §1). Each is switched on separately, only once it has passed its
- * own backend and end-to-end checks; its owner page stays reachable by address
- * so it can be verified on a test system. On a public Tap the server decides
+ * own backend and end-to-end checks. On a public Tap the server decides
  * independently (`public.status`, off everywhere today).
  */
 export const RELEASED: Record<ServerFeature, boolean> = {
@@ -307,6 +304,16 @@ export const RELEASED: Record<ServerFeature, boolean> = {
   return: false,
   connect: false,
 };
+
+/**
+ * Whether this build keeps the owner pages of unreleased features reachable by
+ * their address (owner, Q-C 2026-10-23). A production build does not: those
+ * addresses redirect to "Your AAROH experience" until the feature is released.
+ * A test or preview build does when it is built with
+ * `VITE_AAROH_PREVIEW_PAGES=on`, and so does the dev server. The flag only
+ * opens pages; every operation behind them is still the server's to allow.
+ */
+export const PREVIEW_PAGES: boolean = import.meta.env.VITE_AAROH_PREVIEW_PAGES === 'on' || import.meta.env.DEV;
 
 export const OWNER_PAGE: Record<ServerFeature, string> = {
   emergency: '/shygontap/emergency',

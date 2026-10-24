@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { AVAILABILITY_LABEL, MODES, PRIVE_DEMO, RELEASED, type ServerFeature } from '../components/showroom/modes';
+import { AVAILABILITY_LABEL, MODE_ORDER, MODES, PRIVE_DEMO, RELEASED, type ServerFeature } from '../components/showroom/modes';
 import { AAROH_SHOWCASE, STATUS_LABEL } from '../data/aarohProduct';
 import { AppShell } from '../components/app/AppShell';
 
@@ -49,6 +49,14 @@ describe('customer availability', () => {
     }
   });
 
+  it('the store uses the same word for everything not yet available: "Coming soon", never "Planned" (Q-B)', () => {
+    expect(STATUS_LABEL.future).toBe(AVAILABILITY_LABEL['coming-soon']);
+    expect(Object.values(STATUS_LABEL)).not.toContain('Planned');
+    for (const feature of AAROH_SHOWCASE.filter((f) => f.status === 'future')) {
+      expect(feature.statusLabel ?? STATUS_LABEL[feature.status]).toBe('Coming soon');
+    }
+  });
+
   it('the store says the same for the two it lists', () => {
     for (const [storeId, id] of [['emergency', 'emergency'], ['return-to-owner', 'return']] as const) {
       const feature = AAROH_SHOWCASE.find((f) => f.id === storeId)!;
@@ -59,9 +67,26 @@ describe('customer availability', () => {
     }
   });
 
-  it('Privé is a labelled demo and stays off until its wording is approved', () => {
+  it('Privé is a labelled demo, switched on in the demo showroom with its approved wording (Q-F)', () => {
     expect(MODES.prive.availability).toBe('demo');
-    expect(PRIVE_DEMO).toBe(false);
+    expect(AVAILABILITY_LABEL[MODES.prive.availability]).toBe('Demo');
+    expect(PRIVE_DEMO).toBe(true);
+    expect(MODE_ORDER).toContain('prive');
+  });
+
+  it('unreleased owner pages: only a build made with VITE_AAROH_PREVIEW_PAGES=on (or the dev server) keeps them (Q-C)', async () => {
+    const previewPages = async (flag: string | undefined, dev: boolean) => {
+      vi.resetModules();
+      vi.stubEnv('DEV', dev);
+      vi.stubEnv('VITE_AAROH_PREVIEW_PAGES', flag as string);
+      const { PREVIEW_PAGES } = await import('../components/showroom/modes');
+      vi.unstubAllEnvs();
+      return PREVIEW_PAGES;
+    };
+    expect(await previewPages(undefined, false)).toBe(false);
+    expect(await previewPages('on', false)).toBe(true);
+    expect(await previewPages('true', false)).toBe(false);
+    expect(await previewPages(undefined, true)).toBe(true);
   });
 
   it('the account menu offers no feature that is not released', () => {

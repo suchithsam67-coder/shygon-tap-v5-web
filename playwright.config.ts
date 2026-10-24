@@ -32,7 +32,10 @@ export default defineConfig({
     // The local host reports the visitor's address from the connection (B-9);
     // journeys that need distinct visitors name them with x-shygon-sim-client,
     // which the host honours only with this flag (documentation addresses only).
-    env: { STACK_SIM_CLIENT_ADDRESS: '1' },
+    // The stack's build keeps the unreleased owner pages reachable (Q-C), as a
+    // test build should; a production build redirects them. When the stack is
+    // started by hand, start it with the same two variables.
+    env: { STACK_SIM_CLIENT_ADDRESS: '1', VITE_AAROH_PREVIEW_PAGES: 'on' },
     url: `${APP}/shygontap`,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,

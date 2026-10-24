@@ -210,7 +210,10 @@ test('AAROH (DEC-2026-037): ten editions beside V5; one themed overview explains
   // The collection: the design system's ten editions, in order.
   await page.goto('/shygontap/store/aaroh');
   await expect(page.getByRole('heading', { level: 1, name: 'SHYGON AAROH' })).toBeVisible();
-  await expect(page.getByText('Coming soon', { exact: true })).toBeVisible();
+  await expect(page.locator('#intro').getByText('Coming soon', { exact: true })).toBeVisible();
+  // The roadmap uses the same word, not "Planned" (Q-B).
+  await expect(page.locator('#possibilities').getByText('Coming soon', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('#possibilities').getByText('Planned', { exact: true })).toHaveCount(0);
   await expect(page.getByText('VERSION 01 · ONE CARD. MORE POSSIBILITIES.')).toBeVisible();
   await expect(page.getByText('A physical card, connected to a digital experience powered by SHYGON OS.')).toBeVisible();
   await expect(page.getByText('Explore the collection, discover the planned capabilities, and preview the AAROH experience.')).toBeVisible();
@@ -253,7 +256,7 @@ test('AAROH (DEC-2026-037): ten editions beside V5; one themed overview explains
   await expect(overview).toBeVisible();
   await expect.poll(() => overview.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(12, 33, 26)');
 
-  // Features: live ones link to the account; the roadmap is labelled Planned, its actions disabled; no Privé.
+  // Features: live ones link to the account; the roadmap is labelled Coming soon, its actions disabled; no Privé.
   const features = overview.locator('#ao-features');
   await features.scrollIntoViewIfNeeded();
   await expect(features.getByRole('heading', { name: 'Available now' })).toBeVisible();

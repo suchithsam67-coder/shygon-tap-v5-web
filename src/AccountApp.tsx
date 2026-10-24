@@ -12,6 +12,7 @@ import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import LiquidGlassDefs from './components/LiquidGlassDefs';
 import ScrollProgress from './components/ScrollProgress';
 import { ProtectedRoute } from './components/app/ProtectedRoute';
+import { OwnerPage } from './components/app/OwnerPage';
 import { AuthProvider } from './lib/auth';
 import { AccountProvider } from './lib/account';
 import { ToastProvider } from './components/app/Toast';
@@ -117,10 +118,11 @@ export default function AccountApp() {
 
               <Route path="/shygontap/account" element={<Protected title="Your account"><Account /></Protected>} />
               <Route path="/shygontap/experience" element={<Protected title="Your AAROH experience"><OwnerExperience /></Protected>} />
-              <Route path="/shygontap/emergency" element={<Protected title="Emergency contacts and alerts"><EmergencySettings /></Protected>} />
-              <Route path="/shygontap/return-to-owner" element={<Protected title="Return to owner"><ReturnToOwner /></Protected>} />
-              <Route path="/shygontap/connections" element={<Protected title="Connections"><Connections /></Protected>} />
-              <Route path="/shygontap/connect/:slug" element={<Protected title="Connect"><ConnectRequest /></Protected>} />
+              {/* Unreleased features: a production build redirects these to the experience page (Q-C). */}
+              <Route path="/shygontap/emergency" element={<OwnerPage feature="emergency"><Protected title="Emergency contacts and alerts"><EmergencySettings /></Protected></OwnerPage>} />
+              <Route path="/shygontap/return-to-owner" element={<OwnerPage feature="return"><Protected title="Return to owner"><ReturnToOwner /></Protected></OwnerPage>} />
+              <Route path="/shygontap/connections" element={<OwnerPage feature="connect"><Protected title="Connections"><Connections /></Protected></OwnerPage>} />
+              <Route path="/shygontap/connect/:slug" element={<OwnerPage feature="connect"><Protected title="Connect"><ConnectRequest /></Protected></OwnerPage>} />
               {/* No Tap chosen: the place to see and answer connections. */}
               <Route path="/shygontap/connect" element={<Navigate to="/shygontap/connections" replace />} />
               <Route path="/shygontap/tap" element={<Protected title="Tap profile"><TapEditor /></Protected>} />

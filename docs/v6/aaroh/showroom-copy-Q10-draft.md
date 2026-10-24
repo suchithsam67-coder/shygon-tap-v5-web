@@ -23,7 +23,7 @@ Where the wording is used:
 **Release switch.** `RELEASED` in `modes.ts` is false for all three:
 - the account menu does not list them;
 - the AAROH experience page shows "Coming soon" with nothing to press;
-- their owner pages stay reachable by address, for verification on test systems.
+- their owner pages redirect to the AAROH experience page in a production build (Q-C, 2026-10-23); test and preview builds made with `VITE_AAROH_PREVIEW_PAGES=on` keep them reachable by address, for verification.
 
 On a public Tap, a card appears only when the server's `public.status` says the feature is on. That is off in every environment today.
 
@@ -31,11 +31,11 @@ On a public Tap, a card appears only when the server's `public.status` says the 
 
 Available · Setup required · Coming soon · Unavailable · Demo (for a labelled demonstration). "Live" is never used for customers.
 
-The store's other roadmap items (Student Passport, Event mode, Places and objects, Cloud storage) still use the store's earlier word "Planned". **Open question for the owner:** should they also read "Coming soon"?
+**Q-B, approved 2026-10-23:** the store's other roadmap items (Student Passport, Event mode, Places and objects, Cloud storage, and the use case "Managing a team’s cards") read "Coming soon" too; "Planned" is no longer a status word.
 
-## 3. Still awaiting approval
+## 3. Approved 2026-10-23 (Q-D, Q-F)
 
 | Item | State |
 |---|---|
-| Privé demo wording (sample hotel, "SHYGON's demo desk", the demo notice) | Not yet approved. `PRIVE_DEMO` stays false |
-| The real-Tap card notes under the three features (e.g. "Found this card? Message the owner through SHYGON…") | In the build behind server switches; shown only when a feature is on. Owner to confirm, or replace with the approved description alone |
+| Privé demo wording (sample hotel, the demo notice, the services, the result) | **Approved as drafted (Q-F).** `PRIVE_DEMO` is on: the demo showroom only, never on a real Tap. The exact strings are in `frontend-decision-pack-2026-10-23.md` (Q-F); the six further strings flagged there were approved as drafted on 2026-10-24 |
+| The real-Tap card notes under the three features ("Found this card? Message the owner through SHYGON. You will not see their details.", and the Emergency and Connect notes) | **Keep (Q-D).** Shown only when a feature's server switch is on |

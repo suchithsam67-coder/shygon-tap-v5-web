@@ -32,7 +32,9 @@ export const STATUS_LABEL: Record<FeatureStatus, string> = {
   package: 'Requires an eligible plan',
   addon: 'Paid add-on',
   'card-release': 'With the card release',
-  future: 'Planned',
+  // The owner's status word for anything not yet available (Q-B, 2026-10-23),
+  // the same word the showroom uses. It gives no date.
+  future: 'Coming soon',
 }
 
 /** The four questions the store answers first. */
@@ -323,11 +325,13 @@ export interface ShowcaseFeature {
  * code (the same evidence as SOFTWARE_FEATURES above). The second group is the
  * SHYGON OS roadmap: candidate modules from the owner-app plan
  * (SHYGON_AAROH_Owner_App_and_SHYGON_OS_Experience_Plan, 2026-10), shown as
- * "Planned" on the owner's decision of 2026-10-16. None is built, none has a
- * release date, buying a card does not include or guarantee any of them, and
- * none has an action. Left out on purpose: SHYGON Privé (the owner decided not
- * to launch it), and access and credential modules (an AAROH card is not an
- * access, attendance or authentication credential, DEC-2026-037).
+ * a roadmap on the owner's decision of 2026-10-16, labelled "Coming soon"
+ * since Q-B (2026-10-23). None is built, none has a release date, buying a
+ * card does not include or guarantee any of them, and none has an action. Left
+ * out on purpose: SHYGON Privé (not part of the launch; it exists only as a
+ * labelled demo in the demo showroom, DEC-2026-040), and access and credential
+ * modules (an AAROH card is not an access, attendance or authentication
+ * credential, DEC-2026-037).
  */
 export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
   {
@@ -433,7 +437,6 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     benefit: 'Lost something with SHYGON? Let the finder contact you through a privacy-conscious relay, without automatically exposing your personal contact details.',
     icon: 'return',
     status: 'future',
-    statusLabel: 'Coming soon',
     useCase: 'A candidate SHYGON OS module: someone who finds a lost card could reach you without seeing your details.',
     ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'Its privacy rules would be decided and published before any launch.',
@@ -445,7 +448,6 @@ export const AAROH_SHOWCASE: readonly ShowcaseFeature[] = [
     benefit: 'Keep the emergency information you choose ready when it matters. You control what is stored and what may be shared.',
     icon: 'emergency',
     status: 'future',
-    statusLabel: 'Coming soon',
     useCase: 'A candidate SHYGON OS module for emergency details that you approve, shown only in an emergency flow.',
     ownerControls: 'Not available today, and not included with a card. No release date.',
     privacy: 'Highly sensitive: nothing like it is shown or stored today.',

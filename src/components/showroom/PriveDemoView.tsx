@@ -9,9 +9,9 @@ const SERVICES = ['Fresh towels', 'Housekeeping', 'Late check-out', 'A table at 
  * stays on this page. Nothing is connected to a hotel system; nothing is
  * booked; no door opens; and it never says a hotel received anything.
  *
- * Shown only in the demo showroom. The owner removed Privé from the launch on
- * 2026-10-16; the 2026-10-19 briefs ask for it as a demo, and that conflict is
- * DEC-2026-038 Q6 / FE-D5 for the owner to confirm.
+ * Shown only in the demo showroom. Privé is not part of the launch: it is a
+ * demo only (DEC-2026-038 Q6 → A, DEC-2026-040), and this wording is the
+ * owner's, approved as drafted (Q-F, 2026-10-23).
  */
 export function PriveDemoView() {
   const [chosen, setChosen] = useState<string | null>(null);

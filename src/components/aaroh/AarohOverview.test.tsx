@@ -9,7 +9,7 @@ import type { Catalog } from '../../services/catalog';
  * where it hands off. The welcome and the theme are exercised in the browser
  * (e2e/journeys.spec.ts); here: the selection hands the chosen edition, finish
  * and quantity to checkout only while card sales are open and the variant is
- * in stock; the roadmap is labelled Planned, has no actions and no Privé; and
+ * in stock; the roadmap is labelled Coming soon, has no actions and no Privé; and
  * the edition switcher offers the neighbouring editions.
  */
 
@@ -97,15 +97,15 @@ describe('AarohOverview', () => {
     expect(selection().getByText(/not in stock yet/)).toBeTruthy();
   });
 
-  it('labels the roadmap Planned, gives it no action, and leaves Privé out', () => {
+  it('labels the roadmap Coming soon, gives it no action, and leaves Privé out', () => {
     renderOverview();
     const features = within(document.getElementById('ao-features')!);
     expect(features.getByRole('heading', { name: 'Upcoming SHYGON OS features' })).toBeTruthy();
     expect(features.queryByText(/Privé/)).toBeNull();
     fireEvent.click(features.getByRole('button', { name: /^Return to Owner/ }));
-    // The owner's words for this one (2026-10-20); the rest of the roadmap keeps "Planned".
-    expect(features.getAllByText('Coming soon').length).toBeGreaterThan(0);
-    expect(features.getAllByText('Planned').length).toBeGreaterThan(0);
+    // One word for the whole roadmap, the owner's (Q-B, 2026-10-23); "Planned" is gone.
+    expect(features.getAllByText('Coming soon').length).toBeGreaterThan(1);
+    expect(features.queryByText('Planned')).toBeNull();
     expect((features.getByRole('button', { name: 'Not available yet' }) as HTMLButtonElement).disabled).toBe(true);
     expect(features.queryByRole('link', { name: /Set up|Open|Choose|See|Manage/ })).toBeNull();
     fireEvent.click(features.getByRole('button', { name: /^Digital profile/ }));

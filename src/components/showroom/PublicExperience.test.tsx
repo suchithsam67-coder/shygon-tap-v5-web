@@ -95,9 +95,11 @@ describe('which modes a real Tap shows (FE-D8)', () => {
     expect(liveModesFor(everything, { emergency: true, rescue: true })).toEqual([
       'identity', 'business', 'contact', 'links', 'emergency', 'return', 'owner',
     ]);
-    // Privé is demo-only (and off, FE-D5); Verify and Access are not part of AAROH (DEC-2026-037).
+    // Privé is a demo, in the demo showroom only (Q-F): never on a real Tap, whatever the servers say.
+    // Verify and Access are not part of AAROH (DEC-2026-037).
     expect(MODES.prive.availability).toBe('demo');
-    expect(MODE_ORDER).not.toContain('prive');
+    expect(MODE_ORDER).toContain('prive');
+    expect(liveModesFor(everything, { emergency: true, rescue: true, connect: true })).not.toContain('prive');
     expect([MODES.verify.availability, MODES.access.availability]).toEqual(['unsupported', 'unsupported']);
     // Nothing is called "Live" to a customer (AAROH-API §12).
     expect(Object.values(MODES).map((m) => m.availability)).not.toContain('live');
@@ -288,10 +290,33 @@ describe('the demo showroom (/aaroh/experience)', () => {
       if (MODES[id].demoWalkthrough) expect(within(card).getByRole('button', { name: /Try the demo/ })).toBeTruthy();
       else expect(card.querySelector('button')).toBeNull();
     }
-    // Privé is off until the owner settles FE-D5 / DEC-2026-038 Q6.
-    expect(document.querySelector('[data-mode="prive"]')).toBeNull();
+    // Privé: a labelled demo with its own walkthrough (Q-F).
+    const prive = document.querySelector('[data-mode="prive"]') as HTMLElement;
+    // Its status word, and the walkthrough's own chip, both say Demo.
+    expect(within(prive).getAllByText('Demo').length).toBeGreaterThanOrEqual(1);
+    expect(within(prive).getByRole('button', { name: /Try the demo/ })).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/\bLive\b/);
     expect(client.fetchPublicProfile).not.toHaveBeenCalled();
+  });
+
+  it('the Privé demo: a sample hotel, a request that stays on the page, nothing sent (Q-F)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    visit('/aaroh/experience?mode=prive');
+    expect(await screen.findByRole('heading', { level: 1, name: 'SHYGON Privé' })).toBeTruthy();
+    expect(screen.getByText(/Not connected to any real hotel, booking, room or door/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Late check-out' }));
+    expect(await screen.findByRole('heading', { name: 'Not sent: this is a demo' })).toBeTruthy();
+    expect(screen.getByText(/No hotel received it/)).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/the hotel (has )?received|request (was )?sent to|booking (is )?confirmed/i);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('on a real Tap, ?mode=prive opens nothing: the showroom shows, with no Privé card', async () => {
+    client.fetchPublicProfile.mockResolvedValue(profile());
+    visit('/t/asha?mode=prive');
+    expect(await name('Asha Rao')).toBeTruthy();
+    expect(document.querySelector('[data-mode="prive"]')).toBeNull();
+    expect(screen.queryByText(/Privé/)).toBeNull();
   });
 
   it('the emergency walkthrough asks for intent, works once, sends nothing, and never claims an alert went out', async () => {
