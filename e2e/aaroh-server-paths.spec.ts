@@ -294,3 +294,77 @@ test('connect: a signed-in visitor asks from the Tap, the owner accepts, details
   expect(grants!.every((g) => g.revoked_at !== null)).toBe(true);
   await sim.post('/__sim/switches', { data: { CONNECT_PUBLIC: false } });
 });
+
+test('info mode: the owner writes an Info page and shows it; visitors see only that page; with Info off, "Tap not found", never Business', async ({ page, browser }) => {
+  const db = server();
+  // SHYGON's catalogue switch for Info (off on every database by default, BQ-1).
+  // There is no /__sim hook for it; the test sets it with the stack's service key.
+  const setInfo = async (enabled: boolean) => {
+    const { error } = await db.from('tap_mode_catalog').update({ enabled }).eq('mode', 'info');
+    expect(error).toBeNull();
+  };
+  await setInfo(true);
+  try {
+    const { owner, slug } = await publishedOwner('Info Owner');
+    const { data: tap } = await db.from('tap_profiles').select('id').eq('user_id', owner.userId).single();
+
+    await signIn(page, owner.email, owner.password);
+    await page.goto('/shygontap/mode');
+    await expect(page.getByTestId('tm-active')).toHaveText('Your Tap shows your Business profile.');
+    await expect(page.getByTestId('tm-info-status')).toHaveText('Setup required: add title and short description');
+    await page.getByLabel('Title').fill('Meeting room 3');
+    await page.getByLabel('Short description').fill('Seats eight. Book at reception.');
+    await page.getByLabel('Category (optional)').selectOption('place');
+    await page.getByLabel('Detailed information (optional)').fill('Screen: HDMI and USB-C.\nWi-Fi: ask reception.');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText('Saved.')).toBeVisible();
+    await expect(page.getByTestId('tm-info-status')).toHaveText('Ready to show');
+    await page.getByRole('button', { name: 'Show the Info page instead' }).click();
+    await expect(page.getByText('Done. Your Tap now shows your Info page.')).toBeVisible();
+    await expect(page.getByTestId('tm-publication')).toHaveText('Showing on your Tap');
+    expect(await page.content()).not.toMatch(/\bLive\b/);
+
+    // A visitor taps the card: the Info page, as plain text, and nothing of the owner's.
+    const context = await browser.newContext();
+    await stayLocal(context);
+    const visitor = await context.newPage();
+    const { count: before } = await db.from('tap_events').select('id', { count: 'exact', head: true }).eq('tap_profile_id', tap!.id);
+    await visitor.goto(`/t/${slug}?src=nfc`);
+    await expect(visitor.getByRole('heading', { level: 1, name: 'Meeting room 3' })).toBeVisible();
+    await expect(visitor.getByText('Seats eight. Book at reception.')).toBeVisible();
+    await expect(visitor.getByText('Place', { exact: true })).toBeVisible();
+    expect(await visitor.title()).toBe('Meeting room 3 | SHYGON Tap');
+    await expect(visitor.getByRole('button')).toHaveCount(0);
+    for (const name of [/Message the owner/, /Alert their contacts/, /Ask to connect/, /owner/i]) {
+      await expect(visitor.getByRole('link', { name })).toHaveCount(0);
+    }
+    const html = await visitor.content();
+    const storage = await visitor.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+    for (const canary of ['Info Owner', owner.email, owner.userId]) {
+      expect(html).not.toContain(canary);
+      expect(storage).not.toContain(canary);
+    }
+    // No visitor counts for Info (PQ-2).
+    await visitor.waitForTimeout(500);
+    const { count: after } = await db.from('tap_events').select('id', { count: 'exact', head: true }).eq('tap_profile_id', tap!.id);
+    expect(after).toBe(before);
+
+    // SHYGON switches Info off: the neutral "Tap not found", never the Business profile (BQ-2).
+    await setInfo(false);
+    await visitor.reload();
+    await expect(visitor.getByText('Tap not found')).toBeVisible();
+    expect(await visitor.content()).not.toContain('Info Owner');
+
+    // On again; the owner switches back to Business, and visitors see it again.
+    await setInfo(true);
+    await page.reload();
+    await page.getByRole('button', { name: 'Show my Business profile instead' }).click();
+    await expect(page.getByText('Done. Your Tap now shows your Business profile.')).toBeVisible();
+    await visitor.reload();
+    await visitor.keyboard.press('Escape');
+    await expect(visitor.getByRole('heading', { level: 1, name: 'Info Owner' })).toBeVisible();
+    await context.close();
+  } finally {
+    await setInfo(false);
+  }
+});

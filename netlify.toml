@@ -284,6 +284,11 @@
   to = "/index.html"
   status = 200
 
+[[redirects]]
+  from = "/shygontap/mode"
+  to = "/index.html"
+  status = 200
+
 # The AAROH demo showroom: public, sample data, noindex (FE-D7).
 
 [[redirects]]

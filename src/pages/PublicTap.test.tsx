@@ -17,11 +17,20 @@ import { DEFAULT_THEME } from '../lib/database.types';
  * the profile card does (src/components/showroom/PublicExperience.test.tsx).
  */
 
-const client = vi.hoisted(() => ({
-  fetchPublicProfile: vi.fn(),
-  fetchPublicTapState: vi.fn(),
-  recordTapEvent: vi.fn(),
-}));
+const client = vi.hoisted(() => {
+  const c = {
+    fetchPublicProfile: vi.fn(),
+    fetchPublicTapState: vi.fn(),
+    recordTapEvent: vi.fn(),
+    /** P-6 as the page sees it: a test may set `view`; otherwise the Business profile from P-1. */
+    view: undefined as unknown,
+    fetchPublicTap: (slug: string): Promise<unknown> =>
+      c.view !== undefined
+        ? Promise.resolve(c.view)
+        : Promise.resolve(c.fetchPublicProfile(slug)).then((profile: unknown) => (profile ? { mode: 'business', profile } : null)),
+  };
+  return c;
+});
 vi.mock('../lib/publicTapClient', () => client);
 
 function profile(overrides: Partial<PublicProfile> = {}): PublicProfile {
@@ -74,6 +83,7 @@ async function expectEvents(expected: [string, string][]) {
 }
 
 beforeEach(() => {
+  client.view = undefined;
   client.fetchPublicProfile.mockReset();
   client.fetchPublicTapState.mockReset();
   client.recordTapEvent.mockReset().mockResolvedValue(undefined);
@@ -178,5 +188,95 @@ describe('a Tap that could not be loaded', () => {
     client.fetchPublicProfile.mockRejectedValue(new TypeError('Failed to fetch'));
     visit('/t/asha');
     expect(await screen.findByText("You're offline")).toBeTruthy();
+  });
+});
+
+describe('a Tap in Info mode (AAROH-API v0.8, DEC-2026-041)', () => {
+  // Canaries: what the owner's Business profile holds. None may reach an Info page.
+  const CANARY = {
+    name: 'Asha Canary Rao',
+    email: 'canary@example.test',
+    phone: '+919811111111',
+    company: 'Canary Studio',
+    avatar: 'https://cdn.example.test/canary-avatar.jpg',
+  };
+  const info = {
+    title: 'Meeting room 3',
+    shortDescription: 'Seats eight. Book at reception.',
+    category: 'place',
+    detailedInformation: 'Screen: HDMI and USB-C.\nWi-Fi: ask reception.',
+    updatedAt: '2026-10-24T09:00:00Z',
+  };
+  beforeEach(() => {
+    // P-1 would still answer with the Business profile (BQ-1); the page must not ask it.
+    client.fetchPublicProfile.mockResolvedValue(
+      profile({ displayName: CANARY.name, email: CANARY.email, phone: CANARY.phone, company: CANARY.company, avatarUrl: CANARY.avatar }),
+    );
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  it('shows the five fields as plain text, with no Business data and no capability buttons', async () => {
+    client.view = { mode: 'info', info };
+    visit('/t/asha?src=nfc');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Meeting room 3' })).toBeTruthy();
+    expect(screen.getByText('Seats eight. Book at reception.')).toBeTruthy();
+    expect(screen.getByText('Place')).toBeTruthy();
+    expect(screen.getByText(/Screen: HDMI and USB-C\.\s+Wi-Fi: ask reception\./)).toBeTruthy();
+    // No capability on a page about a thing (PQ-3), and no way into anyone's account.
+    for (const name of [/Message the owner/, /Alert their contacts/, /Ask to connect/, /owner/i, /Call/, /WhatsApp/, /Email/]) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
+      expect(screen.queryByRole('link', { name })).toBeNull();
+    }
+    expect(client.fetchPublicProfile).not.toHaveBeenCalled();
+  });
+
+  it('privacy canaries: nothing of the Business profile in the page, its title, description, share tags or browser storage', async () => {
+    client.view = { mode: 'info', info };
+    visit('/t/asha');
+    await screen.findByRole('heading', { level: 1, name: 'Meeting room 3' });
+    await settle();
+    const head = document.head.innerHTML;
+    const storage = JSON.stringify({ ...window.localStorage }) + JSON.stringify({ ...window.sessionStorage });
+    for (const canary of Object.values(CANARY)) {
+      expect(document.body.innerHTML).not.toContain(canary);
+      expect(head).not.toContain(canary);
+      expect(document.title).not.toContain(canary);
+      expect(storage).not.toContain(canary);
+    }
+    expect(document.title).toBe('Meeting room 3 | SHYGON Tap');
+    expect(document.head.querySelector('meta[name="description"]')?.getAttribute('content')).toBe('Seats eight. Book at reception.');
+    // The share image is SHYGON's own default, never the owner's photo (checked with the canaries above).
+    // Nor does the Info page itself go into storage.
+    expect(storage).not.toContain('Meeting room 3');
+  });
+
+  it('records no visitor event, not even for an NFC tap (PQ-2)', async () => {
+    client.view = { mode: 'info', info };
+    visit('/t/asha?src=nfc');
+    await screen.findByRole('heading', { level: 1, name: 'Meeting room 3' });
+    await settle();
+    expect(client.recordTapEvent).not.toHaveBeenCalled();
+  });
+
+  it('text that looks like markup stays text: nothing is turned into an element or a link', async () => {
+    client.view = {
+      mode: 'info',
+      info: { ...info, title: '<img src=x onerror=alert(1)>', detailedInformation: 'Visit https://example.test <b>now</b>' },
+    };
+    visit('/t/asha');
+    expect(await screen.findByRole('heading', { level: 1, name: '<img src=x onerror=alert(1)>' })).toBeTruthy();
+    expect(document.querySelector('main img, main b')).toBeNull();
+    expect(screen.queryByRole('link', { name: /example\.test/ })).toBeNull();
+  });
+
+  it('Info switched off, missing or invalid (P-6 null): the neutral "Tap not found", never the Business profile (BQ-2)', async () => {
+    client.view = null;
+    client.fetchPublicTapState.mockResolvedValue('active');
+    visit('/t/asha');
+    expect(await screen.findByText('Tap not found')).toBeTruthy();
+    expect(robots()).toContain('noindex');
+    expect(client.fetchPublicProfile).not.toHaveBeenCalled();
+    expect(document.body.innerHTML).not.toContain(CANARY.name);
   });
 });

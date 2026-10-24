@@ -12,11 +12,20 @@ import { liveModesFor, MODES, MODE_ORDER } from './modes';
  * schema in supabase/tests/public-tap.mjs and golden-public-tap.mjs.
  */
 
-const client = vi.hoisted(() => ({
-  fetchPublicProfile: vi.fn(),
-  fetchPublicTapState: vi.fn(),
-  recordTapEvent: vi.fn(),
-}));
+const client = vi.hoisted(() => {
+  const c = {
+    fetchPublicProfile: vi.fn(),
+    fetchPublicTapState: vi.fn(),
+    recordTapEvent: vi.fn(),
+    /** P-6 as the page sees it: a test may set `view`; otherwise the Business profile from P-1. */
+    view: undefined as unknown,
+    fetchPublicTap: (slug: string): Promise<unknown> =>
+      c.view !== undefined
+        ? Promise.resolve(c.view)
+        : Promise.resolve(c.fetchPublicProfile(slug)).then((profile: unknown) => (profile ? { mode: 'business', profile } : null)),
+  };
+  return c;
+});
 vi.mock('../../lib/publicTapClient', () => client);
 
 function profile(overrides: Partial<PublicProfile> = {}): PublicProfile {

@@ -12,11 +12,20 @@ import { DEFAULT_THEME, type PublicProfile } from '../../lib/database.types';
  * one key, and the page shows only the server's own outcome.
  */
 
-const client = vi.hoisted(() => ({
-  fetchPublicProfile: vi.fn(),
-  fetchPublicTapState: vi.fn(),
-  recordTapEvent: vi.fn(),
-}));
+const client = vi.hoisted(() => {
+  const c = {
+    fetchPublicProfile: vi.fn(),
+    fetchPublicTapState: vi.fn(),
+    recordTapEvent: vi.fn(),
+    /** P-6 as the page sees it: a test may set `view`; otherwise the Business profile from P-1. */
+    view: undefined as unknown,
+    fetchPublicTap: (slug: string): Promise<unknown> =>
+      c.view !== undefined
+        ? Promise.resolve(c.view)
+        : Promise.resolve(c.fetchPublicProfile(slug)).then((profile: unknown) => (profile ? { mode: 'business', profile } : null)),
+  };
+  return c;
+});
 vi.mock('../../lib/publicTapClient', () => client);
 
 const profile: PublicProfile = {

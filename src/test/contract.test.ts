@@ -15,6 +15,7 @@ const CLIENTS: Record<string, string[]> = {
   '/api/emergency': ['src/services/emergency.ts', 'src/lib/publicEmergencyClient.ts'],
   '/api/rescue': ['src/services/rescue.ts', 'src/lib/publicRescueClient.ts'],
   '/api/connect': ['src/services/connect.ts', 'src/lib/publicConnectClient.ts'],
+  '/api/modes': ['src/services/tapMode.ts'],
 };
 
 const opsIn = (file: string) => [...read(file).matchAll(/\bop:\s*'([a-z][a-z.]*)'/g)].map((m) => m[1]!);
@@ -35,9 +36,9 @@ describe('every server call is in the published contract', () => {
     });
   }
 
-  it('the public Tap reads only the three published RPCs', () => {
+  it('the public Tap reads only the published RPCs: P-1 to P-3, and P-6 (v0.8)', () => {
     const rpcs = [...read('src/lib/publicTapClient.ts').matchAll(/rpc(?:<[^>]*>)?\('([a-z_]+)'/g)].map((m) => m[1]!);
-    expect(rpcs.sort()).toEqual(['get_public_profile', 'get_public_tap_state', 'record_tap_event']);
+    expect(rpcs.sort()).toEqual(['get_public_profile', 'get_public_tap_mode', 'get_public_tap_state', 'record_tap_event']);
     for (const name of rpcs) expect(contract).toContain(name);
   });
 });

@@ -14,6 +14,7 @@ import type { ServerFeature } from '../showroom/modes';
 const flags = vi.hoisted(() => ({
   preview: false,
   released: { emergency: false, return: false, connect: false } as Record<string, boolean>,
+  info: false,
 }));
 vi.mock('../showroom/modes', () => ({
   get PREVIEW_PAGES() {
@@ -22,22 +23,27 @@ vi.mock('../showroom/modes', () => ({
   get RELEASED() {
     return flags.released;
   },
+  get INFO_RELEASED() {
+    return flags.info;
+  },
 }));
 
 afterEach(() => {
   cleanup();
   flags.preview = false;
   flags.released = { emergency: false, return: false, connect: false };
+  flags.info = false;
 });
 
-const PAGES: [ServerFeature, string][] = [
+const PAGES: [ServerFeature | 'info', string][] = [
   ['emergency', '/shygontap/emergency'],
   ['return', '/shygontap/return-to-owner'],
   ['connect', '/shygontap/connections'],
   ['connect', '/shygontap/connect/asha'],
+  ['info', '/shygontap/mode'],
 ];
 
-const visit = (feature: ServerFeature, path: string) =>
+const visit = (feature: ServerFeature | 'info', path: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
@@ -74,5 +80,9 @@ describe('owner pages of unreleased features', () => {
     cleanup();
     visit('connect', '/shygontap/connections');
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Your AAROH experience');
+    cleanup();
+    flags.info = true;
+    visit('info', '/shygontap/mode');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('The owner page');
   });
 });

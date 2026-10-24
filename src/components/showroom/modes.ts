@@ -315,6 +315,14 @@ export const RELEASED: Record<ServerFeature, boolean> = {
  */
 export const PREVIEW_PAGES: boolean = import.meta.env.VITE_AAROH_PREVIEW_PAGES === 'on' || import.meta.env.DEV;
 
+/**
+ * Info mode (AAROH-API v0.8, DEC-2026-041): one active mode per Tap, Business or
+ * an Info page. Built and switched off: SHYGON's catalogue has Info off on every
+ * database until BQ-1, and its customer wording is not yet approved. Until it
+ * is released, its owner page (`/shygontap/mode`) is hidden like the others.
+ */
+export const INFO_RELEASED = false;
+
 export const OWNER_PAGE: Record<ServerFeature, string> = {
   emergency: '/shygontap/emergency',
   return: '/shygontap/return-to-owner',

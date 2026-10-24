@@ -57,6 +57,7 @@ const EmergencySettings = lazy(() => import('./pages/EmergencySettings'));
 const ReturnToOwner = lazy(() => import('./pages/ReturnToOwner'));
 const Connections = lazy(() => import('./pages/Connections'));
 const ConnectRequest = lazy(() => import('./pages/ConnectRequest'));
+const TapMode = lazy(() => import('./pages/TapMode'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'));
 const Terms = lazy(() => import('./pages/legal/Terms'));
@@ -123,6 +124,7 @@ export default function AccountApp() {
               <Route path="/shygontap/return-to-owner" element={<OwnerPage feature="return"><Protected title="Return to owner"><ReturnToOwner /></Protected></OwnerPage>} />
               <Route path="/shygontap/connections" element={<OwnerPage feature="connect"><Protected title="Connections"><Connections /></Protected></OwnerPage>} />
               <Route path="/shygontap/connect/:slug" element={<OwnerPage feature="connect"><Protected title="Connect"><ConnectRequest /></Protected></OwnerPage>} />
+              <Route path="/shygontap/mode" element={<OwnerPage feature="info"><Protected title="What your Tap shows"><TapMode /></Protected></OwnerPage>} />
               {/* No Tap chosen: the place to see and answer connections. */}
               <Route path="/shygontap/connect" element={<Navigate to="/shygontap/connections" replace />} />
               <Route path="/shygontap/tap" element={<Protected title="Tap profile"><TapEditor /></Protected>} />

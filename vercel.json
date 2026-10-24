@@ -177,6 +177,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/shygontap/mode",
+      "destination": "/index.html"
+    },
+    {
       "source": "/aaroh/experience",
       "destination": "/index.html"
     },

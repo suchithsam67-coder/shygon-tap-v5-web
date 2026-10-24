@@ -1,0 +1,90 @@
+/* A Tap in Info mode: one calm, readable card of plain text (v0.8 §6). */
+
+.info-page {
+  min-height: 100svh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 22px;
+  padding: 40px 16px;
+  background: radial-gradient(60% 45% at 50% 0%, #0d1a33 0%, #04070f 70%);
+  color: #fff;
+  font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.info-card {
+  width: min(560px, 100%);
+  padding: 28px 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+
+.info-category {
+  display: inline-block;
+  margin: 0 0 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  background: rgba(212, 175, 55, 0.1);
+  color: #e3c463;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.info-title {
+  margin: 0 0 10px;
+  font-size: clamp(24px, 6vw, 32px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.info-lead {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 16.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.info-details {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 15px;
+  line-height: 1.7;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.info-updated {
+  margin: 20px 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12.5px;
+}
+
+.info-footnote {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.info-footnote a {
+  color: #d4af37;
+  font-weight: 700;
+}
+
+/* The owner's preview: the same card, on the page's own dark ground. */
+.info-preview {
+  padding: 18px;
+  border-radius: 18px;
+  background: radial-gradient(60% 45% at 50% 0%, #0d1a33 0%, #04070f 70%);
+  color: #fff;
+}

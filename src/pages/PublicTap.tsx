@@ -1,8 +1,8 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Loader2, PauseCircle, SearchX, WifiOff } from 'lucide-react';
-import { fetchPublicProfile, fetchPublicTapState, recordTapEvent } from '../lib/publicTapClient';
-import type { PublicProfile, PublicTapState } from '../lib/database.types';
+import { fetchPublicTap, fetchPublicTapState, recordTapEvent } from '../lib/publicTapClient';
+import type { PublicInfo, PublicProfile, PublicTapState } from '../lib/database.types';
 // Type-only: the builders in seo/meta carry the product catalogue, which the
 // public Tap bundle must not include.
 import type { PageMeta } from '../seo/meta';
@@ -20,13 +20,17 @@ const experienceChunk = loadExperience();
 // A failed early download is retried once when the page needs the chunk.
 experienceChunk.catch(() => undefined);
 const PublicExperience = lazy(() => experienceChunk.catch(loadExperience));
+/** A Tap in Info mode: a small page of its own, fetched only when one is shown. */
+const PublicInfoPage = lazy(() => import('../components/info/PublicInfoPage'));
 
 /**
  * The public Tap page — what a visitor sees after an NFC tap or a QR scan.
  *
- * All of it comes from `get_public_profile()`, a SECURITY DEFINER function that
- * returns whitelisted fields for an active Tap only, already clamped to what
- * the customer actually owns. This component never queries `tap_profiles`
+ * All of it comes from `get_public_tap_mode()` (P-6, AAROH-API v0.8), a
+ * SECURITY DEFINER function that answers with the Tap's Business profile
+ * (`get_public_profile`'s whitelisted fields, clamped to what the customer
+ * owns), its Info page (five plain-text fields), or nothing. It never falls
+ * back to the Business profile for an Info page that is off or incomplete. This component never queries `tap_profiles`
  * directly, so there is no query here that could be broadened into leaking
  * `user_id`, an order, or any other private record — and no entitlement logic
  * of its own, so it cannot upgrade itself.
@@ -58,9 +62,20 @@ function tapMeta(data: PublicProfile): PageMeta {
   };
 }
 
+/** The tab title and share preview for a Tap in Info mode: its own two fields, nothing of the owner's. */
+function infoMeta(info: PublicInfo, slug: string): PageMeta {
+  return {
+    title: `${info.title} | SHYGON Tap`,
+    description: clip(info.shortDescription),
+    path: `/t/${slug}`,
+    type: 'website',
+  };
+}
+
 type Outcome =
   | { kind: 'loading' }
   | { kind: 'tap'; data: PublicProfile }
+  | { kind: 'info'; info: PublicInfo }
   | { kind: 'state'; state: PublicTapState }
   | { kind: 'offline' }
   | { kind: 'error' };
@@ -78,6 +93,7 @@ export default function PublicTap() {
   usePageMeta(
     useMemo<PageMeta | null>(() => {
       if (outcome.kind === 'tap') return tapMeta(outcome.data);
+      if (outcome.kind === 'info') return infoMeta(outcome.info, slug ?? '');
       if (outcome.kind === 'loading') return null;
       // Paused, missing or failed to load: nothing here should be indexed.
       return {
@@ -99,8 +115,9 @@ export default function PublicTap() {
     if (!slug) return { kind: 'state', state: 'unavailable' };
 
     try {
-      const result = await fetchPublicProfile(slug);
-      if (result) return { kind: 'tap', data: result };
+      const view = await fetchPublicTap(slug);
+      if (view?.mode === 'business') return { kind: 'tap', data: view.profile };
+      if (view?.mode === 'info') return { kind: 'info', info: view.info };
 
       // Not live. Ask why, so a paused Tap does not read as a dead link.
       try {
@@ -139,7 +156,8 @@ export default function PublicTap() {
   }, []);
 
   // Exactly one 'view' per landing, plus an 'nfc'/'qr' event when the physical
-  // card or a QR scan added the matching query parameter.
+  // card or a QR scan added the matching query parameter. An Info page records
+  // nothing: no visitor counts for Info (DEC-2026-041 PQ-2).
   useEffect(() => {
     if (!slug || outcome.kind !== 'tap' || viewLogged.current) return;
     viewLogged.current = true;
@@ -217,6 +235,14 @@ function TapOutcome({ outcome, slug, retry }: { outcome: Outcome; slug: string |
         title="Tap not found"
         message="This Tap is not available. Check the link on your card, or ask the owner to share it again."
       />
+    );
+  }
+
+  if (outcome.kind === 'info') {
+    return (
+      <Suspense fallback={<TapLoading />}>
+        <PublicInfoPage info={outcome.info} />
+      </Suspense>
     );
   }
 

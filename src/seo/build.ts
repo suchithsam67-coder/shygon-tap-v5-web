@@ -129,7 +129,7 @@ const PRIVATE_PATHS = [
   '/shygontap/qr', '/shygontap/cards', '/shygontap/customizations', '/shygontap/checkout', '/shygontap/orders',
   '/shygontap/notifications', '/shygontap/analytics', '/shygontap/support', '/shygontap/settings',
   '/shygontap/experience', '/shygontap/emergency', '/shygontap/return-to-owner', '/shygontap/connections',
-  '/shygontap/connect/', '/api/',
+  '/shygontap/connect/', '/shygontap/mode', '/api/',
 ];
 
 export function robotsTxt(site: string): string {

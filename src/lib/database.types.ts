@@ -289,6 +289,24 @@ export interface PublicProfile {
   } | null;
 }
 
+/** The kinds of thing an Info page describes (AAROH-API v0.8 §6). */
+export type InfoCategory = 'place' | 'product' | 'equipment' | 'exhibit' | 'service_point' | 'instructions';
+
+/**
+ * A Tap in Info mode, as a visitor sees it: these five fields and nothing else
+ * (`get_public_tap_mode`). Plain text only. No Business data, no links, no image.
+ */
+export interface PublicInfo {
+  title: string;
+  shortDescription: string;
+  category: InfoCategory | null;
+  detailedInformation: string | null;
+  updatedAt: string | null;
+}
+
+/** What a live Tap shows: its Business profile or its Info page; null when it shows nothing. */
+export type PublicTapView = { mode: 'business'; profile: PublicProfile } | { mode: 'info'; info: PublicInfo } | null;
+
 export interface OrderRow {
   id: string;
   order_id: string;

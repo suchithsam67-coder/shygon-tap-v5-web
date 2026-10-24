@@ -336,7 +336,9 @@
 
 /* --------------------------------------------------------------- form --- */
 .field { display: block; margin-bottom: 16px; }
-.field > span {
+/* A label wrapping its control (span), or one beside it (label), so hints can sit outside the name. */
+.field > span,
+.field > label {
   display: block;
   margin-bottom: 7px;
   font-size: var(--ds-font-size-sm);

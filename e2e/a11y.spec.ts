@@ -88,6 +88,7 @@ test('signed-in pages: no serious or critical WCAG 2.2 AA violation', async ({ p
     '/shygontap/account', '/shygontap/tap', '/shygontap/tiers', '/shygontap/customize', '/shygontap/qr', '/shygontap/cards',
     '/shygontap/customizations', '/shygontap/orders', '/shygontap/analytics', '/shygontap/notifications', '/shygontap/support',
     '/shygontap/settings', '/shygontap/experience', '/shygontap/emergency', '/shygontap/return-to-owner', '/shygontap/connections',
+    '/shygontap/mode',
   ];
   const blocking: string[] = [];
   for (const path of pages) {
@@ -152,7 +153,7 @@ test('landmarks: every page has one main region and a page heading', async ({ pa
     expect(await page.locator('h1').count(), `${path}: h1`).toBeGreaterThanOrEqual(1);
   }
   await signIn(page, owner.email, owner.password);
-  for (const path of ['/shygontap/account', '/shygontap/settings', '/shygontap/experience', '/shygontap/emergency', '/shygontap/return-to-owner', '/shygontap/connections', `/shygontap/connect/${slug}`]) {
+  for (const path of ['/shygontap/account', '/shygontap/settings', '/shygontap/experience', '/shygontap/emergency', '/shygontap/return-to-owner', '/shygontap/connections', `/shygontap/connect/${slug}`, '/shygontap/mode']) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
     expect(await page.locator('main').count(), `${path}: main regions`).toBe(1);
