@@ -1,8 +1,8 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.7.1
+# SHYGON AAROH backend API contract — AAROH-API v0.8
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.7.1** (2026-10-23). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`; changes in §13. v0.8 is reserved for the mode model (DEC-2026-041), which is not approved. DEC-2026-038, -039 and -040 are **APPROVED**. |
+| Contract version | **AAROH-API v0.8** (2026-10-24): modes and Info, §6. v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`; changes in §13. v0.8 is reserved for the mode model (DEC-2026-041), which is not approved. DEC-2026-038, -039 and -040 are **APPROVED**. |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
 | Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040); none applied anywhere. 027 is held aside (DEC-2026-037). |
@@ -154,23 +154,57 @@ T-2 rules, enforced server-side:
 
 ---
 
-## 6. Modes (Business, Info, Return-to-Owner, …)
+## 6. Modes (Business, Info): `POST /api/modes` and `get_public_tap_mode` (v0.8)
 
-| ID | Operation | Status |
+**Status:** LIVE-LOCAL. Implementation scope approved 2026-10-24 (DEC-2026-041; migration 034). **Info is OFF in the catalogue (`tap_mode_catalog`) on every database by default.** The legacy `get_public_profile` is unchanged (BQ-1), so it would still return the Business payload for a Tap on Info. Info may be switched on in a real database only after BQ-1's change to that reader.
+
+**The model:**
+- One active mode per Tap (per account in v1): `business` (the default; no state row means Business) or `info`.
+- **Info** is a public page about a physical object, product, place or service point. One record per account. Plain text only: no image, no language, no links, no Business data.
+- Emergency, Return-to-Owner and Connect remain per-account capabilities (§10, §10a, §10b). **They do not appear on an Info page** (DEC-2026-041 PQ-3).
+
+**P-6 `rpc('get_public_tap_mode', { p_slug })`** (anon; SECURITY DEFINER; read-only) returns one of:
+- `{ mode: 'business', profile: <the P-1 payload, unchanged> }`;
+- `{ mode: 'info', info: { title, shortDescription, category, detailedInformation, updatedAt } }`, those five keys only;
+- `null`: no live Tap (unknown, draft, paused, suspended), **or** the neutral "unavailable" fallback (Info switched off, missing or invalid).
+
+**It never falls back to the Business profile.** On `null`, ask P-2 why, as today.
+
+**Owner operations** (all need `Authorization: Bearer <access token>`):
+
+| op | Request | Success |
 |---|---|---|
-| M-1 | "Published modes per Tap" (choose which modes a Tap shows) | **NOT IMPLEMENTED** |
-| M-2 | "Mode visibility toggle" | **NOT IMPLEMENTED**. Use T-2 (`enabled_customizations`) and T-3 (publish/pause), which exist |
+| `owner.state` | `{ op }` | 200 `{ activeMode, version, changedAt, modes: [{ mode, available, reason: 'active' \| 'ready' \| 'needs_setup' \| 'not_available', missing? }] }` |
+| `owner.activate` | `{ op, mode: 'business' \| 'info', expectedVersion, idempotencyKey }` | 200 `{ activeMode, previousMode, version, changedAt, replayed }`. The same key again → the first answer with `replayed: true` |
+| `owner.info.get` | `{ op }` | 200 `{ info: { title, shortDescription, category, detailedInformation, updatedAt, version } \| null, publicationStatus: 'draft' \| 'ready' \| 'live' \| 'unavailable' }` |
+| `owner.info.save` | `{ op, fields: { title?, shortDescription?, category?, detailedInformation? }, expectedVersion }`. A present key sets the field (null or empty clears it); an absent key leaves it. `expectedVersion` is 0 before the first save | 200, the same shape as `owner.info.get` |
+| `owner.info.clear` | `{ op }` | 200 `{ cleared }` |
+| `owner.preview` | `{ op, mode }` | 200 `{ mode, view }`: exactly what a visitor would get (`null` when it would be unavailable) |
 
-The schema has no mode entity. What exists:
-- one public profile per account (the Business/"digital profile" use, P-1);
-- an experience tier (`selected_ui_tier`);
-- a timed event theme (`tap_event_themes`, admin-managed).
+**Errors** use the shape `{ error: { code, message, field?, reason?, missing?, current? } }`. Messages are fixed text and never repeat a submitted value.
 
-The owner ordered modes as "Business and Info first, then Return-to-Owner" (2026-10-16). Neither "Info" nor a mode table is defined anywhere in the repository. Designing one is an owner decision: DEC-2026-038 Q7.
+| HTTP | Codes |
+|---|---|
+| 401 | `unauthenticated` |
+| 400 | `invalid_request`, `unknown_op`, `invalid_mode`, `invalid_expected_version`, `invalid_idempotency_key` |
+| 404 | `no_tap` |
+| 409 | `tap_suspended`, `mode_unavailable`, `needs_setup` (+`missing`), `stale_version` (+`current`), `mode_active` |
+| 422 | `invalid_field` (+`field`, +`reason`: `too_long`, `markup`, `control_characters`, `not_allowed`, `unknown` or `not_text`) |
 
-Since v0.2, Return-to-Owner and Emergency exist as **per-account capabilities with their own owner switches** (§10a, §10.2), not as entries in a mode model. Show each one by its own `available` answer.
+**Rules (`test:modes`):**
+- **Fields:** title 1–120 characters and short description 1–280, both required to activate. Category one of `place`, `product`, `equipment`, `exhibit`, `service_point`, `instructions`. Detailed information up to 2,000 characters, with line breaks.
+- **Plain text:** no markup and no control characters.
+- **Edits:** no 14-day window and no fixed quota, and an Info save never touches `tap_profiles`.
+- **While Info is live:** clearing it, or blanking a required field, is `mode_active`.
+- **Switching:** to Business is always allowed; switching is refused while the Tap or the account is suspended.
+- **Audit:** field names only, never values.
+- **Role:** comes only from the verified token. Nothing in the body or the URL can claim one.
 
----
+**Frontend impact:**
+- The public page may call P-6 first and fall back to P-1 if P-6 does not exist yet. `src/test/contract.test.ts` must then allow `get_public_tap_mode`.
+- Render Info as plain text, and show no capability buttons on it.
+- On `null`, use the existing "unavailable" copy.
+- Owner page: show the server's `available` / `reason` / `missing`; show "Live" only after a 200; send `expectedVersion` and a fresh `idempotencyKey` per click.
 
 ## 7. Cards (signed in)
 
@@ -455,7 +489,10 @@ Two **signed-in** SHYGON accounts connect. Each side chooses what it shares from
   - `requests.create`, `requests.accept` and `connections.share` answer **404 `unavailable`**, before sign-in is checked (so an anonymous `requests.create` gets 404 rather than 401);
   - `requests.decline`, `requests.block`, `connections.remove`, `connections.list`, `consents.list` and the settings always work, so consent can always be withdrawn;
   - `settings.get` / `settings.set` report `publicAllowed: false`.
-- **Status:** LIVE-LOCAL, **APPROVED** (DEC-2026-038 Q13; DEC-2026-039 Q1–Q7 as built, 2026-10-20). A Connect control may ship with the first production release that contains 032. Its customer wording is the owner's to approve, as for Q10.
+- **Status:** LIVE-LOCAL, **APPROVED** (DEC-2026-038 Q13; DEC-2026-039 Q1–Q7 as built, 2026-10-20; amendment A-1 approved 2026-10-20).
+  - A Connect control may ship with the first production release that contains 032.
+  - Connect becomes visible to visitors only when the owner, after verifying the connection and consent workflows, has the host set `CONNECT_PUBLIC=on` (A-1). Until then it stays off.
+  - Its customer wording is the owner's to approve, as for Q10.
 
 | op | Auth | Request | Success | Errors |
 |---|---|---|---|---|
@@ -604,6 +641,8 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.8 | 2026-10-24 | **New: modes and Info** (DEC-2026-041 implementation scope; migration 034): §6 `POST /api/modes` (`owner.state`, `owner.activate`, `owner.info.get`, `owner.info.save`, `owner.info.clear`, `owner.preview`) and the public reader P-6 `get_public_tap_mode`. **Info is OFF in the catalogue by default**, because `get_public_profile` (P-1) is unchanged (BQ-1). No earlier operation changed. | May build the owner Modes / Info pages and the Info view against §6. Read P-6 first, falling back to P-1 if it is missing, and update `contract.test.ts`. Never show Business when P-6 returns null. No capability buttons on Info. Info cannot go live on a real database until SHYGON switches it on after BQ-1. |
+| v0.7.2 | 2026-10-23 | Editorial: §10b's **Status** line now says what its host-switch bullet already said. Connect is visible to visitors only once the owner has `CONNECT_PUBLIC=on` set (A-1). No operation, request or response changed. | None. |
 | v0.7.1 | 2026-10-23 | **B-10** (owner-approved, DEC-2026-039 amendment A-1): §10b host switch `CONNECT_PUBLIC`. While off, `public.status` is false and `requests.create` / `requests.accept` / `connections.share` answer 404 `unavailable` (create also for an anonymous caller). Decline, block, remove and the lists always work. `settings` gain `publicAllowed`. **B-9:** visitor emergency alerts and finder starts use only the header named by `TRUSTED_CLIENT_IP_HEADER` (no shape change). The local host sets the visitor address itself and offers the opt-in `x-shygon-sim-client` hook. `/__sim/switches` accepts `CONNECT_PUBLIC`. | Show the Connect card only when `public.status` is true (already the case). On the signed-in request page, check `public.status` before offering the form. Show "not yet available" when `publicAllowed` is false. A 404 on accept or share is a refusal, never success. E2E: a browser-sent `x-nf-client-connection-ip` no longer has any effect on the stack; use the sim header with `STACK_SIM_CLIENT_ADDRESS=1` for distinct visitors, and switch `CONNECT_PUBLIC` on through `/__sim/switches` for Connect journeys. |
 | v0.7 | 2026-10-20 | DEC-2026-040 approved: every Privé demo choice as built; 033 listed as approved. No operation, request or response changed. | None beyond v0.6: the public walkthrough stays client-only (Q1 = A); signed-in demo requests use §10c; show the notice. |
 | v0.6 | 2026-10-20 | Privé demo-only (owner's word, DEC-2026-038 Q6 → A): §10c `/api/prive` (migration 033, PROPOSED in DEC-2026-040); the sweep also runs the demo desk and its retention. No earlier operation changed. | Your demo may switch on and use §10c for signed-in accounts. Keep the public showroom walkthrough client-only (DEC-2026-040 Q1). Show the `notice` with every Privé result; never write "the hotel" for the simulator. |

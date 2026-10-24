@@ -32,7 +32,7 @@ export class DbError extends Error {
     this.status = status;
     this.code = body?.code ?? null;
     this.details = body?.details ?? null;
-    const match = /^(emergency|rescue|connect|prive):([a-z_]+)$/.exec(this.message);
+    const match = /^(emergency|rescue|connect|prive|modes):([a-z_]+)$/.exec(this.message);
     this.appCode = match ? match[2] : null;
     this.emergencyCode = match?.[1] === 'emergency' ? match[2] : null;
   }

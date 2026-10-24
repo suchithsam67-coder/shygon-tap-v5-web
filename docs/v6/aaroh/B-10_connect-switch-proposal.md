@@ -4,7 +4,7 @@
 |---|---|
 | Requested by | Session B, 2026-10-20 (B-10) |
 | Owner's direction, 2026-10-20 | "Authorise design and a code-path audit, not immediate implementation. Confirm the existing emergency-alert and Return-to-Owner switches, their server-side enforcement and their tests. Then propose an off-by-default Connect switch that follows the same established pattern. Do not expose Connect merely by hiding its UI; enforce availability server-side too." |
-| Status | **BUILT locally 2026-10-23** on the owner's approval (DEC-2026-039 amendment A-1): "Approve the B-10 Connect switch as proposed (CONNECT_PUBLIC off by default; create, accept and share blocked while off; decline, block, remove and lists always work; publicAllowed reported), as a DEC-2026-039 amendment, built locally with tests. No deploy." Contract AAROH-API v0.7.1. `test:connect` 17/17 (negative control: 2 checks fail against the previous function). Optional `publicAlertsAllowed` for emergency settings (§1): not approved, not built. Nothing pushed or deployed. |
+| Status | **BUILT locally 2026-10-23** on the owner's approval of 2026-10-20 15:46 UTC (DEC-2026-039 amendment A-1): "Approve the B-10 Connect switch as proposed (CONNECT_PUBLIC off by default; create, accept and share blocked while off; decline, block, remove and lists always work; publicAllowed reported), as a DEC-2026-039 amendment, built locally with tests. No deploy." Contract AAROH-API v0.7.1. `test:connect` 17/17 (negative control: 2 checks fail against the previous function). Optional `publicAlertsAllowed` for emergency settings (§1): not approved, not built. Nothing pushed or deployed. |
 | Backlog | V6-125 |
 | Decision record | It changes behaviour approved "as built" in DEC-2026-039, so it needs the owner's approval as an amendment to DEC-2026-039 (Q8) |
 
@@ -71,7 +71,7 @@ Session B confirmed this independently on 2026-10-20 (read-only).
 - `publicAllowed` is reported;
 - the 16 existing checks run with the switch on.
 
-**Contract:** a versioned change note (AAROH-API v0.8 or a point release).
+**Contract:** published as **AAROH-API v0.7.1** on 2026-10-23 (§10b and §13). v0.8 stays reserved for the mode model.
 - Frontend impact (Session B, 2026-10-20):
   - the public Connect card already appears only when `public.status` is true;
   - `?mode=connect` never opens a view;

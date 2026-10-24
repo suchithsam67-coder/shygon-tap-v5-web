@@ -82,8 +82,13 @@ const OWNED = {
   // Migration 033 (counted only where it exists).
   prive_demo_requests: (id) => `SELECT count(*)::int AS n FROM public.prive_demo_requests WHERE user_id = '${id}'`,
   prive_demo_request_events: (id) => `SELECT count(*)::int AS n FROM public.prive_demo_request_events e JOIN public.prive_demo_requests r ON r.id = e.request_id WHERE r.user_id = '${id}'`,
+  // Migration 034 (counted only where it exists).
+  info_pages: (id) => `SELECT count(*)::int AS n FROM public.info_pages WHERE owner_user_id = '${id}'`,
+  tap_mode_state: (id) => `SELECT count(*)::int AS n FROM public.tap_mode_state WHERE user_id = '${id}'`,
+  tap_mode_audit: (id) => `SELECT count(*)::int AS n FROM public.tap_mode_audit WHERE user_id = '${id}'`,
 };
 const KEPT = ['orders', 'order_items', 'payments'];
+const has034 = async (db) => (await db.query(`SELECT to_regclass('public.info_pages') IS NOT NULL AS x`)).rows[0].x;
 const has033 = async (db) => (await db.query(`SELECT to_regclass('public.prive_demo_requests') IS NOT NULL AS x`)).rows[0].x;
 const has032 = async (db) => (await db.query(`SELECT to_regclass('public.connections') IS NOT NULL AS x`)).rows[0].x;
 const has031 = async (db) => (await db.query(`SELECT to_regclass('public.rescue_threads') IS NOT NULL AS x`)).rows[0].x;
@@ -96,6 +101,7 @@ async function owned(db, id) {
     if (table.startsWith('rescue_') && !(await has031(db))) continue;
     if (['connect_settings', 'connections', 'consent_grants', 'connect_audit'].includes(table) && !(await has032(db))) continue;
     if (table.startsWith('prive_') && !(await has033(db))) continue;
+    if (['info_pages', 'tap_mode_state', 'tap_mode_audit'].includes(table) && !(await has034(db))) continue;
     out[table] = (await db.query(sql(id))).rows[0].n;
   }
   return out;
@@ -177,6 +183,13 @@ async function customer(db, id, slug, { request = null, fulfilment = 'fulfilled'
         SELECT '${id}', id, 'housekeeping', 'deletion-prive-${slug.slice(0, 6)}' FROM public.prive_demo_hotels WHERE slug = 'demo-residence';
       INSERT INTO public.prive_demo_request_events (request_id, status, actor)
         SELECT id, 'received', 'guest' FROM public.prive_demo_requests WHERE user_id = '${id}';
+    `);
+  }
+  if (await has034(db)) {
+    await db.exec(`
+      INSERT INTO public.info_pages (owner_user_id, title, short_description) VALUES ('${id}', 'Deletion info', 'A page about a thing');
+      INSERT INTO public.tap_mode_state (tap_profile_id, user_id) SELECT id, '${id}' FROM public.tap_profiles WHERE user_id = '${id}';
+      INSERT INTO public.tap_mode_audit (user_id, action) VALUES ('${id}', 'info_save');
     `);
   }
   if (request) {

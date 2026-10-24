@@ -11,7 +11,7 @@
 | Responsible (R) | Session A (AAROH backend): implementation and evidence |
 | Consulted (C) | Data Owner, Security Owner (the same person); counsel through DEC-2026-017 |
 | Informed (I) | Session B (frontend) |
-| State | **APPROVED 2026-10-20, in session:** "Approve DEC-2026-039 Q1–Q7 as recommended in the record". Every recommendation is the behaviour 032 already has, so no code changed; the gates now list 032 as approved. Approval of the design is not approval to apply: 032 is L3, so the DEC-2026-018 24-hour cool-off and checklist review run first, then the release track. Not applied, pushed or deployed. **Amendment A-1 (Q8), the Connect host switch `CONNECT_PUBLIC`: APPROVED in session; built locally 2026-10-23** (see the end of this record) |
+| State | **APPROVED 2026-10-20, in session:** "Approve DEC-2026-039 Q1–Q7 as recommended in the record". Every recommendation is the behaviour 032 already has, so no code changed; the gates now list 032 as approved. Approval of the design is not approval to apply: 032 is L3, so the DEC-2026-018 24-hour cool-off and checklist review run first, then the release track. Not applied, pushed or deployed. **Amendment A-1 (Q8), the Connect host switch `CONNECT_PUBLIC`: APPROVED in session 2026-10-20; built locally 2026-10-23** (see the end of this record) |
 
 ## Priority
 
@@ -96,7 +96,7 @@ Counsel review applies (DEC-2026-017).
 
 ## Amendment A-1 (Q8): the Connect host switch (B-10)
 
-**State: APPROVED in session** (approved before the 2026-10-23 resume; built and verified locally 2026-10-23). The owner's words:
+**State: APPROVED in session on 2026-10-20 at 15:46 UTC (21:16 IST)**, as the session transcript records. Built and verified locally on 2026-10-23, after the session resumed. The owner's words:
 
 > "Approve the B-10 Connect switch as proposed (CONNECT_PUBLIC off by default; create, accept and share blocked while off; decline, block, remove and lists always work; publicAllowed reported), as a DEC-2026-039 amendment, built locally with tests. No deploy."
 
