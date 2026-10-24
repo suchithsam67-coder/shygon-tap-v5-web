@@ -449,7 +449,7 @@ The approver is always the repository owner, in the role shown (DEC-2026-018 Opt
 | G7 | Remote, push, first CI run; merge plan; **which branch is the release candidate** | The frontend branch (contains the backend up to `34a482d` plus the audit fix) or a merge of both tips | CI has never run remotely | Release Owner | Git-linked previews (AP-4); remote CI |
 | G8 | Optional emergency `publicAlertsAllowed` | Approve or drop | None; cosmetic symmetry | Product Owner | Nothing |
 | G10 | 027 off the release branch (V6-123) | Move it to `supabase/proposed/` (Phase 0.5) on the frontend branch | 027 entering a release bundle | Data Owner / Engineering Owner | The release bundle |
-| G11 | DEC-2026-042 | A (recommended), B or C | A red CI gate on this branch | Engineering Owner | A green `npm run ci` here |
+| G11 | DEC-2026-042 | **Done:** option A approved and implemented in `3fdfd11` (§13) | — | Engineering Owner | — |
 | G13 | Non-production Supabase project (AP-2, AP-3) | Create and allowlist it | Accidental production use; prevented by the allowlist and ref check | Data Owner | P2 hosted |
 | G14 | Previews and protection (AP-4–AP-6) | Per host, with access protection | An exposed preview; prevented by protection and test data only | Release Owner / Security Owner | P1; P2 hosted |
 | Done | G9 (D1–D5), G12 (Node 22) | — | — | — | — |
@@ -486,3 +486,24 @@ The approver is always the repository owner, in the role shown (DEC-2026-018 Opt
 - G1–G7, G10, G13 and G14 are open.
 
 No release approval is claimed.
+
+## 13. G11 closed on this branch (2026-10-24, DEC-2026-042 option A)
+
+- **Owner approval:** "Approve DEC-2026-042 option A: cherry-pick d6a0b46 onto v6/aaroh-backend, run npm ci and the full regression here, record before/after results. Local commit only, no push."
+- **Change:** `3fdfd11`, a cherry-pick of `d6a0b46`, lockfile only. The lockfile is now identical to the frontend branch's `1e7e07d`.
+- **Before:** `npm audit --audit-level=high` exit 1 (1 low, 2 moderate, 1 high).
+- **After:** exit 0, "found 0 vulnerabilities".
+- **Regression, Node v20.18.0:**
+  - lint, build (`tsc -b && vite build`), bundle, bundle-secrets, SEO and push-guard pass;
+  - vitest 23/23; the `test:db` chain green; payments 15;
+  - the stack suites 30 / 25 / 46 / 49 / 18 / 17 / 12 / 9 / 11 / 10 / 11, all 0 failed;
+  - **e2e 14/14** on a stack rebuilt with vite 7.3.7.
+- **Node v22.23.4:** build, vitest 23/23, bundle, payments 15, functions-security 14/0/0.
+- **Pre-existing, unchanged:** V6-014 (gitleaks, 1 known finding) and the Node 20 BLOCKED check (passes on Node 22). The `EBADENGINE` warning on Node 20.18 also predates the fix.
+- Full tables are in DEC-2026-042 "Implementation and verification".
+
+**Verdict, updated:** B-10 READY FOR REVIEW. **Release: BLOCKED**:
+- P1 and hosted P2 are blocked on approvals AP-1–AP-6;
+- G1–G7, G10, G13 and G14 are open.
+
+G11 is no longer a blocker on any AAROH branch: here, and on the frontend branch, per Session B's `1e7e07d`.
