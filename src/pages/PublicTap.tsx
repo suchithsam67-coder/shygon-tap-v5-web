@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { matchPath, useParams, useSearchParams } from 'react-router-dom';
 import { Loader2, PauseCircle, SearchX, WifiOff } from 'lucide-react';
 import { fetchPublicProfile, fetchPublicTapState, recordTapEvent } from '../lib/publicTapClient';
 import type { PublicProfile, PublicTapState } from '../lib/database.types';
@@ -11,15 +11,31 @@ import { OPENING_MS, TapOpening } from '../components/showroom/TapOpening';
 
 /**
  * The AAROH experience (opening, showroom, modes, the profile card) is its own
- * chunk, kept out of the entry bundle (DEC-2026-019 budget). The download
- * starts the moment this page's code runs, in parallel with the profile
- * request, so by the time the profile arrives the chunk usually has too.
+ * chunk, kept out of the entry bundle (DEC-2026-019 budget). Its download
+ * starts ahead of the profile request, so by the time the profile arrives the
+ * chunk usually has too: as the entry bundle runs when the page was opened at
+ * a Tap address, otherwise on this page's first render. Never for any other
+ * page: this module is in the entry bundle, and the landing page, among
+ * others, would download the experience and its icons for nothing.
  */
 const loadExperience = () => import('../components/showroom/PublicExperience');
-const experienceChunk = loadExperience();
-// A failed early download is retried once when the page needs the chunk.
-experienceChunk.catch(() => undefined);
-const PublicExperience = lazy(() => experienceChunk.catch(loadExperience));
+let experienceChunk: ReturnType<typeof loadExperience> | undefined;
+/** Starts the download once; every later call shares it. */
+function startExperience() {
+  if (!experienceChunk) {
+    experienceChunk = loadExperience();
+    // A failed early download is retried once when the page needs the chunk.
+    experienceChunk.catch(() => undefined);
+  }
+  return experienceChunk;
+}
+const PublicExperience = lazy(() => startExperience().catch(loadExperience));
+// Opened at a Tap address (the card, a QR scan): start now rather than wait
+// for React's first render. These are the paths App.tsx routes here; one
+// missing from this list only loses the head start.
+if (['/t/:username', '/tap/:username'].some((path) => matchPath(path, window.location.pathname))) {
+  startExperience();
+}
 
 /**
  * The public Tap page — what a visitor sees after an NFC tap or a QR scan.
@@ -66,6 +82,10 @@ type Outcome =
   | { kind: 'error' };
 
 export default function PublicTap() {
+  // When the address check above did not start it, as after an in-app
+  // navigation here. In render, not an effect: the download is under way
+  // before the profile request this render's effect sends.
+  startExperience();
   const { username: slug } = useParams();
   const [searchParams] = useSearchParams();
 
@@ -163,7 +183,7 @@ export default function PublicTap() {
     let live = true;
     // Ready either way: a failed chunk is retried by the lazy loader below.
     const done = () => live && setChunkReady(true);
-    experienceChunk.then(done, done);
+    startExperience().then(done, done);
     return () => {
       live = false;
     };
