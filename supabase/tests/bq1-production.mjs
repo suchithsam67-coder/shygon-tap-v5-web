@@ -254,6 +254,15 @@ await check('refuses without 034, and nothing changes', async () => {
   return msg.slice(0, 60);
 });
 
+await check('migrations/035 also refuses without 034, and nothing changes (review #7)', async () => {
+  const db = await createLiveDb();
+  const msg = await refuses(db, read(REPO_035), /needs migration 034/);
+  const info = await fnInfo(db);
+  await db.close();
+  assert(info.md5 === BASELINE_MD5, `body ${info.md5}`);
+  return 'no reader that fails for every slug';
+});
+
 await check('refuses on any other body (the repository baseline), and nothing changes', async () => {
   const db = await createLiveDb();
   await db.exec(read(M034));

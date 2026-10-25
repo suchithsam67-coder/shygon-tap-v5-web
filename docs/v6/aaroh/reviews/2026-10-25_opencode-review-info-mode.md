@@ -58,3 +58,19 @@ Findings **#2**, **#3** and **#5** above. Everything else I probed is a real ass
 - The frontend commit was read, not executed: no vitest, no e2e, no build. Its results are as the commit reports.
 - Finding #4 (the F-6 race) is a code reading; I did not construct concurrent transactions to prove the interleaving.
 - One probe script was written outside the repository (`%LOCALAPPDATA%\Temp\opencode\probe-modes-op.mjs`) to exercise finding #1 against the local stack; it was removed after use. Nothing in the repository was modified except this file.
+
+---
+
+## 8. Resolution (added by Session A, backend, 2026-10-25)
+
+The owner approved the hand-off in the coordination session on 2026-10-25. Each finding in Session A's lane was fixed in one hardening change on `v6/aaroh-backend`; readiness report §18 has the commits and the suite results. Each new or changed test was checked against the old code first and failed there.
+
+| # | Resolution |
+|---|---|
+| 1 | Fixed. `Object.hasOwn` for the op lookup in `modes`, `connect`, `emergency` and `rescue`; the local REST emulator's two operator lookups too. New check in `test:security`: 4 functions × 5 inherited names × signed in or not → 400 `unknown_op`. Negative control: fails on the old lookup. |
+| 2 | Fixed. New `admin-contract` check: every function a client role (anon, authenticated, PUBLIC) can EXECUTE, whatever its name, was so on live or is in `APPROVED_CLIENT_EXECUTE` with exactly its roles; stale entries fail too. Today: 66 as on live + 3 approved. Negative control: a new `get_public_info(text)` granted to anon fails. |
+| 3 | Fixed. The canary scans every response body, and a new check pins the exact key set of every owner success answer (all six operations; a successful `owner.info.get` was added so none goes unchecked). Negative control: an extra `phone` key in `owner.state` fails. |
+| 4 | Fixed in 034 in place (applied nowhere): activate, save and clear lock Tap, then mode state, then the Info record. PGlite has one connection, so the race itself is not executable here; a check pins the order in all three writers. Negative control: the old 034 fails it in all three. |
+| 6 | Fixed. `modes_info_missing` also flags invalid stored detailed information; the reader uses it alone. `test:modes` F-3 now asserts the owner's status, preview and `owner.state` agree with the visitor. |
+| 7 | Fixed. 035 refuses to apply without 034 (`DO` pre-check); `test:bq1-production` asserts it, with the body unchanged. |
+| 5, 8 | Frontend (Session B), sent separately by the coordinator. The contract half of #8 is done: §6 documents `previousMode: null` (v0.9.2). |

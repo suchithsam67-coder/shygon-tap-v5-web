@@ -196,12 +196,13 @@ function condition(sql, table, tableName, column, raw) {
   const op = expression.slice(0, dot);
   const value = expression.slice(dot + 1);
   let clause;
-  if (op in OPERATORS) {
+  if (Object.hasOwn(OPERATORS, op)) {
     clause = `${target} ${OPERATORS[op]} ${sql.value(value, type)}`;
   } else if (op === 'like' || op === 'ilike') {
     clause = `${target} ${op === 'like' ? 'LIKE' : 'ILIKE'} ${sql.value(value.replace(/\*/g, '%'), 'text')}`;
   } else if (op === 'is') {
-    const literal = { null: 'NULL', true: 'TRUE', false: 'FALSE', unknown: 'UNKNOWN' }[value.toLowerCase()];
+    const LITERALS = { null: 'NULL', true: 'TRUE', false: 'FALSE', unknown: 'UNKNOWN' };
+    const literal = Object.hasOwn(LITERALS, value.toLowerCase()) ? LITERALS[value.toLowerCase()] : null;
     if (!literal) throw new RestError(400, { code: 'PGRST100', message: `"is.${value}" is not a filter` });
     clause = `${target} IS ${literal}`;
   } else if (op === 'in') {

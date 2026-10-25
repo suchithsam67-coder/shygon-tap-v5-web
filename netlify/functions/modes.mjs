@@ -118,7 +118,8 @@ async function handle(request, log) {
     return fail('invalid_request');
   }
   if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.op !== 'string') return fail('invalid_request');
-  const op = OPS[body.op];
+  // Own keys only: `constructor`, `toString` or `__proto__` are not operations.
+  const op = Object.hasOwn(OPS, body.op) ? OPS[body.op] : null;
   if (!op) return fail('unknown_op');
   try {
     // The role comes only from the verified token; nothing in the body or URL can claim one.

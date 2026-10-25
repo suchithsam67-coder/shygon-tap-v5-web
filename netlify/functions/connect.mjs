@@ -155,7 +155,8 @@ async function handle(request, log) {
       if (!publicAllowed() || !SLUG.test(slug)) return json({ available: false });
       return json({ available: Boolean(await rpc(cfg, 'connect_public_target', { p_slug: slug })) });
     }
-    const op = OPS[body.op];
+    // Own keys only: `constructor`, `toString` or `__proto__` are not operations.
+    const op = Object.hasOwn(OPS, body.op) ? OPS[body.op] : null;
     if (!op) return fail('unknown_op');
     if (LOCKED_WHILE_NOT_PUBLIC.has(body.op) && !publicAllowed()) return fail('unavailable');
     const user = await currentUser(cfg, request);

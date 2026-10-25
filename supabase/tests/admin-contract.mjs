@@ -21,7 +21,10 @@ import { createLiveDb, newMigrations, MIGRATIONS_DIR, ROOT } from './lib/live-db
  *      policy (except APPROVED_POLICY_CHANGES), every existing relation's
  *      grants and every pre-existing trigger is identical, and every new
  *      relation (APPROVED_NEW_RELATIONS) is closed to anon/authenticated/PUBLIC
- *      with row level security on.
+ *      with row level security on;
+ *   5. every function a client role (anon, authenticated, PUBLIC) can EXECUTE,
+ *      whatever its name, was already executable by exactly those roles on
+ *      live, or is listed in APPROVED_CLIENT_EXECUTE with exactly its roles.
  *
  *   node supabase/tests/admin-contract.mjs [migrations-dir]   check
  *   node supabase/tests/admin-contract.mjs --write            regenerate the golden file
@@ -150,6 +153,22 @@ const NEW_ADMIN_FUNCTIONS = {
   'admin_list_rescue_reports(integer,integer)': { decision: 'DEC-2026-038 Q12, approved 2026-10-19 (migration 031)', state: 'APPROVED' },
 };
 
+// Functions an approved decision lets a client role EXECUTE beyond live, with
+// exactly those roles. Any other function a client can execute must already be
+// executable by the same roles on live: a new function granted to anon fails
+// here whatever its name (OpenCode review 2026-10-25 #2).
+const APPROVED_CLIENT_EXECUTE = {
+  'admin_list_emergency_events(text,integer,integer)': {
+    roles: ['authenticated'], decision: 'DEC-2026-038 Q1, approved 2026-10-19 (migration 029; administrators only, checked inside)',
+  },
+  'admin_list_rescue_reports(integer,integer)': {
+    roles: ['authenticated'], decision: 'DEC-2026-038 Q12, approved 2026-10-19 (migration 031; administrators only, checked inside)',
+  },
+  'get_public_tap_mode(text)': {
+    roles: ['anon', 'authenticated'], decision: 'DEC-2026-041 implementation scope, approved 2026-10-24 (migration 034; the public reader P-6)',
+  },
+};
+
 // Relations a PROPOSED decision adds. Held to the same rule (closed, RLS on),
 // but NOT approved: the check names them as pending so the gate output says so.
 // Move an entry to APPROVED_NEW_RELATIONS only when the owner approves it.
@@ -195,7 +214,19 @@ async function snapshot(db) {
      FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE n.nspname = 'public' AND NOT t.tgisinternal ORDER BY 1, 2`,
   )).rows;
-  return { all, policies, tableGrants, triggers };
+  // Effective EXECUTE for the client roles (PUBLIC grants included), by signature.
+  const exposure = (await db.query(
+    `SELECT p.oid::regprocedure::text AS signature,
+            array_remove(ARRAY[
+              CASE WHEN p.proacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a
+                                                    WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') THEN 'PUBLIC' END,
+              CASE WHEN has_function_privilege('anon', p.oid, 'EXECUTE') THEN 'anon' END,
+              CASE WHEN has_function_privilege('authenticated', p.oid, 'EXECUTE') THEN 'authenticated' END
+            ], NULL) AS roles
+     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public' ORDER BY 1`,
+  )).rows;
+  return { all, policies, tableGrants, triggers, exposure };
 }
 
 const byKey = (rows, key) => new Map(rows.map((r) => [key(r), r]));
@@ -340,6 +371,37 @@ await check('no other existing function changed (signature, body, grants)', () =
   assert(problems.length === 0, problems.join('; '));
   const added = mig.all.filter((f) => !base.all.some((b) => b.signature === f.signature)).map((f) => f.signature);
   return `${others.length - approved.length} unchanged; body approved: ${approved.map((f) => f.signature).join(', ') || 'none'}; new: ${added.join(', ') || 'none'}`;
+});
+
+await check('every function a client role can EXECUTE was so on live, or is approved with exactly its roles', () => {
+  const live = byKey(base.exposure, (r) => r.signature);
+  const problems = [];
+  let asOnLive = 0;
+  for (const { signature, roles } of mig.exposure) {
+    if (roles.length === 0) continue;
+    const approved = APPROVED_CLIENT_EXECUTE[signature];
+    if (approved) {
+      if ([...roles].sort().join() !== [...approved.roles].sort().join()) {
+        problems.push(`${signature}: executable by ${roles.join(', ')}, approved for ${approved.roles.join(', ')}`);
+      }
+      continue;
+    }
+    const before = live.get(signature);
+    if (!before) {
+      problems.push(`${signature}: new and executable by ${roles.join(', ')}, not in APPROVED_CLIENT_EXECUTE`);
+      continue;
+    }
+    const wider = roles.filter((role) => !before.roles.includes(role));
+    if (wider.length) problems.push(`${signature}: now also executable by ${wider.join(', ')}`);
+    else asOnLive++;
+  }
+  for (const signature of Object.keys(APPROVED_CLIENT_EXECUTE)) {
+    if (!mig.exposure.some((r) => r.signature === signature && r.roles.length > 0)) {
+      problems.push(`${signature}: approved, but no client role can execute it (stale entry)`);
+    }
+  }
+  assert(problems.length === 0, problems.join('; '));
+  return `${asOnLive} as on live; approved: ${Object.entries(APPROVED_CLIENT_EXECUTE).map(([s, a]) => `${s} (${a.roles.join(', ')})`).join(', ')}`;
 });
 
 await check('no policy changed, added or removed, except the approved ones', () => {

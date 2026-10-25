@@ -1,8 +1,8 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.9.1
+# SHYGON AAROH backend API contract — AAROH-API v0.9.2
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.9.1** (2026-10-25): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
+| Contract version | **AAROH-API v0.9.2** (2026-10-25): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
 | Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041); none applied anywhere. 027 is held aside (DEC-2026-037). |
@@ -177,8 +177,8 @@ T-2 rules, enforced server-side:
 
 | op | Request | Success |
 |---|---|---|
-| `owner.state` | `{ op }` | 200 `{ activeMode, version, changedAt, modes: [{ mode, available, reason: 'active' \| 'ready' \| 'needs_setup' \| 'not_available', missing? }] }` |
-| `owner.activate` | `{ op, mode: 'business' \| 'info', expectedVersion, idempotencyKey }` | 200 `{ activeMode, previousMode, version, changedAt, replayed }`. The same key again → the first answer with `replayed: true` |
+| `owner.state` | `{ op }` | 200 `{ activeMode, version, changedAt, modes: [{ mode, available, reason: 'active' \| 'ready' \| 'needs_setup' \| 'not_available', missing? }] }`. `missing` names `title` and `shortDescription` when absent or invalid, and `detailedInformation` when the stored text is invalid (only a direct database write can cause that; `/api/modes` refuses it) |
+| `owner.activate` | `{ op, mode: 'business' \| 'info', expectedVersion, idempotencyKey }` | 200 `{ activeMode, previousMode, version, changedAt, replayed }`; `previousMode` is `null` until the Tap has switched at least once (activating the mode it is already on changes nothing). The same key again → the first answer with `replayed: true` |
 | `owner.info.get` | `{ op }` | 200 `{ info: { title, shortDescription, category, detailedInformation, updatedAt, version } \| null, publicationStatus: 'draft' \| 'ready' \| 'live' \| 'unavailable' }` |
 | `owner.info.save` | `{ op, fields: { title?, shortDescription?, category?, detailedInformation? }, expectedVersion }`. A present key sets the field (null or empty clears it); an absent key leaves it. `expectedVersion` is 0 before the first save | 200, the same shape as `owner.info.get` |
 | `owner.info.clear` | `{ op }` | 200 `{ cleared }` |
@@ -189,7 +189,7 @@ T-2 rules, enforced server-side:
 | HTTP | Codes |
 |---|---|
 | 401 | `unauthenticated` |
-| 400 | `invalid_request`, `unknown_op`, `invalid_mode`, `invalid_expected_version`, `invalid_idempotency_key` |
+| 400 | `invalid_request`, `unknown_op` (any name that is not an operation, `constructor` and `toString` included: v0.9.2), `invalid_mode`, `invalid_expected_version`, `invalid_idempotency_key` |
 | 404 | `no_tap` |
 | 409 | `tap_suspended`, `mode_unavailable`, `needs_setup` (+`missing`), `stale_version` (+`current`), `mode_active` |
 | 422 | `invalid_field` (+`field`, +`reason`: `too_long`, `markup`, `control_characters`, `not_allowed`, `unknown` or `not_text`) |
@@ -545,7 +545,7 @@ Connection = { id, direction: 'outgoing' | 'incoming',
 
 **Retention:** ended connections and their grants are deleted 180 days after they end; account deletion removes everything.
 
-**Tests:** `npm run test:connect`, 16 checks. They cover closure, the ledger's append-only rule, opt-in, sign-in, the exact share, the note cleaner, duplicates, two-party-only access, accept with live reads, share versions, removal, decline cool-down, block never revealed, suspended/paused/off, limits, expiry through the sweep, direct REST, and no value reaching any caller without a grant.
+**Tests:** `npm run test:connect`, 17 checks (the 17th, added in v0.7.1, is the host switch). They cover closure, the ledger's append-only rule, opt-in, sign-in, the exact share, the note cleaner, duplicates, two-party-only access, accept with live reads, share versions, removal, decline cool-down, block never revealed, suspended/paused/off, limits, expiry through the sweep, direct REST, and no value reaching any caller without a grant.
 
 ---
 
@@ -644,6 +644,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.9.2 | 2026-10-25 | Hardening after the OpenCode second review; no new operation, request or response field.<br>(1) `/api/modes`, `/api/connect`, `/api/emergency` and `/api/rescue` answer an `op` that only names an inherited object property (`constructor`, `toString`, `__proto__`, …) with the documented 400 `unknown_op`. Before, a signed-in caller could get a 500 outside the contract.<br>(2) §6: `missing` may also name `detailedInformation` when the stored text is invalid. `owner.info.get`, `owner.preview` and the public reader now use the same check.<br>(3) §6 documents `previousMode: null`.<br>(4) Info writers take their locks in one order (034, revised before any application), so Info cannot go live incomplete under a race.<br>(5) Migration 035 refuses to apply without 034.<br>(6) §10b: `test:connect` has 17 checks. | Type `previousMode` as `TapMode \| null`. If `missing` names `detailedInformation`, show that field as needing attention; only a corrupted record can cause it, never the API. No other change. |
 | v0.9.1 | 2026-10-25 | Wording only: the visitor-initiated alert SMS (§10) now reads "someone using the SHYGON profile of <owner> … Try to reach them directly." It names the owner once, so the DLT template has two variables (name, time), like the owner alert. Wording approved by the owner on 2026-10-25, relayed by the coordination session; DLT registration pending. Visitor alerts stay off (DEC-2026-038 Q2). No request, response or error changed. | None, unless a page shows a preview of that SMS (none does on the frontend's `dce0ec9`: a text search of its `src/` finds no copy, 2026-10-25). |
 | v0.9 | 2026-10-24 | **BQ-1** (DEC-2026-041, migration 035): P-1 `get_public_profile` also returns `null` while the Tap's active mode is not Business. Shape, signature and grants are unchanged. Every Tap without Info is byte-identical (golden), and the admin-contract gate pins the edit to one guard. | Older clients that call only P-1 show their existing "Tap not found" page for a Tap on Info (P-2 still answers `active`). Read P-6 first. `owner.preview` for Business answers `null` while the Tap is on Info. |
 | v0.8 | 2026-10-24 | **New: modes and Info** (DEC-2026-041 implementation scope; migration 034): §6 `POST /api/modes` (`owner.state`, `owner.activate`, `owner.info.get`, `owner.info.save`, `owner.info.clear`, `owner.preview`) and the public reader P-6 `get_public_tap_mode`. **Info is OFF in the catalogue by default**, because `get_public_profile` (P-1) is unchanged (BQ-1). No earlier operation changed. | May build the owner Modes / Info pages and the Info view against §6. Read P-6 first, falling back to P-1 if it is missing, and update `contract.test.ts`. Never show Business when P-6 returns null. No capability buttons on Info. Info cannot go live on a real database until SHYGON switches it on after BQ-1. |

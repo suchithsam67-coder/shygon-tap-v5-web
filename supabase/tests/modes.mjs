@@ -67,6 +67,32 @@ await t.check('the mode audit is append-only, even for the server role', async (
   assertEqual([r.u, r.d], [false, false], 'update/delete');
   return 'insert only';
 });
+
+// OpenCode review 2026-10-25 #4. PGlite has one connection, so the race itself
+// cannot be run here; this pins the fix instead: every writer takes the same
+// row locks in the same order (Tap, mode state, Info record), which is what
+// makes a save and an activation of the same Tap wait for each other.
+await t.check('lock order: activate, save and clear lock Tap, then mode state, then the Info record', async () => {
+  const src = async (fn) => (await db.query(`SELECT prosrc FROM pg_proc WHERE oid = $1::regprocedure`, [fn])).rows[0].prosrc;
+  const at = (text, re, label) => {
+    const m = re.exec(text);
+    assert(m, `${label}: not found`);
+    return m.index;
+  };
+  const TAP = /FROM public\.tap_profiles\b[^;]*FOR UPDATE/;
+  const STATE = /FROM public\.tap_mode_state\b[^;]*FOR UPDATE/;
+  for (const [fn, info] of [
+    ['public.modes_owner_activate(uuid,text,integer,text)', /FROM public\.info_pages\b[^;]*FOR UPDATE/],
+    ['public.modes_info_save(uuid,jsonb,integer)', /FROM public\.info_pages\b[^;]*FOR UPDATE/],
+    ['public.modes_info_clear(uuid)', /DELETE FROM public\.info_pages\b/],
+  ]) {
+    const text = await src(fn);
+    const order = [at(text, TAP, `${fn} Tap lock`), at(text, STATE, `${fn} state lock`), at(text, info, `${fn} Info lock`)];
+    assert(order[0] < order[1] && order[1] < order[2], `${fn}: lock order ${order.join(' < ')}`);
+    assert(!/FROM public\.tap_mode_state\b(?![^;]*FOR UPDATE)[^;]*;/.test(text.slice(order[1] + 1)), `${fn}: reads mode state again without its lock`);
+  }
+  return '3 writers, one order (race not executable on PGlite: static pin)';
+});
 await db.close();
 
 // ---------------------------------------------------------------------------
@@ -74,9 +100,11 @@ t.section('B. Over HTTP on the local stack');
 
 const stack = await startStack();
 const bodies = [];
+const answers = []; // every response, by op, for the success-shape check
 const call = async (body, token) => {
   const r = await callFunction(stack, 'modes', { token, body });
   bodies.push(JSON.stringify(r.body));
+  answers.push({ op: body?.op, status: r.status, body: r.body });
   return r;
 };
 const codeOf = (r) => r.body?.error?.code;
@@ -185,6 +213,8 @@ await t.check('saving: versions guard stale writes; a draft is not public; Busin
     shortDescription: 'How to use the projector in room 204.', category: 'equipment',
     detailedInformation: `1. Press the wall switch.\n2. Wait 30 seconds.\n${DRAFT}` } }, asha.token);
   assertEqual([s2.status, s2.body.publicationStatus, s2.body.info.version], [200, 'ready', 2], 'complete');
+  const got = await call({ op: 'owner.info.get' }, asha.token);
+  same([got.status, got.body.publicationStatus, got.body.info], [200, 'ready', s2.body.info], 'owner.info.get reads back the save');
   const whileDraft = await pub(SLUG);
   same(whileDraft, { mode: 'business', profile: businessView }, 'still Business publicly');
   assert(!JSON.stringify(whileDraft).includes(DRAFT) && !JSON.stringify(await legacy(SLUG)).includes(DRAFT), 'the unpublished draft reached a public read');
@@ -251,6 +281,12 @@ await t.check('fallbacks: Info off, invalid, missing, paused or suspended gives 
   await setInfo(true);
   await stack.query(`UPDATE public.info_pages SET detailed_information = '<b>broken' WHERE owner_user_id = $1`, [asha.userId]);
   assertEqual(await pub(SLUG), null, 'F-3 invalid at read time');
+  // One predicate everywhere (review #6): the owner sees what the visitor gets.
+  const corrupt = await call({ op: 'owner.info.get' }, asha.token);
+  assertEqual(corrupt.body.publicationStatus, 'draft', 'F-3: owner.info.get no longer answers live');
+  assertEqual((await call({ op: 'owner.preview', mode: 'info' }, asha.token)).body.view, null, 'F-3: the preview shows what the visitor gets');
+  same((await call({ op: 'owner.state' }, asha.token)).body.modes.find((m) => m.mode === 'info'),
+    { mode: 'info', available: false, reason: 'needs_setup', missing: ['detailedInformation'] }, 'F-3: owner.state names the invalid field');
   await stack.query(`UPDATE public.info_pages SET detailed_information = 'Press the wall switch.' WHERE owner_user_id = $1`, [asha.userId]);
   assertEqual((await pub(SLUG)).mode, 'info', 'restored');
   const saved = (await stack.query(`SELECT * FROM public.info_pages WHERE owner_user_id = $1`, [asha.userId])).rows[0];
@@ -282,13 +318,45 @@ await t.check('switching back to Business restores the identical Business payloa
   return 'reversible';
 });
 
-await t.check('canaries: no account detail, switched-off field, draft or rejected value in any public output, error or log', async () => {
+// Every owner success answer has exactly the §6 shape, so a new key (an
+// account phone, say) cannot ride along unnoticed (OpenCode review #3).
+await t.check('owner success answers have exactly the contract §6 keys', async () => {
+  const INFO = ['category', 'detailedInformation', 'shortDescription', 'title', 'updatedAt', 'version'];
+  const SHAPES = {
+    'owner.state': ['activeMode', 'changedAt', 'modes', 'version'],
+    'owner.activate': ['activeMode', 'changedAt', 'previousMode', 'replayed', 'version'],
+    'owner.info.get': ['info', 'publicationStatus'],
+    'owner.info.save': ['info', 'publicationStatus'],
+    'owner.info.clear': ['cleared'],
+    'owner.preview': ['mode', 'view'],
+  };
+  const wrong = [];
+  const seen = new Set();
+  const keys = (o) => Object.keys(o ?? {}).sort().join();
+  for (const { op, status, body } of answers.filter((a) => a.status >= 200 && a.status < 300)) {
+    seen.add(op);
+    if (keys(body) !== [...SHAPES[op]].sort().join()) wrong.push(`${op}: ${keys(body)}`);
+    if (body.info && keys(body.info) !== INFO.join()) wrong.push(`${op} info: ${keys(body.info)}`);
+    for (const m of body.modes ?? []) {
+      if (!['available,mode,reason', 'available,missing,mode,reason'].includes(keys(m))) wrong.push(`${op} mode entry: ${keys(m)}`);
+    }
+    if (op === 'owner.preview' && body.mode === 'info' && body.view) {
+      if (keys(body.view) !== 'category,detailedInformation,shortDescription,title,updatedAt') wrong.push(`preview info view: ${keys(body.view)}`);
+    }
+  }
+  assertEqual(wrong, [], 'shapes');
+  const missing = Object.keys(SHAPES).filter((op) => !seen.has(op));
+  assertEqual(missing, [], 'operations never answered with success in this run');
+  return `${answers.filter((a) => a.status < 300).length} success answers over ${seen.size} operations`;
+});
+
+await t.check('canaries: no account detail, switched-off field, draft or rejected value in any public output, response or log', async () => {
   const leaks = [];
   const scan = (label, text) => {
     for (const [name, value] of Object.entries(C)) if (text.includes(value)) leaks.push(`${name} in ${label}`);
   };
   publicReads.forEach((text, i) => scan(`public read #${i}`, text));
-  bodies.filter((b) => b.includes('"error"')).forEach((b, i) => scan(`error body #${i}`, b));
+  bodies.forEach((b, i) => scan(`response body #${i}`, b)); // successes too, not only errors (review #3)
   logLines.forEach((line, i) => scan(`log line #${i}`, line));
   scan('public read while Business', JSON.stringify(await pub(SLUG)));
   assertEqual(leaks, [], 'leaks');

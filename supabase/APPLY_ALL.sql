@@ -4163,10 +4163,18 @@ END $$;
 --     never touches tap_profiles.
 --
 -- BACKWARD COMPATIBILITY (BQ-1, readiness report §0.12)
---   get_public_profile is NOT changed. A Tap on Info would still return its
---   Business payload through that legacy reader, so 'info' is seeded OFF.
---   Do not set tap_mode_catalog.enabled = true for 'info' on any real database
---   until BQ-1's change to get_public_profile is approved and applied.
+--   This file does not change get_public_profile; migration 035 does (BQ-1,
+--   approved 2026-10-24): it returns null while a Tap is on Info. 'info' is
+--   seeded OFF. Do not set tap_mode_catalog.enabled = true for 'info' on any
+--   real database before 035 (on production: its re-based variant, V6-106) is
+--   applied there; switching it on is the owner's per-environment decision.
+--
+-- REVISED 2026-10-25, before any application (OpenCode review #4 and #6):
+--   - one lock order in every writer (activate, save, clear): Tap row, then
+--     mode state, then Info record, so a save racing an activation can no
+--     longer leave Info live and incomplete;
+--   - modes_info_missing also flags stored detailed information in an invalid
+--     form, and the public reader uses it alone (one predicate everywhere).
 --
 -- VERIFY ON LIVE before applying (read-only, human):
 --   SELECT to_regclass('public.info_pages');                       -- NULL
@@ -4268,7 +4276,10 @@ AS $$
   END
 $$;
 
--- The required fields an Info record still lacks (or holds in an invalid form).
+-- The required fields an Info record still lacks (or holds in an invalid form),
+-- and the optional detailed information when it is stored in an invalid form.
+-- The one predicate every consumer uses: owner state, publication status,
+-- activation, the preview and the public reader (OpenCode review 2026-10-25 #6).
 CREATE OR REPLACE FUNCTION public.modes_info_missing(p_info public.info_pages)
 RETURNS text[]
 LANGUAGE sql STABLE
@@ -4278,7 +4289,8 @@ AS $$
     CASE WHEN p_info.id IS NULL OR p_info.title IS NULL
            OR public.modes_text_problem(p_info.title, 120, false) IS NOT NULL THEN 'title' END,
     CASE WHEN p_info.id IS NULL OR p_info.short_description IS NULL
-           OR public.modes_text_problem(p_info.short_description, 280, false) IS NOT NULL THEN 'shortDescription' END
+           OR public.modes_text_problem(p_info.short_description, 280, false) IS NOT NULL THEN 'shortDescription' END,
+    CASE WHEN public.modes_text_problem(p_info.detailed_information, 2000, true) IS NOT NULL THEN 'detailedInformation' END
   ], NULL)
 $$;
 
@@ -4377,7 +4389,10 @@ BEGIN
       jsonb_build_object('activeMode', v_state.active_mode, 'version', v_state.version));
   END IF;
   IF p_mode = 'info' THEN
-    SELECT * INTO v_info FROM public.info_pages WHERE owner_user_id = p_user;
+    -- Lock order, the same in every writer: Tap, then mode state, then Info
+    -- record. A save racing this activation waits, so Info never goes live
+    -- incomplete (F-6; OpenCode review 2026-10-25 #4).
+    SELECT * INTO v_info FROM public.info_pages WHERE owner_user_id = p_user FOR UPDATE;
     v_missing := public.modes_info_missing(v_info);
     IF cardinality(v_missing) > 0 THEN
       RETURN jsonb_build_object('ok', false, 'code', 'needs_setup', 'missing', to_jsonb(v_missing));
@@ -4449,8 +4464,10 @@ BEGIN
   IF p_fields IS NULL OR jsonb_typeof(p_fields) <> 'object' THEN
     RETURN jsonb_build_object('ok', false, 'code', 'invalid_request');
   END IF;
-  SELECT * INTO v_tap FROM public.tap_profiles WHERE user_id = p_user ORDER BY created_at LIMIT 1;
+  -- Lock order, the same in every writer: Tap, then mode state, then Info record.
+  SELECT * INTO v_tap FROM public.tap_profiles WHERE user_id = p_user ORDER BY created_at LIMIT 1 FOR UPDATE;
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'code', 'no_tap'); END IF;
+  SELECT * INTO v_state FROM public.tap_mode_state WHERE tap_profile_id = v_tap.id FOR UPDATE;
   SELECT * INTO v_info FROM public.info_pages WHERE owner_user_id = p_user FOR UPDATE;
   IF p_expected_version IS DISTINCT FROM COALESCE(v_info.version, 0) THEN
     RETURN jsonb_build_object('ok', false, 'code', 'stale_version', 'current', jsonb_build_object('version', COALESCE(v_info.version, 0)));
@@ -4484,8 +4501,8 @@ BEGIN
     v_fields := v_fields || v_key;
   END LOOP;
 
-  -- While Info is live it may not become incomplete (F-6): switch to Business first.
-  SELECT * INTO v_state FROM public.tap_mode_state WHERE tap_profile_id = v_tap.id;
+  -- While Info is live it may not become incomplete (F-6): switch to Business
+  -- first. v_state was read under its lock above, so an activation cannot slip in.
   IF COALESCE(v_state.active_mode, 'business') = 'info' AND cardinality(public.modes_info_missing(v_new)) > 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'mode_active');
   END IF;
@@ -4516,9 +4533,10 @@ DECLARE
   v_state public.tap_mode_state;
   v_cleared boolean;
 BEGIN
-  SELECT * INTO v_tap FROM public.tap_profiles WHERE user_id = p_user ORDER BY created_at LIMIT 1;
+  -- Lock order, the same in every writer: Tap, then mode state, then Info record.
+  SELECT * INTO v_tap FROM public.tap_profiles WHERE user_id = p_user ORDER BY created_at LIMIT 1 FOR UPDATE;
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'code', 'no_tap'); END IF;
-  SELECT * INTO v_state FROM public.tap_mode_state WHERE tap_profile_id = v_tap.id;
+  SELECT * INTO v_state FROM public.tap_mode_state WHERE tap_profile_id = v_tap.id FOR UPDATE;
   IF COALESCE(v_state.active_mode, 'business') = 'info' THEN RETURN jsonb_build_object('ok', false, 'code', 'mode_active'); END IF;
   DELETE FROM public.info_pages WHERE owner_user_id = p_user;
   v_cleared := FOUND;
@@ -4585,8 +4603,7 @@ BEGIN
     SELECT enabled INTO v_on FROM public.tap_mode_catalog WHERE mode = 'info';
     IF NOT COALESCE(v_on, false) THEN RETURN NULL; END IF;
     SELECT * INTO v_info FROM public.info_pages WHERE owner_user_id = v_tap.user_id;
-    IF cardinality(public.modes_info_missing(v_info)) > 0
-       OR public.modes_text_problem(v_info.detailed_information, 2000, true) IS NOT NULL THEN
+    IF cardinality(public.modes_info_missing(v_info)) > 0 THEN
       RETURN NULL;
     END IF;
     RETURN jsonb_build_object('mode', 'info', 'info', public.modes_info_public(v_info));
@@ -4753,6 +4770,17 @@ END $$;
 -- ROLLBACK (end)
 --
 -- Idempotent: safe to run more than once.
+
+-- Refuse to run without 034. plpgsql resolves tap_mode_state only when the
+-- function first runs, so without this check 035 would install a reader that
+-- fails for every slug (OpenCode review 2026-10-25 #7).
+DO $needs_034$
+BEGIN
+  IF to_regclass('public.tap_mode_state') IS NULL THEN
+    RAISE EXCEPTION '035: needs migration 034 (public.tap_mode_state); nothing changed';
+  END IF;
+END
+$needs_034$;
 
 CREATE OR REPLACE FUNCTION public.get_public_profile(p_slug text)
  RETURNS jsonb
