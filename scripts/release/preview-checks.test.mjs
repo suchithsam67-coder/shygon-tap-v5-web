@@ -185,9 +185,13 @@ await stack.query(`UPDATE public.profiles SET email = $2, company = $3, phone = 
   owner.userId, 'p2.owner@example.test', 'Preview Check Co', '+919800000000',
 ]);
 const visitor = await signUp(stack, { name: 'P2 Visitor' });
+// Phase on declines and blocks for real, each with a requester of its own.
+const decliner = await signUp(stack, { name: 'P2 Decliner' });
+const blocked = await signUp(stack, { name: 'P2 Blocked' });
 
-const runP2quiet = (phase, log = noop) =>
-  runP2({ base: stack.appUrl, ownerToken: owner.token, visitorToken: visitor.token, slug: 'p2-owner-check', phase, hostLabel: 'vercel', log });
+const runP2quiet = (phase, log = noop, extra = {}) =>
+  runP2({ base: stack.appUrl, ownerToken: owner.token, visitorToken: visitor.token, slug: 'p2-owner-check', phase, hostLabel: 'vercel', log, ...extra });
+const realEndings = { declineToken: decliner.token, blockToken: blocked.token };
 let p2OffEvidence = null;
 let p2OnEvidence = null;
 
@@ -203,15 +207,37 @@ await t.check('phase off: the switch locks what starts, never what stops, and ad
   return `${evidence.checks.length} checks, ${evidence.dbChecklist.length} checklist line`;
 });
 
-await t.check('phase on: the §11.2 journey - settings, request, accept, scope, refused widening, decline, block, remove', async () => {
+await t.check('phase on: the §11.2 journey - settings, request, accept, scope, refused widening, real decline, real block, remove', async () => {
   await setSwitch('CONNECT_PUBLIC', true);
-  const evidence = await runP2quiet('on');
+  const evidence = await runP2quiet('on', noop, realEndings);
   p2OnEvidence = evidence;
   assertEqual(evidence.verdict, 'PASS', evidence.reason);
   assertEqual(evidence.checks.filter((c) => !c.ok).map((c) => c.id), [], 'failed checks');
-  assertEqual(evidence.dbChecklist.length, 2, 'database checklist lines');
+  assertEqual(evidence.declineAndBlock, 'real', 'decline and block ran for real');
+  for (const kind of ['decline', 'block']) {
+    assert(evidence.checks.some((c) => c.id.startsWith(`a new request from the ${kind} account is refused`)), `${kind}: re-request checked`);
+  }
+  assertEqual(evidence.dbChecklist.length, 4, 'database checklist lines');
   assert(evidence.dbChecklist.every((line) => line.includes('consent_grants')), 'the checklist names the table to inspect');
   return `${evidence.checks.length} checks, ${evidence.dbChecklist.length} checklist lines`;
+});
+
+await t.check('hosted phase on without the decline and block accounts is INCONCLUSIVE before any write', async () => {
+  const ops = [];
+  // A stand-in for a hosted preview: nothing leaves the process.
+  const fakeFetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    ops.push(body.op);
+    const answer = body.op === 'settings.get' ? { settings: { enabled: true, publicAllowed: true } } : { consents: [] };
+    return new Response(JSON.stringify(answer), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  const evidence = await runP2({
+    base: 'https://preview.example.test', ownerToken: 'x', visitorToken: 'y', slug: 'p2-owner-check', phase: 'on', fetchImpl: fakeFetch, log: noop,
+  });
+  assertEqual(evidence.verdict, 'INCONCLUSIVE', evidence.reason);
+  assert(/P2_DECLINE_TOKEN/.test(evidence.reason), evidence.reason);
+  assertEqual(ops, ['settings.get', 'consents.list'], 'only the read-only preflight ran');
+  return evidence.reason.slice(0, 70);
 });
 
 await t.check('phase off withdraws a connection an earlier run left open', async () => {
@@ -267,7 +293,7 @@ await t.check('P2 refuses a production host and a bad phase before any request',
 await t.check('the P2 evidence carries no token, shared value or address', async () => {
   assert(p2OffEvidence && p2OnEvidence, 'both phases ran first');
   const text = JSON.stringify([p2OffEvidence, p2OnEvidence]);
-  for (const forbidden of [owner.token, visitor.token, 'p2.owner@example.test', 'Preview Check Co', '+919800000000', 'Release check']) {
+  for (const forbidden of [owner.token, visitor.token, decliner.token, blocked.token, 'p2.owner@example.test', 'Preview Check Co', '+919800000000', 'Release check']) {
     assert(!text.includes(forbidden), `evidence contains ${forbidden}`);
   }
   return `${text.length} bytes of evidence over both phases`;

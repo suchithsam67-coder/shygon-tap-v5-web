@@ -9,11 +9,21 @@
 //   P2_TAP_SLUG=<the test Tap> \
 //   P2_PHASE=off|on \
 //   P2_HOST_LABEL=netlify|vercel \
+//   P2_DECLINE_TOKEN=<a third test account>  P2_BLOCK_TOKEN=<a fourth> \   (phase on)
 //   node scripts/release/preview-p2-connect.mjs
 //
-// Both tokens must belong to *@example.test test accounts. The script cannot
+// Every token must belong to an *@example.test test account. The script cannot
 // see an address behind a session token, so it prints that as a reminder and
 // verifies nothing about it.
+//
+// Decline and block: with P2_DECLINE_TOKEN and P2_BLOCK_TOKEN, phase on runs
+// both for real (each account requests, the owner declines or blocks, the
+// requester sees "declined" with nothing shared, its grant is revoked, and a
+// new request is refused). Those two accounts cannot request this Tap again
+// (30-day cool-down; the block stays), so use fresh ones each run. Hosted
+// evidence needs them: on a non-loopback host phase on without them is
+// INCONCLUSIVE. On the local stack, without them, decline and block are only
+// probed with a connection id that cannot exist (not switch-locked).
 //
 // P2_PHASE=off (CONNECT_PUBLIC unset on the host): public.status is false,
 // requests.create / requests.accept / connections.share answer 404
@@ -42,7 +52,7 @@ const LOCAL_HOSTS = ['localhost', '127.0.0.1'];
 // connection_not_found instead of unavailable.
 const NO_CONNECTION = 'e0000000-0000-4000-8000-000000000000';
 const REMINDER =
-  'Reminder: P2_OWNER_TOKEN and P2_VISITOR_TOKEN must belong to *@example.test test accounts; this script cannot verify that.';
+  'Reminder: every P2_*_TOKEN must belong to an *@example.test test account; this script cannot verify that.';
 
 class Inconclusive extends Error {}
 
@@ -73,12 +83,19 @@ function previewUrl(base) {
  * Runs the §11.2 sequence for one phase and returns the evidence object.
  * Throws (before any request) when the host is not a preview we may touch.
  */
-export async function runP2({ base, ownerToken, visitorToken, slug, phase, hostLabel, fetchImpl = globalThis.fetch, log = console.log } = {}) {
+export async function runP2({
+  base, ownerToken, visitorToken, declineToken, blockToken, slug, phase, hostLabel, fetchImpl = globalThis.fetch, log = console.log,
+} = {}) {
   const url = previewUrl(base);
   if (!ownerToken || !visitorToken) throw new Error('Set P2_OWNER_TOKEN and P2_VISITOR_TOKEN (see the header).');
   if (!slug || typeof slug !== 'string') throw new Error('Set P2_TAP_SLUG (see the header).');
   if (phase !== 'off' && phase !== 'on') throw new Error('P2_PHASE must be off or on.');
   if (hostLabel && !['netlify', 'vercel'].includes(hostLabel)) throw new Error('P2_HOST_LABEL must be netlify or vercel when it is set.');
+  if (Boolean(declineToken) !== Boolean(blockToken)) throw new Error('Set both P2_DECLINE_TOKEN and P2_BLOCK_TOKEN, or neither.');
+  const realEndings = Boolean(declineToken && blockToken);
+  if (realEndings && new Set([ownerToken, visitorToken, declineToken, blockToken]).size !== 4) {
+    throw new Error('P2_OWNER_TOKEN, P2_VISITOR_TOKEN, P2_DECLINE_TOKEN and P2_BLOCK_TOKEN must be four different accounts.');
+  }
   log(REMINDER);
 
   const evidence = {
@@ -86,6 +103,7 @@ export async function runP2({ base, ownerToken, visitorToken, slug, phase, hostL
     hostLabel: hostLabel || 'unspecified',
     origin: url.origin,
     phase,
+    declineAndBlock: phase === 'on' ? (realEndings ? 'real' : 'probe only') : 'probe only (switch lock)',
     startedAt: new Date().toISOString(),
     preflight: null,
     checks: [],
@@ -196,6 +214,13 @@ export async function runP2({ base, ownerToken, visitorToken, slug, phase, hostL
       );
     } else {
       // ---- §11.2, on: the whole journey, through the preview URL.
+      // P2 closes only on hosted evidence, and that must withdraw consent for
+      // real in every way the contract offers: stop before any write without it.
+      if (!LOCAL_HOSTS.includes(url.hostname) && !realEndings) {
+        throw new Inconclusive(
+          'hosted P2 evidence runs decline and block for real: set P2_DECLINE_TOKEN and P2_BLOCK_TOKEN to two more *@example.test accounts that have not requested this Tap before, then re-run',
+        );
+      }
       const set = guard('settings.set', await call({ op: 'settings.set', enabled: true }, ownerToken));
       const settingsNow = set.body?.settings ?? {};
       check(
@@ -266,10 +291,41 @@ export async function runP2({ base, ownerToken, visitorToken, slug, phase, hostL
       check('a widening beyond the shareable fields is refused: 400 invalid_share', widen.status === 400 && code(widen) === 'invalid_share', outcome(widen));
       check('no ledger row was added by the refused widening', beforeWiden === afterWiden, `${ownerLedger.length} rows before, ${widenedLedger.length} after`);
 
-      const decline = guard('requests.decline', await call({ op: 'requests.decline', connectionId: NO_CONNECTION }, ownerToken));
-      check('requests.decline is not locked: 404 connection_not_found', decline.status === 404 && code(decline) === 'connection_not_found', outcome(decline));
-      const block = guard('requests.block', await call({ op: 'requests.block', connectionId: NO_CONNECTION }, ownerToken));
-      check('requests.block is not locked: 404 connection_not_found', block.status === 404 && code(block) === 'connection_not_found', outcome(block));
+      const endings = [];
+      if (realEndings) {
+        // Decline and block for real, each with its own requester (§10b lifecycle).
+        for (const [kind, token] of [['decline', declineToken], ['block', blockToken]]) {
+          const label = `${kind} account`;
+          const opened = guard(`requests.create (${label})`, await call({ op: 'requests.create', slug, idempotencyKey: crypto.randomUUID(), share: ['company'] }, token));
+          if ([404, 409, 429].includes(opened.status)) {
+            throw new Inconclusive(`the ${label} cannot open a request (${outcome(opened)}): an earlier run used it; use a fresh *@example.test account`);
+          }
+          const id = opened.body?.connection?.id;
+          check(`a request from the ${label} is created: 201 requested`, opened.status === 201 && opened.body?.connection?.status === 'requested', outcome(opened));
+          if (typeof id !== 'string') throw new Inconclusive(`requests.create (${label}) returned no connection id`);
+          const want = kind === 'decline' ? 'declined' : 'blocked';
+          const decided = guard(`requests.${kind}`, await call({ op: `requests.${kind}`, connectionId: id }, ownerToken));
+          check(`the owner's ${kind} works: 200 ${want}`, decided.status === 200 && decided.body?.connection?.status === want, `${outcome(decided)} status=${decided.body?.connection?.status}`);
+          const theirList = must200(`connections.list (${label})`, await call({ op: 'connections.list' }, token));
+          const theirs = (theirList.connections ?? []).find((c) => c.id === id) ?? {};
+          check(
+            `the ${label} sees "declined" and nothing shared${kind === 'block' ? ' (a block is never revealed)' : ''}`,
+            theirs.status === 'declined' && JSON.stringify(theirs.theyShare ?? {}) === '{}',
+            `status=${theirs.status} theyShare fields=${JSON.stringify(Object.keys(theirs.theyShare ?? {}))}`,
+          );
+          const given = (await ledger(`consents.list (${label})`, token)).filter((g) => g.connectionId === id && g.direction === 'given');
+          check(`the ${label}'s own grant on that request is revoked`, given.length >= 1 && given.every((g) => g.revokedAt !== null), `${given.length} grant(s), ${given.filter((g) => g.revokedAt === null).length} active`);
+          const again = guard(`requests.create again (${label})`, await call({ op: 'requests.create', slug, idempotencyKey: crypto.randomUUID(), share: ['company'] }, token));
+          const refusal = kind === 'decline' ? [429, 'recently_declined'] : [404, 'unavailable'];
+          check(`a new request from the ${label} is refused: ${refusal.join(' ')}`, again.status === refusal[0] && code(again) === refusal[1], outcome(again));
+          endings.push([want, id]);
+        }
+      } else {
+        const decline = guard('requests.decline', await call({ op: 'requests.decline', connectionId: NO_CONNECTION }, ownerToken));
+        check('requests.decline is not locked: 404 connection_not_found', decline.status === 404 && code(decline) === 'connection_not_found', outcome(decline));
+        const block = guard('requests.block', await call({ op: 'requests.block', connectionId: NO_CONNECTION }, ownerToken));
+        check('requests.block is not locked: 404 connection_not_found', block.status === 404 && code(block) === 'connection_not_found', outcome(block));
+      }
 
       const removed = guard('connections.remove', await call({ op: 'connections.remove', connectionId }, ownerToken));
       check(
@@ -290,6 +346,7 @@ export async function runP2({ base, ownerToken, visitorToken, slug, phase, hostL
       evidence.dbChecklist.push(
         `consent_grants: confirm that every grant on connection ${connectionId} is revoked (revoked_at set, revoke_reason 'removed', none active); the API reported ${onConnection.length} grant(s), ${stillActive.length} active.`,
         `consent_grants: confirm that no row was added by the refused widening call (the API reported ${ownerLedger.length} rows before and ${widenedLedger.length} after).`,
+        ...endings.map(([status, id]) => `connections / consent_grants: confirm that connection ${id} is ${status} and every grant on it is revoked.`),
       );
     }
 
@@ -314,12 +371,14 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const slug = process.env.P2_TAP_SLUG;
   const phase = process.env.P2_PHASE;
   const hostLabel = process.env.P2_HOST_LABEL;
+  const declineToken = process.env.P2_DECLINE_TOKEN;
+  const blockToken = process.env.P2_BLOCK_TOKEN;
   if (!base || !ownerToken || !visitorToken || !slug || !phase) {
-    console.error('Set P2_BASE_URL, P2_OWNER_TOKEN, P2_VISITOR_TOKEN, P2_TAP_SLUG and P2_PHASE (off|on); P2_HOST_LABEL is optional. See the header.');
+    console.error('Set P2_BASE_URL, P2_OWNER_TOKEN, P2_VISITOR_TOKEN, P2_TAP_SLUG and P2_PHASE (off|on); for phase on also P2_DECLINE_TOKEN and P2_BLOCK_TOKEN; P2_HOST_LABEL is optional. See the header.');
     process.exit(3);
   }
   try {
-    const evidence = await runP2({ base, ownerToken, visitorToken, slug, phase, hostLabel });
+    const evidence = await runP2({ base, ownerToken, visitorToken, declineToken, blockToken, slug, phase, hostLabel });
     if (evidence.dbChecklist.length > 0) {
       console.log('\nCONFIRM IN THE NON-PRODUCTION DATABASE (this script never connects to one):');
       for (const line of evidence.dbChecklist) console.log(`  [ ] ${line}`);

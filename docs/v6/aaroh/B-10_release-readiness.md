@@ -572,3 +572,58 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
   - P1 and P2 hosted (AP-1–AP-6);
   - G1–G7, G10, G13 and G14;
   - the V6-106 fresh capture.
+
+## 18. 2026-10-25: OpenCode hand-off (P1/P2 runners, second review) and the hardening change
+
+**Approval:** the owner, in the coordination session on 2026-10-25: "hand OpenCode's check scripts (48d75fb) and the review findings to the backend and frontend sessions … fix the findings as one hardening change each, and take the scripts after their own full test run". The coordinator relayed it with the owner's words quoted; it was not given in Session A.
+
+**Taken** (cherry-picked with `-x` from `opencode/aaroh-preview-checks`, base `b04a72d`):
+- `b719f9b` (= `48d75fb`): `scripts/release/preview-p1-address.mjs`, `preview-p2-connect.mjs`, `preview-checks.test.mjs` and `docs/v6/aaroh/preview-check-runbook.md`. Read in full first: they refuse production hosts and plain http before any request, use only documentation-range addresses, and print no tokens.
+- `e18c7cc` (= `572127d`): the review, `docs/v6/aaroh/reviews/2026-10-25_opencode-review-info-mode.md`, with Session A's resolution appended (§8 there).
+
+**Hardening (one change, backend lane), findings #1–#4, #6, #7.** Every new or changed check was run against the old code first and failed there [OBSERVED].
+
+| # | Change | Proof |
+|---|---|---|
+| 1 | `Object.hasOwn` op lookup in `modes`, `connect`, `emergency` and `rescue`, and in the local REST emulator's two lookups | `test:security` 12 (new: 4 functions × 5 inherited names × 2 callers → 400 `unknown_op`) |
+| 2 | `admin-contract`: every function a client role can EXECUTE is as on live, or in `APPROVED_CLIENT_EXECUTE` with exactly its roles | admin-contract 17; 66 as on live + 3 approved; a new anon function fails |
+| 3 | `test:modes`: the canary scans every response; the exact key sets of all six owner success answers are pinned | `test:modes` 19 |
+| 4 | 034 revised in place (applied nowhere): one lock order (Tap → mode state → Info) in activate, save and clear | a static pin in `test:modes`. **The race itself is not executable on PGlite (one connection): NOT run.** |
+| 6 | `modes_info_missing` also flags invalid stored detailed information; the reader uses only it | `test:modes` F-3: owner status, preview and `owner.state` agree with the visitor |
+| 7 | 035 refuses to apply without 034 | `test:bq1-production` 14 |
+
+- **Contract AAROH-API v0.9.2:**
+  - `unknown_op` for inherited names;
+  - `missing` may name `detailedInformation`;
+  - `previousMode: null` documented (#8's contract half);
+  - `test:connect` has 17 checks (the §10b drift is fixed).
+- **`APPLY_ALL.sql`** regenerated: it applies as one batch, and twice.
+
+**The P2 runner, decline and block for real** (the coordinator's question 2; Session A's call):
+- With `P2_DECLINE_TOKEN` and `P2_BLOCK_TOKEN`, phase on declines one real request and blocks another. For each, it checks:
+  - the requester sees `declined` with nothing shared;
+  - its grant is revoked;
+  - a new request is refused: 429 `recently_declined` after a decline, 404 `unavailable` after a block.
+- A hosted phase on without them is INCONCLUSIVE before any write.
+- Wired as `npm run test:preview-checks` (in `ci` and `ci.yml`): 13 checks.
+- OpenCode's other choices are accepted: exit codes 0–3, the P1 pre-flight, the INCONCLUSIVE policy, `P2_HOST_LABEL`, and refusing every shygontech.com subdomain.
+
+**Full suite after both changes** [OBSERVED; Node 20.18.0; outbound network denied for the stack suites]. Every step exited 0.
+
+| Group | Results |
+|---|---|
+| Static checks | lint; build; bundle; bundle-secrets; seo; push-guard |
+| `test:db` | verify 21; adversarial 64; RLS matrix 1565; identity 69; admin-notes 12; golden 17; admin-contract 17; rollbacks 16; account-deletion 9; history 2; bundle check |
+| Payments | `payments:ci` 15, and 13 + 1 BLOCKED (Node-20-only; on Node 22.23.4: 15, and 14/0/0) |
+| Stack suites | payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 19; bq1-production 14; local-host 9; admin-edge 11; observability 10; security 12 |
+| Preview checks | 13, on spare ports 4383/54531 (OpenCode's stack uses 4373/54521) |
+| Other | components 23/23; `npm audit --audit-level=high` 0 vulnerabilities |
+
+**Not run:**
+- browser e2e;
+- the hosted P1/P2 themselves (they need AP-1–AP-6).
+
+**Verdict unchanged:** B-10 READY FOR REVIEW. Release BLOCKED:
+- P1 and P2 hosted (AP-1–AP-6);
+- G1–G7, G10, G13 and G14;
+- the V6-106 fresh capture.
