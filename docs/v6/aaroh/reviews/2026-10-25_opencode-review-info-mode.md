@@ -58,3 +58,72 @@ Findings **#2**, **#3** and **#5** above. Everything else I probed is a real ass
 - The frontend commit was read, not executed: no vitest, no e2e, no build. Its results are as the commit reports.
 - Finding #4 (the F-6 race) is a code reading; I did not construct concurrent transactions to prove the interleaving.
 - One probe script was written outside the repository (`%LOCALAPPDATA%\Temp\opencode\probe-modes-op.mjs`) to exercise finding #1 against the local stack; it was removed after use. Nothing in the repository was modified except this file.
+
+---
+
+# Production variant (dbc611a)
+
+| | |
+|---|---|
+| Scope | Backend `dbc611a` ("BQ-1 production variant of 035, re-based on production evidence, V6-106") on `v6/aaroh-backend`, now under `bb5bc85`. Reviewed: `supabase/proposed/035_public_profile_respects_mode.production.sql` (295 lines), `supabase/tests/bq1-production.mjs` (361 lines, 13 checks), `docs/v6/aaroh/bq1-production-reconciliation.md`, plus the `package.json` / `ci.yml` wiring — all read with `git show` only, **never checked out**, the other session's folder never opened. |
+| Mode | **Read-only.** No source, migration or test was changed. This report remains the only file added or modified; no push. |
+| Tests run here | The commit was materialized read-only outside the repository (`git archive -o … bb5bc85` into `%LOCALAPPDATA%\Temp\opencode\bq1run`, junction to this workspace's `node_modules`, removed afterwards), then run with network denied: `node --import ./scripts/ci/deny-network.mjs supabase/tests/bq1-production.mjs` → **13 passed, 0 failed** (exit 0), matching the commit's claim. Then, in the same sandbox, six pre-check probes ran the same way (comment-only body change, whitespace-only body change, changed grant, drifted volatility, drifted owner, CR-only difference) — all network denied, all against isolated in-memory PGlite. The temporary directory was deleted afterwards. |
+| Verdict | **No release-blocking finding (no P0, no P1).** The single-guard claim, the pre-check's refusal behaviour and the byte-exact rollback all hold; the test suite would fail without the guard. One P2 (the pre-check doesn't cover volatility) and two nits follow. Release stays **BLOCKED** and Info stays off, as the proposal itself states. |
+
+## 1. Findings
+
+| # | Severity | Where | What goes wrong (concrete input) | Fix | Status |
+|---|---|---|---|---|---|
+| P-1 | P2 | `supabase/proposed/035_public_profile_respects_mode.production.sql` (`DO $precheck$`) | The pre-check validates only body md5, owner, `prosecdef`, `proconfig` and that `tap_mode_state` exists — **not `provolatile`** (nor `prokind`/language). The file's stated invariant is "never overwrite drift it was not written for", but `CREATE OR REPLACE … STABLE` will happily rewrite a drifted attribute: probe C ran `ALTER FUNCTION … VOLATILE;` on the production-equivalent database, then applied the proposal — **no refusal, and the volatility was silently reset `v → s`**. That is a behavioural change beyond the single guard, exactly the class of change the pre-check exists to catch. The header's "one guard, nothing else" is proven for the test database, not for drifted live. | Add `p.provolatile = 's'` (and `p.prolang = 'plpgsql'`) to the pre-check's attribute test, so attribute drift raises instead of being silently corrected. | **OBSERVED** (probe; the header's `VERIFY ON LIVE` query does list `provolatile`, so the human gate covers it) |
+| P-2 | Nit | same (`DO $precheck$`; `ROLLBACK` block) | A changed grant slips through: probe B ran `GRANT EXECUTE ON FUNCTION public.get_public_profile(text) TO authenticated;` first — the proposal **applied without complaint** and the extra grant survived untouched (`proacl` before == after, `CREATE OR REPLACE` keeps privileges). So the pre-check refuses "any other *body*" but not any other grant set. The commented ROLLBACK contains no `GRANT`/`REVOKE` either, so grants are "restored" only in the sense that they are never touched — if live's `proacl` had drifted from the capture, neither apply nor rollback returns it to the captured state; only the human `VERIFY ON LIVE` comparison (which does include `proacl`) would notice. Nothing is lost or widened today. | Note in the header that `proacl` is deliberately not machine-checked (and why), or compare it in the pre-check and refuse on mismatch. | **OBSERVED** (probe) |
+| P-3 | Nit | same (ROLLBACK block) | The rollback is a commented statement with **no pre-check of its own**: whoever uncomments and runs it on a database that does not hold the captured body would overwrite that body unconditionally — the transaction's refusal only protects the forward direction. The header's "VERIFY AFTER ROLLBACK" is a manual step, not an enforcement. | Add the same `DO $precheck$` (or at least the md5 allowlist) to the rollback block, or say plainly that it is guarded by the human checklist only. | **INFERRED** (the block is inert as committed; the risk is the manual un-comment step) |
+
+## 2. Is the only behavioural change the single BQ-1 guard?
+
+- **Byte-level, from the committed file alone [OBSERVED].** I extracted the commented `ROLLBACK (begin)…(end)` statement (stripping the `-- ` prefixes) and the executable forward statement, removed exactly the six guard lines from the forward one, and compared: **93 lines each, byte-identical** (`forward − guard == rollback`). The guard block occurs exactly once; the anchor `IF NOT FOUND THEN RETURN NULL; END IF;` occurs exactly once in each.
+- **Hashes, computed independently from the file [OBSERVED].** Following the project's convention (`md5` of `prosrc` with carriage returns removed; PostgreSQL stores `prosrc` as `\n` + the body between `$function$` delimiters): forward body = **`d267acb378c604576f950c3da651faa1`**, rollback body = **`4a70098823695f40395d7c32439ffc98`** — both exactly the values the header claims, and the rollback value is the one the test independently derives from replaying the 2026-10-18 evidence.
+- **Against the evidence, not just the file [OBSERVED].** Test #1 rebuilds production from the owner's recorded seven migrations on the 2026-09-30 baseline and asserts body md5 `4a700988…`, the anchor occurring once, and the production drift (`pageTemplate`, `tier_buttons`) present. Test #5 then asserts the applied body is **that** body with exactly the guard inserted (string equality, CRs removed) and that owner, SECURITY DEFINER, `search_path`, volatility, signature and grants are unchanged; test #6 asserts the other **107 functions, 835 table grants and 64 policies** are byte-for-byte unchanged. Test #2 additionally asserts the file contains no `GRANT`/`REVOKE`. **Answer: yes — the only change is the guard**, with the caveat of finding P-1: "nothing else" is verified on the un-drifted test database, and attribute drift outside the pre-check's four fields would be silently normalised.
+
+## 3. Does the pre-check really refuse any other body?
+
+The pre-check raises unless `md5(replace(prosrc, chr(13),''))` is one of two literals (`4a700988…` = production, `d267acb3…` = already applied), owner is `postgres`, `prosecdef` is true, `proconfig` is exactly `{search_path=public, pg_temp}`, and `public.tap_mode_state` exists — all inside the same transaction, so a refusal changes nothing.
+
+| Input | Result | Label |
+|---|---|---|
+| A single comment added inside the body | **REFUSED** (`md5 c266c24f8fcf8e1264ce1a50a70df780`), body unchanged afterwards | **OBSERVED** (probe) |
+| One trailing space added to a declaration line | **REFUSED** (`md5 93343ed6ffb4007143ed7232cce328af`) | **OBSERVED** (probe) |
+| The repository baseline body (034 applied, production body absent) | **REFUSED**, body still `acbaff4f0fb3014a0a080cbf15267cd9` | **OBSERVED** (test #4) |
+| `tap_mode_state` missing (034 not applied) | **REFUSED** ("needs migration 034"), body unchanged | **OBSERVED** (test #3) |
+| Owner changed | **REFUSED** ("attributes differ from the capture") | **OBSERVED** (probe) |
+| CR-only difference in the body | **ACCEPTED** — `replace(…, chr(13), '')` deliberately erases it | **OBSERVED** (probe; documented as risk R-3 in the reconciliation) |
+| Changed grant (`proacl`) | **ACCEPTED**, grant preserved untouched | **OBSERVED** (probe → finding P-2) |
+| Drifted volatility | **ACCEPTED**, silently reset `v → s` | **OBSERVED** (probe → finding P-1) |
+
+So: any byte change to `prosrc` — whitespace, comment, reworded SQL — changes the md5 and is refused; carriage returns are the one deliberate exception; grants and volatility are outside the check. A changed *signature* also refuses (the `to_regprocedure('public.get_public_profile(text)')` lookup misses, so `v_md5 IS NULL`), and a changed return type would make `CREATE OR REPLACE` error out rather than change anything (**INFERRED**).
+
+## 4. Is the rollback byte-exact?
+
+- **File level [OBSERVED]:** the uncommented ROLLBACK statement equals the forward statement minus the six guard lines, byte for byte (§2), and its body hashes to the captured production value `4a700988…`.
+- **Database level [OBSERVED]:** test #12 runs the uncommented block on the applied database and asserts `pg_get_functiondef` equals the capture (CRs aside), owner/definer/`search_path`/volatility/signature/grants equal the before-snapshot, all 107/835/64 other objects equal, and all 20 rendered outputs are byte-identical to the pre-apply outputs. Test #2 separately asserts the ROLLBACK text equals the `pg_get_functiondef` of the replayed production function (`noCr(def) + ';'`).
+- **Grants caveat [OBSERVED, wording]:** the block contains no `GRANT`/`REVOKE`. It "restores grants" only because `CREATE OR REPLACE` never altered them — true for the captured grant set (test #12 asserts `proacl` equality), and see P-2 for drifted live grants.
+
+## 5. Does bq1-production.mjs catch a wrong body, a missing tap_mode_state, and the Business case?
+
+**Yes to all three, and no — it would not pass if the guard were missing.** OBSERVED: my own run of the suite is **13/13, 0 failed, exit 0**.
+
+- **Wrong body:** check 4 applies the proposal to a database holding the *repository baseline* body and requires the refusal message plus an unchanged body. Check 1 requires the replayed production body hash, and check 2 requires the proposal to name exactly the two right hashes plus the evidence sha256.
+- **Missing `tap_mode_state`:** check 3 applies it with 034 withheld and requires the "needs migration 034" refusal with an unchanged body.
+- **Business case:** check 7 compares all 20 slugs before/after (15 with payloads, page and card families included) and requires **zero** changed outputs plus `pageTemplate: 'event'` kept; check 10 switches back to Business and again requires byte-identical output; check 8 requires `null` while Info is live with `get_public_tap_state` still `active`, and check 9 requires `null` after the kill switch.
+- **Guard missing → FAIL:** check 5 asserts the applied body is *production + guard by string equality* and that its md5 equals the dynamically computed forward hash; without the guard that assertion fails immediately, as do 8, 9 and 10 (Info would serve the Business payload) and 2 (the forward hash in the pre-check would not match). The suite also carries a negative control (check 13): applying the baseline-derived `migrations/035` to production changes 15 slugs and drops `pageTemplate` — proving why this file exists.
+- One gap for fairness: the suite's "wrong body" fixture is only the baseline body — it does not itself exercise a whitespace/comment variant. My probes above do, and both are refused (md5 logic); that is a coverage nit of the suite, not a hole in the pre-check.
+
+## 6. Wiring and placement
+
+- `package.json` has `test:bq1-production` running the file under `--import ./scripts/ci/deny-network.mjs`, it is included in the `ci` script, and `ci.yml` runs it — **OBSERVED** in `bb5bc85`'s trees.
+- The file lives in `supabase/proposed/`, so `db:push` and `APPLY_ALL.sql` cannot run it; `APPLY_ALL.sql` references only the baseline-derived `035_public_profile_respects_mode.sql`, with the existing STOP note about production drift — **OBSERVED**.
+- The reconciliation document is candid: body is INFERRED from 2026-10-18 evidence rather than a fresh capture, no fresh capture exists, PostgreSQL 17.6 vs PGlite 18.3 unverified, callers of `get_public_profile` on production unverified, and release stays **BLOCKED** pending the owner's capture, DEC-2026-018 cool-off and the release gates. Those are stated risks, not findings.
+
+## 7. Limits of this review
+
+- The suite and probes ran on PGlite 18.3 in memory with network denied, replaying recorded evidence — not on production, not on PostgreSQL 17.6. The evidence body is a 2026-10-18 rebuild, not a fresh capture; every conclusion about *live* holds only until live changes, which is exactly what the pre-check is for (findings P-1/P-2 name what it does not cover).
+- The commit was materialized with `git archive` into a temporary directory and deleted afterwards; `dbc611a`/`bb5bc85` were never checked out, the other session's folder was never opened, and no probe file was left anywhere in the repository. Nothing in the repository was modified except this report.
