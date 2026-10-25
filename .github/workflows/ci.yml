@@ -200,6 +200,14 @@ jobs:
       - name: Modes and Info (local stack)
         run: npm run test:modes
 
+      # BQ-1 production variant (V6-106): supabase/proposed/035_…production.sql
+      # on a production-equivalent database rebuilt from the owner's 2026-10-18
+      # evidence (docs/governance/evidence/). The guard only; Business output,
+      # grants and every other object unchanged; refuses any other body; exact
+      # rollback. Isolated PGlite, outbound network denied.
+      - name: BQ-1 production variant (evidence replay)
+        run: npm run test:bq1-production
+
       # B-9 (V6-124): the local host reports the visitor's address from the
       # connection, never from a header the caller sends; the E2E simulator is
       # opt-in, loopback-only and limited to RFC 5737 addresses. Outbound

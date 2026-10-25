@@ -559,3 +559,16 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
 - **Verdict unchanged:** B-10 READY FOR REVIEW. Release BLOCKED:
   - P1 and P2 hosted (AP-1–AP-6);
   - G1–G7, G10, G13 and G14.
+
+## 17. 2026-10-25: BQ-1 production variant prepared (V6-106)
+
+- **No fresh production capture.** Session A has no production access and used none. The latest genuine evidence is the owner's of 2026-10-18 (migration record + `VERIFY-LIVE-DRIFT.sql` hash match).
+- **Finding** [INFERRED from OBSERVED evidence]: production's `get_public_profile` differs from the repository baseline (`pageTemplate`, `tier_buttons`, two comments). Applied there, `migrations/035` would remove those.
+- **Prepared:** `supabase/proposed/035_public_profile_respects_mode.production.sql`. It is production's body plus the single guard, with a pre-check that refuses any other body and an exact rollback. It is not in `migrations/` or `APPLY_ALL.sql`.
+- **Evidence:**
+  - `npm run test:bq1-production` 13/13 (the full table is in `docs/v6/aaroh/bq1-production-reconciliation.md` §4);
+  - gates re-run [OBSERVED]: on Node 20.18 every step exit 0: lint; test:push-guard; test:db (RLS matrix 1565, golden 17, admin-contract, rollbacks 16, the bundle applied as one batch and twice); test:modes 17/17; test:bq1-production 13/13. gitleaks 8.30.1 on each new file: 0 findings.
+- **Verdict unchanged:** B-10 READY FOR REVIEW. Release BLOCKED:
+  - P1 and P2 hosted (AP-1–AP-6);
+  - G1–G7, G10, G13 and G14;
+  - the V6-106 fresh capture.

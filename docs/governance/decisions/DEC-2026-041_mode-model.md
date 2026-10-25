@@ -585,3 +585,16 @@ To be filled at verification.
   - steps 3 and 4 are now in place locally;
   - **step 2 stays:** Info is off in the catalogue until the owner switches it on per environment;
   - **step 1 (re-pin at the rebaseline) stays BLOCKED** with V6-106: production's P-1 has drifted and 035 must be re-based before production.
+
+## BQ-1 production variant prepared (2026-10-25, V6-106)
+
+**Direction:** the owner's task "BQ-1 Production Baseline Reconciliation — V6-106", given in session on 2026-10-25: prepare a production-compatible 035 without touching production or enabling Info.
+
+**Prepared** (PROPOSED; evidence in `docs/v6/aaroh/bq1-production-reconciliation.md`):
+- **What:** `supabase/proposed/035_public_profile_respects_mode.production.sql`, production's `get_public_profile` plus the same single guard.
+- **Where its base came from** [INFERRED from OBSERVED evidence]: production's body was rebuilt from the owner's 2026-10-18 read-only migration record. On 2026-10-18 the owner's `VERIFY-LIVE-DRIFT.sql` had matched that replay by hash. Its body hash (CRs removed) is `4a70098823695f40395d7c32439ffc98`; the repository baseline's is `acbaff4f…`.
+- **What it keeps:** the drift that `migrations/035` would remove, namely `pageTemplate` and `tier_buttons`.
+- **Safety:** a pre-check refuses any other body. The ROLLBACK block is the captured definition.
+- **Verification:** `test:bq1-production` 13/13, including the exact rollback and a negative control that shows `migrations/035` dropping `pageTemplate`.
+- **Not performed:** no fresh capture. Session A holds no production access, and none was used.
+- **Compatibility plan step 1 stays BLOCKED** until the owner's fresh capture confirms the hash. The production variant then replaces `migrations/035` in the re-based chain.
