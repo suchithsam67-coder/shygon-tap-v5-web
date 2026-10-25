@@ -241,8 +241,16 @@ await check('the proposal names the right hashes, and its ROLLBACK is the captur
   const db = await createProductionDb({ with034: false });
   const { def } = await fnInfo(db);
   await db.close();
-  assert(rollbackOf(proposal) === noCr(def).replace(/\s*$/, '') + ';', 'ROLLBACK differs from the captured definition');
-  return `forward ${FWD_MD5}`;
+  const captured = noCr(def).replace(/\s*$/, '') + ';';
+  // The ROLLBACK is the captured definition behind its own guard (OC-2b P-3).
+  const rb = rollbackOf(proposal);
+  assert(rb.startsWith('BEGIN;\nDO $rollback_check$') && rb.endsWith(`\n${captured}\nCOMMIT;`), 'ROLLBACK is not guard + captured definition');
+  assert(rb.split(captured).length === 2 && rb.includes(`NOT IN ('${FWD_MD5}', '${PROD_MD5}')`), 'ROLLBACK guard hashes');
+  // The forward statement is exactly the captured one plus the guard (OpenCode's byte check).
+  const forward = noCr(proposal).match(/\n(CREATE OR REPLACE FUNCTION public\.get_public_profile[\s\S]*?\$function\$;)\n+COMMIT;\n*$/);
+  assert(forward, 'no forward statement');
+  assert(forward[1].split(INSERT).length === 2 && forward[1].replace(INSERT, ANCHOR) === captured, 'forward is not captured + guard');
+  return `forward ${FWD_MD5}; forward minus the guard is the captured definition, byte for byte`;
 });
 
 await check('refuses without 034, and nothing changes', async () => {
@@ -271,6 +279,47 @@ await check('refuses on any other body (the repository baseline), and nothing ch
   await db.close();
   assert(info.md5 === BASELINE_MD5, `body ${info.md5}`);
   return 'no silent overwrite of a body it was not written for';
+});
+
+// OC-2b (OpenCode, 2026-10-25): drift the pre-check must refuse rather than
+// silently normalise. Each is applied on the production-equivalent database,
+// the proposal is refused, the drift is still there (nothing changed), and it
+// is then undone for the next one.
+await check('refuses every kind of drift, and nothing changes: comment, whitespace, volatility, grant, owner', async () => {
+  const db = await createProductionDb();
+  const { def } = await fnInfo(db);
+  const original = noCr(def);
+  const FIXTURES = [
+    ['a comment added in the body', original.replace('BEGIN\n', 'BEGIN\n  -- drift\n'), original, /not the captured production body/],
+    ['a trailing space on one line', original.replace('v_tier        TEXT;', 'v_tier        TEXT; '), original, /not the captured production body/],
+    ['VOLATILE instead of STABLE', 'ALTER FUNCTION public.get_public_profile(text) VOLATILE', 'ALTER FUNCTION public.get_public_profile(text) STABLE', /attributes differ/],
+    ['an extra EXECUTE grant', 'GRANT EXECUTE ON FUNCTION public.get_public_profile(text) TO authenticated', 'REVOKE EXECUTE ON FUNCTION public.get_public_profile(text) FROM authenticated', /grants differ/],
+    ['another owner', 'ALTER FUNCTION public.get_public_profile(text) OWNER TO service_role', 'ALTER FUNCTION public.get_public_profile(text) OWNER TO postgres', /attributes differ/],
+  ];
+  const seen = [];
+  for (const [label, drift, undo, pattern] of FIXTURES) {
+    assert(drift !== original, `${label}: the fixture did not change anything`);
+    await db.exec(drift);
+    const drifted = await fnInfo(db);
+    await refuses(db, proposal, pattern);
+    const after = await fnInfo(db);
+    assert(same(after, drifted), `${label}: the refused proposal changed something`);
+    await db.exec(undo);
+    assert((await fnInfo(db)).md5 === PROD_MD5, `${label}: not restored`);
+    seen.push(label);
+  }
+  await db.close();
+  return `${seen.length} drifts refused, none silently corrected`;
+});
+
+await check('the ROLLBACK refuses a body that is neither the forward nor the captured one', async () => {
+  const db = await createLiveDb();
+  await db.exec(read(M034));
+  await refuses(db, rollbackOf(proposal), /rollback: get_public_profile is neither/);
+  const info = await fnInfo(db);
+  await db.close();
+  assert(info.md5 === BASELINE_MD5, `body ${info.md5}`);
+  return 'the repository baseline body stays untouched';
 });
 
 // The main run: one production-equivalent database, before / after / rollback.

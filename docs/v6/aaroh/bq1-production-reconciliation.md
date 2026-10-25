@@ -77,14 +77,15 @@ Production's body plus the same single guard as `migrations/035`, after the Tap 
 ### 3.2 Protection against unrelated drift
 - **A pre-check, in the same transaction, refuses to run unless:**
   - the body is the captured production one, or already the forward one (a re-run);
-  - the function is SECURITY DEFINER, with `search_path = public, pg_temp` and owner postgres;
+  - every attribute `CREATE OR REPLACE` would otherwise silently reset is as captured: a plpgsql function, STABLE, SECURITY DEFINER, `search_path = public, pg_temp`, owner postgres;
+  - the EXECUTE grants are exactly the captured set: `anon`, `postgres`, `service_role`. `CREATE OR REPLACE` keeps grants, so a drifted set would otherwise survive unseen;
   - `public.tap_mode_state` exists, meaning 034 was applied first.
-- On any other body it raises an error and changes nothing. It never overwrites drift it was not written for.
+- **On any other state it raises an error and changes nothing.** It never overwrites drift it was not written for. The volatility, language, kind and grant checks came from OpenCode's review OC-2b (P-1, P-2), 2026-10-25.
 - **VERIFY ON LIVE** queries in the header give every field to compare by hand first.
 
 ### 3.3 Rollback
-- The ROLLBACK block is the full captured production definition. The test checks it against the replay.
-- It restores the body, every attribute and the grants (§4).
+- The ROLLBACK block is the full captured production definition behind its own guard (OC-2b P-3). It runs only when the body is the forward one, or already the captured one (a re-run), so un-commenting it on any other database changes nothing.
+- It restores the body and every attribute. It touches no grant: the pre-check pinned them, and neither direction changes them (§4).
 - **Carriage returns:** the comparisons ignore them, as the 2026-10-18 comparison did. The evidence cannot show whether the live body stores CRs, so a fresh capture should record both hashes.
 
 ### 3.4 Dependencies and order
@@ -99,14 +100,17 @@ Production's body plus the same single guard as `migrations/035`, after the Tap 
 ## 4. Verification
 
 ### 4.1 Executed (2026-10-25, Node 20.18.0, isolated PGlite, outbound network denied)
-`npm run test:bq1-production` (`supabase/tests/bq1-production.mjs`, now in `ci` and `ci.yml`): **13 passed, 0 failed.**
+`npm run test:bq1-production` (`supabase/tests/bq1-production.mjs`, now in `ci` and `ci.yml`): **16 passed, 0 failed.** There were 13 when first committed in `dbc611a`; the three marked + were added since (one for review #7, two after OC-2b).
 
 | # | Check | Result |
 |---|---|---|
 | 1 | The evidence file's sha256; seven recorded migrations; the replay gives body `4a700988…`; the anchor occurs once; production drift present | PASS |
-| 2 | The proposal's pre-check names both hashes and the evidence checksum; no GRANT or REVOKE; its ROLLBACK equals the captured `pg_get_functiondef` | PASS |
+| 2 | The proposal's pre-check names both hashes and the evidence checksum; no GRANT or REVOKE. Its ROLLBACK is the guard plus the captured `pg_get_functiondef`. The forward statement minus the guard is the captured definition, byte for byte | PASS |
 | 3 | Refuses without 034; the body is unchanged | PASS |
+| + | `migrations/035` refuses without 034 too; the body is unchanged | PASS |
 | 4 | Refuses on another body (the repository baseline + 034); the body is unchanged | PASS |
+| + | Refuses five kinds of drift, and the drift is still there afterwards (nothing silently corrected): a comment in the body, a trailing space, VOLATILE, an extra EXECUTE grant, another owner | PASS |
+| + | The ROLLBACK refuses a body that is neither the forward nor the captured one | PASS |
 | 5 | After applying: the body is production's plus exactly the guard; owner, SECURITY DEFINER, `search_path`, volatility, signature and grants unchanged | PASS |
 | 6 | Every other function (107), table grant (835) and policy (64) is unchanged | PASS |
 | 7 | Business and no-state Taps: 20 slugs (15 with a payload, including page and card families) byte-identical; `pageTemplate` kept | PASS |
@@ -117,7 +121,7 @@ Production's body plus the same single guard as `migrations/035`, after the Tap 
 | 12 | ROLLBACK: the definition, attributes, grants, every other object and every output equal the capture | PASS |
 | 13 | Negative control: `migrations/035` on production would change 15 slugs and drop `pageTemplate` | PASS |
 
-The existing gates, re-run after these changes, are in readiness report §17.
+The existing gates, re-run after these changes, are in readiness report §17 (and §19 for the OC-2b changes). Each check added after OC-2b was run against the earlier proposal first, and failed there.
 
 ### 4.2 Not performed
 - **A fresh production capture**, and any read of production since 2026-10-18. This needs the owner and production credentials.

@@ -46,9 +46,13 @@
 --   after this file           d267acb378c604576f950c3da651faa1
 --
 -- PRE-CHECK (inside the transaction below; any failure aborts with nothing changed)
---   the body is the captured production one (or already this file's: a re-run),
---   SECURITY DEFINER, search_path public, pg_temp, owner postgres, and
---   public.tap_mode_state exists (034 applied first).
+--   the body is the captured production one (or already this file's: a re-run);
+--   every attribute CREATE OR REPLACE would otherwise silently reset is as
+--   captured: a plpgsql function, STABLE, SECURITY DEFINER, search_path
+--   public, pg_temp, owner postgres; the EXECUTE grants are exactly
+--   anon:EXECUTE, postgres:EXECUTE, service_role:EXECUTE (CREATE OR REPLACE keeps grants, so a drifted grant set
+--   would otherwise survive unseen); and public.tap_mode_state exists (034
+--   applied first). OpenCode review OC-2b, 2026-10-25: P-1, P-2.
 --
 -- VERIFY ON LIVE before applying (read-only, human; STOP on any difference):
 --   SELECT md5(replace(p.prosrc, chr(13), '')) AS body_md5,
@@ -69,7 +73,22 @@
 --   becomes migrations/035 in the chain re-based on the new baseline, and the
 --   baseline-derived 035 is retired with the old baseline. Never through db:push.
 --
+-- ROLLBACK: guarded like the forward direction (OC-2b P-3). It runs only when
+-- the body is this file's (or already the captured one), and restores the
+-- captured definition. It touches no grant: the pre-check pinned them, and
+-- neither direction changes them.
 -- ROLLBACK (begin)
+-- BEGIN;
+-- DO $rollback_check$
+-- BEGIN
+--   IF (SELECT md5(replace(p.prosrc, chr(13), '')) FROM pg_proc p
+--       WHERE p.oid = to_regprocedure('public.get_public_profile(text)'))
+--      NOT IN ('d267acb378c604576f950c3da651faa1', '4a70098823695f40395d7c32439ffc98') THEN
+--     RAISE EXCEPTION '035 (production) rollback: get_public_profile is neither this file''s body nor the captured one; stop';
+--   END IF;
+-- END
+-- $rollback_check$;
+--
 -- CREATE OR REPLACE FUNCTION public.get_public_profile(p_slug text)
 --  RETURNS jsonb
 --  LANGUAGE plpgsql
@@ -163,6 +182,7 @@
 --   );
 -- END;
 -- $function$;
+-- COMMIT;
 -- ROLLBACK (end)
 -- VERIFY AFTER ROLLBACK: body_md5 4a70098823695f40395d7c32439ffc98 and every other field as captured.
 --
@@ -176,15 +196,30 @@ DECLARE
   v_owner text;
   v_definer boolean;
   v_config text[];
+  v_volatile "char";
+  v_kind "char";
+  v_language text;
+  v_grants text[];
 BEGIN
-  SELECT md5(replace(p.prosrc, chr(13), '')), pg_get_userbyid(p.proowner), p.prosecdef, p.proconfig
-    INTO v_md5, v_owner, v_definer, v_config
-  FROM pg_proc p WHERE p.oid = to_regprocedure('public.get_public_profile(text)');
+  SELECT md5(replace(p.prosrc, chr(13), '')), pg_get_userbyid(p.proowner), p.prosecdef, p.proconfig,
+         p.provolatile, p.prokind, l.lanname,
+         (SELECT array_agg(g.entry ORDER BY g.entry COLLATE "C")
+            FROM (SELECT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END
+                         || ':' || a.privilege_type AS entry
+                    FROM aclexplode(p.proacl) a) g)
+    INTO v_md5, v_owner, v_definer, v_config, v_volatile, v_kind, v_language, v_grants
+  FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
+  WHERE p.oid = to_regprocedure('public.get_public_profile(text)');
   IF v_md5 IS NULL OR v_md5 NOT IN ('4a70098823695f40395d7c32439ffc98', 'd267acb378c604576f950c3da651faa1') THEN
     RAISE EXCEPTION '035 (production): get_public_profile is not the captured production body (md5 %); stop and re-capture (V6-106)', v_md5;
   END IF;
-  IF v_owner <> 'postgres' OR NOT v_definer OR v_config IS DISTINCT FROM ARRAY['search_path=public, pg_temp'] THEN
-    RAISE EXCEPTION '035 (production): get_public_profile attributes differ from the capture (owner %, definer %, config %)', v_owner, v_definer, v_config;
+  IF v_owner <> 'postgres' OR NOT v_definer OR v_config IS DISTINCT FROM ARRAY['search_path=public, pg_temp']
+     OR v_volatile <> 's' OR v_kind <> 'f' OR v_language <> 'plpgsql' THEN
+    RAISE EXCEPTION '035 (production): get_public_profile attributes differ from the capture (owner %, definer %, config %, volatility %, kind %, language %)',
+      v_owner, v_definer, v_config, v_volatile, v_kind, v_language;
+  END IF;
+  IF v_grants IS DISTINCT FROM ARRAY['anon:EXECUTE', 'postgres:EXECUTE', 'service_role:EXECUTE'] THEN
+    RAISE EXCEPTION '035 (production): get_public_profile EXECUTE grants differ from the capture (%); stop and re-capture', v_grants;
   END IF;
   IF to_regclass('public.tap_mode_state') IS NULL THEN
     RAISE EXCEPTION '035 (production): needs migration 034 (public.tap_mode_state)';

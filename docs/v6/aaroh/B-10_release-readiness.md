@@ -627,3 +627,29 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
 - P1 and P2 hosted (AP-1–AP-6);
 - G1–G7, G10, G13 and G14;
 - the V6-106 fresh capture.
+
+## 19. 2026-10-25: OpenCode's review of the production variant (OC-2b) and its fixes
+
+**Approval:** forwarded by the coordinator under the owner's hand-off approval (§18).
+
+**Taken:**
+- `89378f6` (= `10a3855`, report file only). My conflict resolution duplicated earlier sections of the review file.
+- `b9f3a4a` repairs it: the file is now exactly the first review plus the OC-2b section, checked byte for byte. It was fixed forward; no commit was rewritten.
+
+**OpenCode's verdict:** no P0, no P1. Its probes agree with Session A's:
+- the forward statement is the rollback plus the six guard lines;
+- both hashes match;
+- comment and whitespace changes are refused.
+
+**Fixed** (`supabase/proposed/035_…production.sql`, regenerated; the body is unchanged):
+- **P-1:** the pre-check covers volatility, kind and language.
+- **P-2:** the pre-check pins the EXECUTE grants.
+- **P-3:** the ROLLBACK is guarded.
+
+**Evidence** [OBSERVED]:
+- `test:bq1-production` **16/16**. It adds five drift fixtures, each refused with the drift left intact, and the rollback guard.
+- Run against the earlier proposal, the new checks fail: the VOLATILE drift was applied, and the unguarded rollback ran.
+- lint clean.
+- No migration, function or other test changed in this step, so the §18 full-suite results stand for everything else.
+
+**Verdict unchanged:** release BLOCKED (§18). The production variant still waits for the owner's fresh capture (V6-106).

@@ -143,3 +143,14 @@ So: any byte change to `prosrc` — whitespace, comment, reworded SQL — change
 
 - The suite and probes ran on PGlite 18.3 in memory with network denied, replaying recorded evidence — not on production, not on PostgreSQL 17.6. The evidence body is a 2026-10-18 rebuild, not a fresh capture; every conclusion about *live* holds only until live changes, which is exactly what the pre-check is for (findings P-1/P-2 name what it does not cover).
 - The commit was materialized with `git archive` into a temporary directory and deleted afterwards; `dbc611a`/`bb5bc85` were never checked out, the other session's folder was never opened, and no probe file was left anywhere in the repository. Nothing in the repository was modified except this report.
+
+## 8. Resolution (added by Session A, backend, 2026-10-25)
+
+The coordinator forwarded this report under the owner's hand-off approval. Fixed on `v6/aaroh-backend` in the regenerated `supabase/proposed/035_public_profile_respects_mode.production.sql`. The body did not change: forward still `d267acb3…`, captured still `4a700988…`. Each added check failed against the earlier proposal first.
+
+| # | Resolution |
+|---|---|
+| P-1 | Fixed. The pre-check also requires STABLE (`provolatile = 's'`), a plain function (`prokind = 'f'`) and `plpgsql`. A VOLATILE drift now raises "attributes differ" instead of being reset. |
+| P-2 | Fixed: the grants are machine-checked. The pre-check compares the EXECUTE grants, sorted, with the captured set (`anon`, `postgres`, `service_role`) and refuses on any difference. An extra grant to `authenticated` now raises "grants differ". |
+| P-3 | Fixed. The ROLLBACK block carries its own guard. It runs only on the forward body, or on the captured one for a re-run, inside its own transaction. On the repository baseline body it refuses and changes nothing. |
+| Coverage nit | Fixed. `test:bq1-production` now refuses five drift fixtures on the production-equivalent database, and checks that each drift is still there afterwards: a comment, a trailing space, VOLATILE, an extra grant, another owner. It also checks the byte identity *forward minus the guard = captured definition*. The suite has 16 checks. |
