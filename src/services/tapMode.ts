@@ -39,7 +39,8 @@ export interface InfoState {
 
 export interface ActivateResult {
   activeMode: TapMode;
-  previousMode: TapMode;
+  /** Null when the Tap had no earlier switch: `tap_mode_state.previous_mode` is nullable (034). */
+  previousMode: TapMode | null;
   version: number;
   changedAt: string;
   replayed: boolean;

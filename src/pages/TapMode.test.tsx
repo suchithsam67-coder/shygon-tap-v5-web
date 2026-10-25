@@ -97,6 +97,22 @@ describe('what your Tap shows', () => {
     expect(screen.getByRole('button', { name: 'Show my Business profile instead' })).toBeTruthy();
   });
 
+  it('a Tap’s first switch ever: the server sends previousMode null, and the switch is still confirmed (finding #8)', async () => {
+    let switched = false;
+    handler = (op) => {
+      if (op === 'owner.activate') {
+        switched = true;
+        return { status: 200, body: { activeMode: 'info', previousMode: null, version: 1, changedAt: '2026-10-25T10:00:00Z', replayed: false } };
+      }
+      if (op === 'owner.state') return { status: 200, body: switched ? state({ activeMode: 'info', version: 1, reason: 'active' }) : state({ version: 0 }) };
+      return base(op);
+    };
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Show the Info page instead' }));
+    expect(await screen.findByText('Done. Your Tap now shows your Info page.')).toBeTruthy();
+    expect(sent('owner.activate')[0]).toMatchObject({ mode: 'info', expectedVersion: 0 });
+  });
+
   it('Info switched off by SHYGON: says so, and offers no switch', async () => {
     handler = (op) => (op === 'owner.state' ? { status: 200, body: state({ available: false, reason: 'not_available' }) } : base(op));
     show();
