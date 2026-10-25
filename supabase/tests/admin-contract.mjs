@@ -78,6 +78,9 @@ const V6_071 = [
   ["NEW.enabled_customizations:=ARRAY(SELECT DISTINCT value FROM unnest(COALESCE(NEW.enabled_customizations,'{}'::text[]) || ARRAY['phone','email']) AS u(value) WHERE value<>'' ORDER BY value);",
    "NEW.enabled_customizations:=ARRAY(SELECT DISTINCT value FROM unnest(COALESCE(NEW.enabled_customizations,'{}'::text[])) AS u(value) WHERE value<>'' ORDER BY value);"],
 ];
+// BQ-1 (migration 035, DEC-2026-041): the public profile reader answers NULL
+// while the Tap shows another mode (Info). One guard after the Tap lookup.
+const BQ_1 = [["IF NOT FOUND THEN RETURN NULL; END IF;", "IF NOT FOUND THEN RETURN NULL; END IF;\n  -- BQ-1 (migration 035, DEC-2026-041): while the Tap shows another mode\n  -- (Info), its Business profile is not public through this reader either.\n  IF EXISTS (SELECT 1 FROM public.tap_mode_state s\n             WHERE s.tap_profile_id = v_tap.id AND s.active_mode <> 'business') THEN\n    RETURN NULL;\n  END IF;"]];
 const APPROVED_BODY_CHANGES = {
   'provision_tap_on_payment()': {
     decision: 'DEC-2026-024 D-U4 (migration 021)', replacements: D_U4,
@@ -98,6 +101,10 @@ const APPROVED_BODY_CHANGES = {
   'enforce_tap_edit_rules()': {
     decision: 'DEC-2026-035 V6-071 (migration 025)', replacements: V6_071,
     summary: 'phone and email no longer forced visible; nothing else',
+  },
+  'get_public_profile(text)': {
+    decision: 'DEC-2026-041 BQ-1, approved 2026-10-24 (migration 035)', replacements: BQ_1,
+    summary: 'NULL while the Tap shows another mode; nothing else',
   },
 };
 

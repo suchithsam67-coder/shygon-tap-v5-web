@@ -532,3 +532,30 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
 - **The advisory:** zod < 4.6.6, high, GHSA-mrhx-c7xc-m3w5 (memory exhaustion validating oversized constrained collections). It was published after this morning's green run.
 - **Exposure:** zod 4.4.3 is a **transitive dev dependency**, and nothing in `src/`, `netlify/` or `api/` imports it.
 - **Not changed** (DEC-2026-021/042 precedent): it needs the owner's approval for a lockfile-only bump. Release stays BLOCKED.
+
+## 15. 2026-10-24: G15 closed (zod), DEC-2026-042 amendment A-1
+
+- **Change:** a lockfile-only update of zod 4.4.3 → **4.6.7** (transitive dev dependency of the lint tooling), with the owner's approval. The diff is the zod entry only.
+- **Audit gate:** exit 0, "found 0 vulnerabilities".
+- **Full suite:** green on Node 20.18, including **e2e 14/14**. The only items left are the known ones: V6-014, and the Node-20 BLOCKED check.
+- **The audit gate is green on this branch again.** The frontend branch still has zod 4.4.3 until it takes this commit.
+- **Verdict unchanged:** B-10 READY FOR REVIEW. Release BLOCKED:
+  - P1 and P2 hosted, on approvals AP-1–AP-6;
+  - BQ-1;
+  - G1–G7, G10, G13 and G14.
+
+## 16. 2026-10-24: BQ-1 built (migration 035, contract v0.9)
+
+- **Change:** `get_public_profile` returns null while a Tap is on Info. It is one guard, generated from the exact current body, pinned by the admin-contract gate.
+- **Evidence:**
+  - golden 17/17: every other Tap is byte-identical;
+  - rollbacks 16/16;
+  - `test:modes` 17/17, including older clients falling back to "Tap not found".
+  - full regression on Node 20.18 [OBSERVED]: every step exit 0 (lint, build, bundle, bundle-secrets, seo, push-guard, test:db with rls-matrix 1565, payments:ci, all 13 stack suites, components 23/23); `npm audit --audit-level=high` 0 vulnerabilities;
+  - Node 22.23.4: payments 15/0 and functions-security 14/0/0 (the Node-20-only BLOCKED check passes);
+  - browser e2e was not re-run for this change: Info is off by default and golden shows every other Tap is byte-identical.
+- **BQ-1 is closed locally.** Info is still OFF in the catalogue: switching it on per environment is the owner's decision.
+- **Production:** 035 must be re-based on the fresh capture (V6-106 / G2) before any production use.
+- **Verdict unchanged:** B-10 READY FOR REVIEW. Release BLOCKED:
+  - P1 and P2 hosted (AP-1–AP-6);
+  - G1–G7, G10, G13 and G14.

@@ -1,11 +1,11 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.8
+# SHYGON AAROH backend API contract — AAROH-API v0.9
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.8** (2026-10-24): modes and Info, §6. v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`; changes in §13. v0.8 is reserved for the mode model (DEC-2026-041), which is not approved. DEC-2026-038, -039 and -040 are **APPROVED**. |
+| Contract version | **AAROH-API v0.9** (2026-10-24): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040); none applied anywhere. 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041); none applied anywhere. 027 is held aside (DEC-2026-037). |
 | Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
@@ -91,7 +91,7 @@ No operation is labelled LIVE: nothing is deployed.
 
 **P-1 `get_public_profile(p_slug text) → jsonb | null`** (anon; SECURITY DEFINER; frozen contract, doc 12 §2)
 - URL format today: `/t/<slug>` and `/tap/<slug>`; the slug is 3–40 chars, `[a-z0-9-]`, case-insensitive.
-- **Returns** `null` unless the Tap is `status = 'active'` and not suspended. Otherwise it returns:
+- **Returns** `null` unless the Tap is `status = 'active'` and not suspended. **Since v0.9 (migration 035), also `null` while the Tap's active mode is not Business** (§6). Otherwise it returns:
   `{ slug, experience, displayName, headline, designation, company, bio, avatarUrl, location, phone, whatsapp, email, website, instagram, linkedin, youtube, customLinks, theme{palette,layout,buttons,font,animation}, baseTheme{…}, activeEvent }`.
   A contact field is non-null only if the owner switched it on (`enabled_customizations`) and owns the add-on (phone and email need none). `experience` is clamped to what the owner paid for.
 - **Never contains** user id, customer id, card id, order data, account email, emergency data or any S3 data (verified: `test:public-tap` field allowlist; `test:emergency` "no emergency data").
@@ -156,7 +156,10 @@ T-2 rules, enforced server-side:
 
 ## 6. Modes (Business, Info): `POST /api/modes` and `get_public_tap_mode` (v0.8)
 
-**Status:** LIVE-LOCAL. Implementation scope approved 2026-10-24 (DEC-2026-041; migration 034). **Info is OFF in the catalogue (`tap_mode_catalog`) on every database by default.** The legacy `get_public_profile` is unchanged (BQ-1), so it would still return the Business payload for a Tap on Info. Info may be switched on in a real database only after BQ-1's change to that reader.
+**Status:** LIVE-LOCAL. Implementation scope approved 2026-10-24 (DEC-2026-041; migrations 034 and 035).
+- **BQ-1 is built (v0.9, migration 035):** P-1 returns `null` while a Tap is on Info, so Business is never public through the old reader while Info is shown.
+- **Info ships OFF in the catalogue (`tap_mode_catalog`).** Switching it on is now a per-environment owner decision; there is no remaining technical blocker in the repository.
+- **Production:** 034 and 035 wait for the release track. 035 must be re-based on the fresh production capture first (V6-106), because production's P-1 has drifted.
 
 **The model:**
 - One active mode per Tap (per account in v1): `business` (the default; no state row means Business) or `info`.
@@ -641,6 +644,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.9 | 2026-10-24 | **BQ-1** (DEC-2026-041, migration 035): P-1 `get_public_profile` also returns `null` while the Tap's active mode is not Business. Shape, signature and grants are unchanged. Every Tap without Info is byte-identical (golden), and the admin-contract gate pins the edit to one guard. | Older clients that call only P-1 show their existing "Tap not found" page for a Tap on Info (P-2 still answers `active`). Read P-6 first. `owner.preview` for Business answers `null` while the Tap is on Info. |
 | v0.8 | 2026-10-24 | **New: modes and Info** (DEC-2026-041 implementation scope; migration 034): §6 `POST /api/modes` (`owner.state`, `owner.activate`, `owner.info.get`, `owner.info.save`, `owner.info.clear`, `owner.preview`) and the public reader P-6 `get_public_tap_mode`. **Info is OFF in the catalogue by default**, because `get_public_profile` (P-1) is unchanged (BQ-1). No earlier operation changed. | May build the owner Modes / Info pages and the Info view against §6. Read P-6 first, falling back to P-1 if it is missing, and update `contract.test.ts`. Never show Business when P-6 returns null. No capability buttons on Info. Info cannot go live on a real database until SHYGON switches it on after BQ-1. |
 | v0.7.2 | 2026-10-23 | Editorial: §10b's **Status** line now says what its host-switch bullet already said. Connect is visible to visitors only once the owner has `CONNECT_PUBLIC=on` set (A-1). No operation, request or response changed. | None. |
 | v0.7.1 | 2026-10-23 | **B-10** (owner-approved, DEC-2026-039 amendment A-1): §10b host switch `CONNECT_PUBLIC`. While off, `public.status` is false and `requests.create` / `requests.accept` / `connections.share` answer 404 `unavailable` (create also for an anonymous caller). Decline, block, remove and the lists always work. `settings` gain `publicAllowed`. **B-9:** visitor emergency alerts and finder starts use only the header named by `TRUSTED_CLIENT_IP_HEADER` (no shape change). The local host sets the visitor address itself and offers the opt-in `x-shygon-sim-client` hook. `/__sim/switches` accepts `CONNECT_PUBLIC`. | Show the Connect card only when `public.status` is true (already the case). On the signed-in request page, check `public.status` before offering the form. Show "not yet available" when `publicAllowed` is false. A 404 on accept or share is a refusal, never success. E2E: a browser-sent `x-nf-client-connection-ip` no longer has any effect on the stack; use the sim header with `STACK_SIM_CLIENT_ADDRESS=1` for distinct visitors, and switch `CONNECT_PUBLIC` on through `/__sim/switches` for Connect journeys. |

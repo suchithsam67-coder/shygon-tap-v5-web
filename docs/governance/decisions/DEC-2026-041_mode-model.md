@@ -567,3 +567,21 @@ To be filled at verification.
 | Contract | AAROH-API **v0.8** (§6, §13) |
 | Gates | rls-matrix (55 tables × 7 callers), admin-contract (four relations approved under this DEC), account deletion (runbook and test), rollbacks, golden, the bundle |
 | Tests | `test:modes` **17/17** (in `ci` and the CI workflow) |
+
+## BQ-1 built (2026-10-24, migration 035)
+
+**Approved by the owner in session.** The build question "What should I build?" was answered **"BQ-1 fix (Recommended)"**. Its text: "Migration 035: the old public profile reader returns nothing while a Tap is on Info (shape unchanged; every other Tap byte-identical, golden test). Contract v0.9, tests, compatibility notes. Info can then be switched on safely later. Written against the repo baseline; production's drifted copy still waits for the rebaseline (V6-106)."
+
+**Built** [OBSERVED]:
+- `035_public_profile_respects_mode.sql` adds **one guard** after the Tap lookup in `get_public_profile`. The guard returns NULL while `tap_mode_state.active_mode <> 'business'`.
+- The migration was generated from the exact current definition (body md5 `acbaff4f0fb3014a0a080cbf15267cd9`), not retyped. Its ROLLBACK block restores that body.
+- Gates:
+  - **admin-contract:** "the body differs from live by exactly the approved edit" (`APPROVED_BODY_CHANGES`);
+  - **rollbacks 16/16**;
+  - **golden 17/17**: every Tap without Info is byte-identical;
+  - **test:modes 17/17:** P-1 is null while Info is live and after the kill switch; P-2 still answers `active`, so older clients show "Tap not found"; Business is restored byte-identical; a Tap on Business is unaffected.
+- **Contract:** AAROH-API v0.9.
+- **Compatibility plan** (readiness report §0.12):
+  - steps 3 and 4 are now in place locally;
+  - **step 2 stays:** Info is off in the catalogue until the owner switches it on per environment;
+  - **step 1 (re-pin at the rebaseline) stays BLOCKED** with V6-106: production's P-1 has drifted and 035 must be re-based before production.

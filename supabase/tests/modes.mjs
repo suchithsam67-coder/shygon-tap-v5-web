@@ -55,10 +55,10 @@ await t.check('only get_public_tap_mode is open to visitors; every modes_* funct
   return `${rows.length - 1} server-only functions, 1 public reader`;
 });
 
-await t.check('the catalogue ships with Business on and Info OFF (BQ-1: get_public_profile is unchanged)', async () => {
+await t.check('the catalogue ships with Business on and Info OFF (switching it on is a per-environment owner decision)', async () => {
   const rows = (await db.query(`SELECT mode, enabled FROM public.tap_mode_catalog ORDER BY mode`)).rows;
   assertEqual(rows.map((r) => [r.mode, r.enabled]), [['business', true], ['info', false]], 'catalogue');
-  return 'Info off until BQ-1';
+  return 'Info off by default';
 });
 
 await t.check('the mode audit is append-only, even for the server role', async () => {
@@ -213,13 +213,15 @@ await t.check('activate Info: version, idempotent replay, one audit row; the rea
   return 'Live only after the server answered';
 });
 
-await t.check('preview equals the public view; legacy get_public_profile is unchanged (BQ-1, documented)', async () => {
+await t.check('BQ-1 (035): while Info is live the legacy reader returns null; older clients take their existing unavailable path', async () => {
   const pv = await call({ op: 'owner.preview', mode: 'info' }, asha.token);
   same(pv.body.view, (await pub(SLUG)).info, 'info preview');
   const pb = await call({ op: 'owner.preview', mode: 'business' }, asha.token);
-  same(pb.body.view, businessView, 'business preview');
-  same(await legacy(SLUG), businessView, 'legacy reader unchanged: why Info ships off in the catalogue');
-  return 'one rendering path';
+  assertEqual(pb.body.view, null, 'business preview while Info is live (035)');
+  assertEqual(await legacy(SLUG), null, 'get_public_profile while Info is live');
+  assertEqual(await rpc('get_public_tap_state', SLUG), 'active', 'P-2 still active: an older client shows its "Tap not found" page');
+  same(await legacy('cara-modes'), (await pub('cara-modes')).profile, 'a Tap on Business is unaffected');
+  return 'Business never public through the old reader while Info is shown';
 });
 
 await t.check('while Info is live it cannot become incomplete or be cleared', async () => {
@@ -245,6 +247,7 @@ await t.check('other accounts: no Tap is 404; another owner changes only their o
 await t.check('fallbacks: Info off, invalid, missing, paused or suspended gives "unavailable" (null), never Business', async () => {
   await setInfo(false);
   assertEqual(await pub(SLUG), null, 'F-1 switched off by SHYGON');
+  assertEqual(await legacy(SLUG), null, 'F-1: and not Business through the legacy reader either (BQ-2)');
   await setInfo(true);
   await stack.query(`UPDATE public.info_pages SET detailed_information = '<b>broken' WHERE owner_user_id = $1`, [asha.userId]);
   assertEqual(await pub(SLUG), null, 'F-3 invalid at read time');
@@ -270,6 +273,7 @@ await t.check('switching back to Business restores the identical Business payloa
   const b = await call({ op: 'owner.activate', mode: 'business', expectedVersion: 1, idempotencyKey: key() }, asha.token);
   assertEqual([b.status, b.body.activeMode, b.body.version], [200, 'business', 2], 'business');
   same(await pub(SLUG), { mode: 'business', profile: businessView }, 'identical');
+  same(await legacy(SLUG), businessView, 'legacy reader serves Business again, byte-identical');
   const clear = await call({ op: 'owner.info.clear' }, asha.token);
   assertEqual([clear.status, clear.body.cleared], [200, true], 'cleared');
   const audit = (await stack.query(`SELECT action, fields FROM public.tap_mode_audit WHERE user_id = $1 ORDER BY created_at`, [asha.userId])).rows;
