@@ -1,8 +1,8 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.9
+# SHYGON AAROH backend API contract — AAROH-API v0.9.1
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.9** (2026-10-24): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
+| Contract version | **AAROH-API v0.9.1** (2026-10-25): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
 | Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041); none applied anywhere. 027 is held aside (DEC-2026-037). |
@@ -295,7 +295,7 @@ Rules:
 
 - `available` is true only if the Tap is published, neither the Tap nor the account is suspended, visitor alerts are on, and at least one contact is verified. Every other case is indistinguishable.
 - **Relay only.** The visitor never sees who was alerted or how many, and no contact detail is returned.
-- Contacts receive: "SHYGON emergency alert: someone using <owner>'s SHYGON profile reported an emergency at <time> IST. SHYGON cannot confirm it. Try to reach <owner> directly. If they may be in danger, call 112."
+- Contacts receive: "SHYGON emergency alert: someone using the SHYGON profile of <owner> reported an emergency at <time> IST. SHYGON cannot confirm it. Try to reach them directly. If they may be in danger, call 112." (v0.9.1)
 - The owner gets an in-app `security` notification every time.
 - Limits:
   - 3 visitor alerts per owner per 24 h;
@@ -644,6 +644,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.9.1 | 2026-10-25 | Wording only: the visitor-initiated alert SMS (§10) now reads "someone using the SHYGON profile of <owner> … Try to reach them directly." It names the owner once, so the DLT template has two variables (name, time), like the owner alert. Wording approved by the owner on 2026-10-25, relayed by the coordination session; DLT registration pending. Visitor alerts stay off (DEC-2026-038 Q2). No request, response or error changed. | None, unless a page shows a preview of that SMS (none does on the frontend's `dce0ec9`: a text search of its `src/` finds no copy, 2026-10-25). |
 | v0.9 | 2026-10-24 | **BQ-1** (DEC-2026-041, migration 035): P-1 `get_public_profile` also returns `null` while the Tap's active mode is not Business. Shape, signature and grants are unchanged. Every Tap without Info is byte-identical (golden), and the admin-contract gate pins the edit to one guard. | Older clients that call only P-1 show their existing "Tap not found" page for a Tap on Info (P-2 still answers `active`). Read P-6 first. `owner.preview` for Business answers `null` while the Tap is on Info. |
 | v0.8 | 2026-10-24 | **New: modes and Info** (DEC-2026-041 implementation scope; migration 034): §6 `POST /api/modes` (`owner.state`, `owner.activate`, `owner.info.get`, `owner.info.save`, `owner.info.clear`, `owner.preview`) and the public reader P-6 `get_public_tap_mode`. **Info is OFF in the catalogue by default**, because `get_public_profile` (P-1) is unchanged (BQ-1). No earlier operation changed. | May build the owner Modes / Info pages and the Info view against §6. Read P-6 first, falling back to P-1 if it is missing, and update `contract.test.ts`. Never show Business when P-6 returns null. No capability buttons on Info. Info cannot go live on a real database until SHYGON switches it on after BQ-1. |
 | v0.7.2 | 2026-10-23 | Editorial: §10b's **Status** line now says what its host-switch bullet already said. Connect is visible to visitors only once the owner has `CONNECT_PUBLIC=on` set (A-1). No operation, request or response changed. | None. |
