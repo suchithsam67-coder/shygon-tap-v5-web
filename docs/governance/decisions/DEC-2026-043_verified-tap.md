@@ -10,7 +10,7 @@
 | **Accountable Owner (A)** | The repository owner, who holds every role (DEC-2026-018 Option B) |
 | Responsible (R) | Session A (backend). The pure crypto core is being written by OpenCode on `opencode/u1-sun-crypto` (coordinator, 2026-10-25) and comes to Session A as a hand-off |
 | Consulted | Session B (frontend: the verdict page); the coordination session; ChatGPT's U1 threat model (pending, §8) |
-| State | **PROPOSED (draft).** Docs only. Nothing is built, keyed, personalised or deployed. **Contract v0.10 and migration 036 wait for the owner's approval of this record** (differentiation plan §5, U1 gate) |
+| State | **PROPOSED (draft), ON HOLD for the owner's review.** Docs only. Nothing is built, keyed, personalised or deployed. **Owner, 2026-10-25, in session:** "I'll review DEC-2026-043 first. Hold contract v0.10 and migration 036 until I answer Q1-Q7 and the threat model (T-1 to T-7) is folded in." Until both are done, Session A writes no contract v0.10, no migration 036 and no `/api/verify` |
 
 Labels: **OBSERVED** (in this repository or a decision record), **INFERRED** (from public vendor documents or reasoning, not tested here), **PROPOSED**, **PENDING** (waits for an input named in §8).
 
