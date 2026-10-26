@@ -1,15 +1,17 @@
 import { requestLog } from '../lib/log.mjs';
+import { env } from '../lib/sms.mjs';
 import { config, currentUser, DbError, rpc } from '../lib/emergency.mjs';
 
 /**
- * POST /api/modes: the Tap owner's mode control (migration 034, DEC-2026-041).
- * The contract is docs/v6/aaroh/api-contract.md §6.
+ * POST /api/modes: the Tap owner's mode control (migrations 034 and 036,
+ * DEC-2026-041 and its amendment A-1). The contract is
+ * docs/v6/aaroh/api-contract.md §6.
  *
  * Body: { op: '<operation>', ...fields }. Every operation needs
  * Authorization: Bearer <the customer's access token>.
  *
  *   owner.state          the active mode, its version, and each mode's availability
- *   owner.activate       { mode: 'business' | 'info', expectedVersion, idempotencyKey }
+ *   owner.activate       { mode: 'business' | 'info' | 'lost', expectedVersion, idempotencyKey }
  *   owner.info.get       my Info record and its publication status
  *   owner.info.save      { fields: { title?, shortDescription?, category?, detailedInformation? }, expectedVersion }
  *   owner.info.clear     delete my Info record (refused while Info is live)
@@ -26,22 +28,31 @@ const ERRORS = {
   method_not_allowed: [405, 'Method not allowed.'],
   unknown_op: [400, 'Unknown operation.'],
   invalid_request: [400, 'That request is not valid.'],
-  invalid_mode: [400, 'Choose business or info.'],
+  invalid_mode: [400, 'Choose business, info or lost.'],
   invalid_expected_version: [400, 'Send the version you last saw.'],
   invalid_idempotency_key: [400, 'Send a new idempotency key: 16 to 64 letters, digits, "-" or "_".'],
   invalid_field: [422, 'One of the fields is not valid.'],
   no_tap: [404, 'You do not have a Tap yet.'],
   tap_suspended: [409, 'Your Tap is suspended, so its mode cannot change.'],
   mode_unavailable: [409, 'That mode is not available yet.'],
-  needs_setup: [409, 'Finish setting up Info first.'],
+  needs_setup: [409, 'Finish setting up this mode first.'],
   stale_version: [409, 'This changed somewhere else. Reload and try again.'],
   mode_active: [409, 'Info is live. Switch your Tap to Business first.'],
   server_misconfigured: [500, 'The server is not configured.'],
   internal: [500, 'Something went wrong. Please try again.'],
 };
 
-const MODES = new Set(['business', 'info']);
+const MODES = new Set(['business', 'info', 'lost']);
 const KEY = /^[A-Za-z0-9_-]{16,64}$/;
+
+/**
+ * Lost (036) reuses Return to Owner, whose finder side runs only where the host
+ * has RESCUE_RELAY=on (031; off until release). The database cannot see a host
+ * setting, so this function applies it: while it is off, Lost is not available,
+ * cannot be activated, and its preview is empty. Read per request.
+ */
+const relayAllowed = () => env('RESCUE_RELAY') === 'on';
+const LOST_OFF = { mode: 'lost', available: false, reason: 'not_available' };
 const MAX_BODY = 16 * 1024;
 
 const json = (body, status = 200) =>
@@ -75,11 +86,18 @@ const answer = (r, status = 200) => {
 const version = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
 
 const OPS = {
-  'owner.state': async (cfg, user) => answer(await rpc(cfg, 'modes_owner_state', { p_user: user.id })),
+  'owner.state': async (cfg, user) => {
+    const r = await rpc(cfg, 'modes_owner_state', { p_user: user.id });
+    if (r?.ok !== false && Array.isArray(r?.modes) && !relayAllowed()) {
+      r.modes = r.modes.map((m) => (m.mode === 'lost' ? LOST_OFF : m));
+    }
+    return answer(r);
+  },
   'owner.activate': async (cfg, user, body, log) => {
     if (!MODES.has(body.mode)) return fail('invalid_mode');
     if (version(body.expectedVersion) === null) return fail('invalid_expected_version');
     if (typeof body.idempotencyKey !== 'string' || !KEY.test(body.idempotencyKey)) return fail('invalid_idempotency_key');
+    if (body.mode === 'lost' && !relayAllowed()) return fail('mode_unavailable');
     const r = await rpc(cfg, 'modes_owner_activate', {
       p_user: user.id, p_mode: body.mode, p_expected_version: body.expectedVersion, p_idempotency_key: body.idempotencyKey,
     });
@@ -98,7 +116,10 @@ const OPS = {
   'owner.info.clear': async (cfg, user) => answer(await rpc(cfg, 'modes_info_clear', { p_user: user.id })),
   'owner.preview': async (cfg, user, body) => {
     if (!MODES.has(body.mode)) return fail('invalid_mode');
-    return answer(await rpc(cfg, 'modes_preview', { p_user: user.id, p_mode: body.mode }));
+    const r = await rpc(cfg, 'modes_preview', { p_user: user.id, p_mode: body.mode });
+    // With the relay off a visitor gets no Lost page, so neither does the preview.
+    if (body.mode === 'lost' && r?.ok !== false && !relayAllowed()) r.view = null;
+    return answer(r);
   },
 };
 

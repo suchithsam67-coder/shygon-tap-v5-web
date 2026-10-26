@@ -653,3 +653,45 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
 - No migration, function or other test changed in this step, so the §18 full-suite results stand for everything else.
 
 **Verdict unchanged:** release BLOCKED (§18). The production variant still waits for the owner's fresh capture (V6-106).
+
+## 20. 2026-10-26: Lost mode (U2) built (migration 036, contract v0.10)
+
+**Approval:**
+- The owner, in the coordination session on 2026-10-25 (relayed with the owner's words): "Approved: U2 = Lost mode (option L1) now, for adults' own cards, reusing Return to Owner, off until release. Keep Return to Owner on the Business page too. Defer Guardian until visitor alerts are reconsidered."
+- In this session on 2026-10-26: "start".
+- Record: DEC-2026-041 amendment A-1, with Session A's design choices L-1 to L-6 for the owner to confirm.
+
+**Built (local):**
+- **`036_lost_mode.sql`**, generated from 034's own text:
+  - a `lost` catalogue row, OFF;
+  - Lost in owner state, activation, preview and the public reader;
+  - its ROLLBACK restores 034's functions verbatim.
+- **`/api/modes`:** applies `RESCUE_RELAY`.
+- **Contract AAROH-API v0.10.**
+- **Unchanged:** `get_public_profile` (035's guard already covers Lost), and Return to Owner (031).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]. Every step exited 0.
+
+| Group | Results |
+|---|---|
+| Static checks | lint; build; bundle; bundle-secrets; seo; push-guard |
+| `test:db` | RLS matrix 1565; golden 18 (a new stage for 036, byte-identical); admin-contract 17 (no new client-executable function); rollbacks 17 (036 restores the schema exactly); bundle check |
+| Payments | `payments:ci` 15, and 13 + 1 known Node-20-only BLOCKED (Node 22: 15, and 14/0/0) |
+| Stack suites | modes **25** (six new for Lost); bq1-production 16; preview-checks 13; security 12; rescue 18; connect 17; emergency 49; and the others as in §18 |
+| Other | components 23/23; audit 0 vulnerabilities |
+
+**What the six Lost checks prove:**
+- Lost is off by default, and gated by `RESCUE_RELAY`.
+- The Return to Owner opt-in is required, and switching never turns it on.
+- The reader answers exactly `{ mode: 'lost' }`, while P-1 is null and P-2 is `active`.
+- A finder can message the owner, and no Business, Info or owner value appears in any answer.
+- The kill switch, the opt-in turned off and suspension each give null, never Business.
+- Switching back restores Business byte-identical, and the opt-in is untouched.
+
+**Not run:**
+- browser e2e (Session B has no Lost page yet);
+- any hosted check.
+
+**Numbering:** U1 (DEC-2026-043, on hold) is renumbered to migration 037 and contract v0.11.
+
+**Verdict unchanged:** release BLOCKED (§18). Lost stays OFF in the catalogue and behind `RESCUE_RELAY` until release.

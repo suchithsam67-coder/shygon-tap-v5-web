@@ -598,3 +598,42 @@ To be filled at verification.
 - **Verification:** `test:bq1-production` 13/13, including the exact rollback and a negative control that shows `migrations/035` dropping `pageTemplate`.
 - **Not performed:** no fresh capture. Session A holds no production access, and none was used.
 - **Compatibility plan step 1 stays BLOCKED** until the owner's fresh capture confirms the hash. The production variant then replaces `migrations/035` in the re-based chain.
+
+## Amendment A-1: Lost mode (U2), 2026-10-25 / 2026-10-26
+
+**Approval:**
+- **The owner, in the coordination session on 2026-10-25,** relayed by the coordinator with the owner's words quoted: "Approved: U2 = Lost mode (option L1) now, for adults' own cards, reusing Return to Owner, off until release. Keep Return to Owner on the Business page too. Defer Guardian until visitor alerts are reconsidered."
+- **In Session A on 2026-10-26:** "start". Session A takes this as the go-ahead to build it, as the coordinator suggested checking with the owner first.
+
+**Scope (L1, from the hand-off):**
+- a `lost` mode on the 034 model, OFF in the catalogue by default, and available only with `RESCUE_RELAY`;
+- visitors see only "Found this card?" and the existing Return to Owner form (031);
+- no Business or Info data, no owner detail, number or location, and **no new public field**;
+- P-1 and P-6 never return Business data while Lost is active, kill switch included;
+- the Business page's Return to Owner opt-in unchanged.
+- **Out of scope:** Guardian (waits for DEC-2026-038 Q2).
+
+**Session A's design choices** (the hand-off left these to Session A; the owner may change any of them):
+
+| # | Choice | Why |
+|---|---|---|
+| L-1 | Switching to Lost **requires** the owner's own Return to Owner opt-in (`needs_setup`, `missing: ['returnToOwner']`) and **never turns it on** | Consent to receive finder messages stays the owner's own explicit step. Turning it on silently would also switch Return to Owner on for the Business page afterwards, against "keep Return to Owner on the Business page too" as the owner set it |
+| L-2 | The public reader answers `{ mode: 'lost' }` (one key) or `null` | No new public field. The page and its form come from the frontend and §10a. A visitor learns no more than `public.status` already tells them (the owner can take a message) |
+| L-3 | Lost is `null` unless all three hold: the catalogue row is on, `rescue_public_target` answers (opt-in on, Tap published, account not suspended), and the Tap is live | Fail closed. If the owner turns Return to Owner off while Lost is active, visitors get the neutral "unavailable"; the owner sees `needs_setup` |
+| L-4 | `RESCUE_RELAY` (a host setting the database cannot see) is applied in `/api/modes`. While it is off, Lost is `not_available`, activation is `mode_unavailable` and the preview is `null`. `/api/rescue` keeps refusing finders as before | One host switch governs the whole finder path |
+| L-5 | Migration **036** for Lost. U1 (DEC-2026-043, on hold, not written) moves to **037**. Contract **v0.10** is Lost; U1 takes the next version | Migrations apply in name order: taking the next number avoids a gap that could apply out of order later. DEC-2026-043 and the plan are renumbered to match |
+| L-6 | Connect and visitor alerts are not mode-aware, as with Info: the Lost page simply does not show them | Changing 029 or 032 was outside the hand-off. Making them refuse while Lost is active is a possible follow-up |
+
+**Built** (local; readiness report §20):
+- `036_lost_mode.sql`, generated from 034's own function text: the catalogue row (OFF) and its CHECK; `modes_owner_state`, `modes_owner_activate`, `modes_preview` and `get_public_tap_mode` with Lost. The ROLLBACK restores 034's four functions verbatim (rollbacks gate).
+- `/api/modes`: `lost` accepted; `RESCUE_RELAY` applied.
+- `test:modes` 25, six of them for Lost:
+  - off by default and relay-gated;
+  - the opt-in is required and never turned on;
+  - the reader answers exactly `{ mode: 'lost' }` and P-1 is null;
+  - a finder can message the owner with no owner detail in any answer;
+  - the kill switch, the opt-in turned off and suspension all give null, never Business;
+  - switching back restores Business byte-identical, and the opt-in is untouched.
+- Contract AAROH-API v0.10.
+
+Customer copy is drafted in §6 of the contract. The owner approves the exact strings at Session B's gate.

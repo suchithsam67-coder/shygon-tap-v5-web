@@ -55,10 +55,10 @@ await t.check('only get_public_tap_mode is open to visitors; every modes_* funct
   return `${rows.length - 1} server-only functions, 1 public reader`;
 });
 
-await t.check('the catalogue ships with Business on and Info OFF (switching it on is a per-environment owner decision)', async () => {
+await t.check('the catalogue ships with Business on, Info OFF and Lost OFF (switching either on is a per-environment owner decision)', async () => {
   const rows = (await db.query(`SELECT mode, enabled FROM public.tap_mode_catalog ORDER BY mode`)).rows;
-  assertEqual(rows.map((r) => [r.mode, r.enabled]), [['business', true], ['info', false]], 'catalogue');
-  return 'Info off by default';
+  assertEqual(rows.map((r) => [r.mode, r.enabled]), [['business', true], ['info', false], ['lost', false]], 'catalogue');
+  return 'Info and Lost off by default';
 });
 
 await t.check('the mode audit is append-only, even for the server role', async () => {
@@ -315,6 +315,101 @@ await t.check('switching back to Business restores the identical Business payloa
   const audit = (await stack.query(`SELECT action, fields FROM public.tap_mode_audit WHERE user_id = $1 ORDER BY created_at`, [asha.userId])).rows;
   assertEqual(audit.map((a) => a.action), ['info_save', 'info_save', 'activate', 'activate', 'info_clear'], 'audit trail');
   assert(audit.every((a) => !JSON.stringify(a).includes('projector')), 'the audit holds field names, never values');
+  return 'reversible';
+});
+
+// ---------------------------------------------------------------------------
+t.section('C. Lost mode (036, DEC-2026-041 A-1): only "Found this card?" and Return to Owner');
+
+const setLost = (on) => stack.query(`UPDATE public.tap_mode_catalog SET enabled = $1 WHERE mode = 'lost'`, [on]);
+const lostEntry = async () => (await call({ op: 'owner.state' }, asha.token)).body.modes.find((m) => m.mode === 'lost');
+// The finder side of Return to Owner, as /api/rescue serves it; its answers join the canary scan.
+process.env.STACK_SIM_CLIENT_ADDRESS = '1';
+const rescue = async (body, token) => {
+  const r = await callFunction(stack, 'rescue', { token, body, headers: { 'x-shygon-sim-client': '203.0.113.77' } });
+  bodies.push(JSON.stringify(r.body));
+  return r;
+};
+// Business and Info values that must never reach any Lost output.
+const NOT_IN_LOST = ['Asha Rao', 'Designer', 'Room 204 projector', ...Object.values(C)];
+const lostLeaks = (label, value) => NOT_IN_LOST.filter((v) => JSON.stringify(value ?? null).includes(v)).map((v) => `${v} in ${label}`);
+let lostVersion;
+
+await t.check('Lost is off by default, and needs the host relay: not available, activation refused', async () => {
+  same(await lostEntry(), { mode: 'lost', available: false, reason: 'not_available' }, 'catalogue off');
+  await setLost(true);
+  delete process.env.RESCUE_RELAY;
+  same(await lostEntry(), { mode: 'lost', available: false, reason: 'not_available' }, 'relay off');
+  const a = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: key() }, asha.token);
+  assertEqual([a.status, codeOf(a)], [409, 'mode_unavailable'], 'activate while the relay is off');
+  const pv = await call({ op: 'owner.preview', mode: 'lost' }, asha.token);
+  assertEqual(pv.body.view, null, 'preview while the relay is off');
+  return 'catalogue and RESCUE_RELAY both gate it';
+});
+
+await t.check('with the relay on, Lost needs the owner\'s own Return to Owner opt-in; switching never turns it on', async () => {
+  process.env.RESCUE_RELAY = 'on';
+  same(await lostEntry(), { mode: 'lost', available: false, reason: 'needs_setup', missing: ['returnToOwner'] }, 'state');
+  const a = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: key() }, asha.token);
+  assertEqual([a.status, codeOf(a), a.body.error.missing], [409, 'needs_setup', ['returnToOwner']], 'activate');
+  assertEqual((await rescue({ op: 'settings.get' }, asha.token)).body.settings.enabled, false, 'the opt-in is still off');
+  return 'consent stays the owner\'s own step';
+});
+
+await t.check('activate Lost: the reader answers { mode: "lost" } and nothing else; the legacy reader is null', async () => {
+  const on = await rescue({ op: 'settings.set', enabled: true }, asha.token);
+  assertEqual([on.status, on.body.settings.enabled], [200, true], 'Return to Owner on');
+  same(await lostEntry(), { mode: 'lost', available: true, reason: 'ready' }, 'ready');
+  const a = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: key() }, asha.token);
+  assertEqual([a.status, a.body.activeMode, a.body.previousMode, a.body.version], [200, 'lost', 'business', 3], 'activated');
+  lostVersion = a.body.version;
+  const p = await pub(SLUG);
+  same(p, { mode: 'lost' }, 'the whole public answer');
+  assertEqual(await legacy(SLUG), null, 'get_public_profile while Lost is active (035)');
+  assertEqual(await rpc('get_public_tap_state', SLUG), 'active', 'P-2: an older client shows its unavailable page');
+  same((await call({ op: 'owner.preview', mode: 'lost' }, asha.token)).body.view, {}, 'Lost preview');
+  assertEqual((await call({ op: 'owner.preview', mode: 'business' }, asha.token)).body.view, null, 'Business preview while Lost is active');
+  same(await lostEntry(), { mode: 'lost', available: true, reason: 'active' }, 'active');
+  const leaks = lostLeaks('the reader', p);
+  assertEqual(leaks, [], 'Business or Info data in the Lost reader');
+  return 'no Business, Info or owner field';
+});
+
+await t.check('a finder messages the owner from the Lost page; no owner detail in any answer', async () => {
+  const status = await rescue({ op: 'public.status', slug: SLUG });
+  assertEqual([status.status, status.body.available], [200, true], 'public.status');
+  const start = await rescue({ op: 'public.start', slug: SLUG, idempotencyKey: key(), message: 'I found your card at the station' });
+  assertEqual(start.status, 201, `public.start: ${JSON.stringify(start.body?.error ?? null)}`);
+  const leaks = [...lostLeaks('public.status', status.body), ...lostLeaks('public.start', { ...start.body, finderToken: null })];
+  assertEqual(leaks, [], 'owner details in a finder answer');
+  return 'Return to Owner (031) unchanged';
+});
+
+await t.check('kill switch, opt-in off, suspension: Lost gives the neutral null, never Business', async () => {
+  await setLost(false);
+  assertEqual(await pub(SLUG), null, 'Lost switched off by SHYGON');
+  assertEqual(await legacy(SLUG), null, 'and not Business through the legacy reader either');
+  await setLost(true);
+  same(await pub(SLUG), { mode: 'lost' }, 'back on');
+  await rescue({ op: 'settings.set', enabled: false }, asha.token);
+  assertEqual(await pub(SLUG), null, 'the owner turned Return to Owner off');
+  same(await lostEntry(), { mode: 'lost', available: false, reason: 'needs_setup', missing: ['returnToOwner'] }, 'the owner sees why');
+  await rescue({ op: 'settings.set', enabled: true }, asha.token);
+  await stack.query(`UPDATE public.tap_profiles SET suspended_at = now() WHERE user_id = $1`, [asha.userId]);
+  assertEqual(await pub(SLUG), null, 'suspended');
+  await stack.query(`UPDATE public.tap_profiles SET suspended_at = NULL WHERE user_id = $1`, [asha.userId]);
+  same(await pub(SLUG), { mode: 'lost' }, 'restored');
+  return 'fail closed in every case';
+});
+
+await t.check('switching back to Business restores the identical payload; the Return to Owner opt-in is left as the owner set it', async () => {
+  const b = await call({ op: 'owner.activate', mode: 'business', expectedVersion: lostVersion, idempotencyKey: key() }, asha.token);
+  assertEqual([b.status, b.body.activeMode, b.body.previousMode], [200, 'business', 'lost'], 'business');
+  same(await pub(SLUG), { mode: 'business', profile: businessView }, 'identical');
+  same(await legacy(SLUG), businessView, 'legacy reader byte-identical');
+  assertEqual((await rescue({ op: 'settings.get' }, asha.token)).body.settings.enabled, true, 'opt-in unchanged by the mode switches');
+  await rescue({ op: 'settings.set', enabled: false }, asha.token);
+  delete process.env.RESCUE_RELAY;
   return 'reversible';
 });
 

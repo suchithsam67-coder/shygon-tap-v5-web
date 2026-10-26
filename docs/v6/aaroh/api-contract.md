@@ -1,11 +1,11 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.9.2
+# SHYGON AAROH backend API contract — AAROH-API v0.10
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.9.2** (2026-10-25): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
+| Contract version | **AAROH-API v0.10** (2026-10-25): Lost mode (§6; migration 036). v0.9.2 (`2686606`): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041); none applied anywhere. 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041), **036** (APPROVED 2026-10-25, DEC-2026-041 A-1); none applied anywhere. 027 is held aside (DEC-2026-037). |
 | Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
@@ -154,22 +154,30 @@ T-2 rules, enforced server-side:
 
 ---
 
-## 6. Modes (Business, Info): `POST /api/modes` and `get_public_tap_mode` (v0.8)
+## 6. Modes (Business, Info, Lost): `POST /api/modes` and `get_public_tap_mode` (v0.8; Lost v0.10)
 
-**Status:** LIVE-LOCAL. Implementation scope approved 2026-10-24 (DEC-2026-041; migrations 034 and 035).
+**Status:** LIVE-LOCAL. Implementation scope approved 2026-10-24 (DEC-2026-041; migrations 034 and 035). **Lost (U2) approved 2026-10-25 (DEC-2026-041 amendment A-1; migration 036)**, built locally, OFF in the catalogue and behind `RESCUE_RELAY`.
 - **BQ-1 is built (v0.9, migration 035):** P-1 returns `null` while a Tap is on Info, so Business is never public through the old reader while Info is shown.
 - **Info ships OFF in the catalogue (`tap_mode_catalog`).** Switching it on is now a per-environment owner decision; there is no remaining technical blocker in the repository.
 - **Production:** 034 and 035 wait for the release track. 035 must be re-based on the fresh production capture first (V6-106), because production's P-1 has drifted.
 
 **The model:**
-- One active mode per Tap (per account in v1): `business` (the default; no state row means Business) or `info`.
+- One active mode per Tap (per account in v1): `business` (the default; no state row means Business), `info` or `lost`.
 - **Info** is a public page about a physical object, product, place or service point. One record per account. Plain text only: no image, no language, no links, no Business data.
-- Emergency, Return-to-Owner and Connect remain per-account capabilities (§10, §10a, §10b). **They do not appear on an Info page** (DEC-2026-041 PQ-3).
+- **Lost** is for an adult's own card that is missing. Visitors see only "Found this card?" and the existing Return to Owner message form (§10a, unchanged).
+  - It carries no Business or Info data, no owner detail, no number, no location, and no new public field.
+  - It needs three things:
+    1. SHYGON has it on (`tap_mode_catalog`, OFF by default);
+    2. the host has `RESCUE_RELAY=on` (off until release);
+    3. the owner's own Return to Owner opt-in is on.
+  - Switching to Lost never turns the opt-in on, so the Business page's Return to Owner stays exactly as the owner set it.
+- Emergency, Return-to-Owner and Connect remain per-account capabilities (§10, §10a, §10b). **They do not appear on an Info page** (DEC-2026-041 PQ-3). A Lost page shows only Return to Owner's form.
 
 **P-6 `rpc('get_public_tap_mode', { p_slug })`** (anon; SECURITY DEFINER; read-only) returns one of:
 - `{ mode: 'business', profile: <the P-1 payload, unchanged> }`;
 - `{ mode: 'info', info: { title, shortDescription, category, detailedInformation, updatedAt } }`, those five keys only;
-- `null`: no live Tap (unknown, draft, paused, suspended), **or** the neutral "unavailable" fallback (Info switched off, missing or invalid).
+- `{ mode: 'lost' }`, that one key only (v0.10). Show "Found this card?" and Return to Owner's form (§10a `public.status` / `public.start`). If `public.status` answers `available: false`, show the neutral "unavailable" copy;
+- `null`: no live Tap (unknown, draft, paused, suspended), **or** the neutral "unavailable" fallback. That covers Info switched off, missing or invalid, and Lost switched off or with Return to Owner unable to take a message.
 
 **It never falls back to the Business profile.** On `null`, ask P-2 why, as today.
 
@@ -177,12 +185,12 @@ T-2 rules, enforced server-side:
 
 | op | Request | Success |
 |---|---|---|
-| `owner.state` | `{ op }` | 200 `{ activeMode, version, changedAt, modes: [{ mode, available, reason: 'active' \| 'ready' \| 'needs_setup' \| 'not_available', missing? }] }`. `missing` names `title` and `shortDescription` when absent or invalid, and `detailedInformation` when the stored text is invalid (only a direct database write can cause that; `/api/modes` refuses it) |
-| `owner.activate` | `{ op, mode: 'business' \| 'info', expectedVersion, idempotencyKey }` | 200 `{ activeMode, previousMode, version, changedAt, replayed }`; `previousMode` is `null` until the Tap has switched at least once (activating the mode it is already on changes nothing). The same key again → the first answer with `replayed: true` |
+| `owner.state` | `{ op }` | 200 `{ activeMode, version, changedAt, modes: [{ mode, available, reason: 'active' \| 'ready' \| 'needs_setup' \| 'not_available', missing? }] }`. `missing` names `title` and `shortDescription` when absent or invalid, and `detailedInformation` when the stored text is invalid (only a direct database write can cause that; `/api/modes` refuses it). Lost (v0.10) is `not_available` while SHYGON has it off or `RESCUE_RELAY` is off, and `needs_setup` with `missing: ['returnToOwner']` until the owner's Return to Owner opt-in is on. Show only the modes you render; ignore any other entry |
+| `owner.activate` | `{ op, mode: 'business' \| 'info' \| 'lost', expectedVersion, idempotencyKey }`. Lost: `mode_unavailable` while it is off or `RESCUE_RELAY` is off; `needs_setup` (`missing: ['returnToOwner']`) without the opt-in | 200 `{ activeMode, previousMode, version, changedAt, replayed }`; `previousMode` is `null` until the Tap has switched at least once (activating the mode it is already on changes nothing). The same key again → the first answer with `replayed: true` |
 | `owner.info.get` | `{ op }` | 200 `{ info: { title, shortDescription, category, detailedInformation, updatedAt, version } \| null, publicationStatus: 'draft' \| 'ready' \| 'live' \| 'unavailable' }` |
 | `owner.info.save` | `{ op, fields: { title?, shortDescription?, category?, detailedInformation? }, expectedVersion }`. A present key sets the field (null or empty clears it); an absent key leaves it. `expectedVersion` is 0 before the first save | 200, the same shape as `owner.info.get` |
 | `owner.info.clear` | `{ op }` | 200 `{ cleared }` |
-| `owner.preview` | `{ op, mode }` | 200 `{ mode, view }`: exactly what a visitor would get (`null` when it would be unavailable) |
+| `owner.preview` | `{ op, mode }` | 200 `{ mode, view }`: exactly what a visitor would get (`null` when it would be unavailable). For `lost`, `view` is `{}` (the page carries no data) while Return to Owner can take a message and `RESCUE_RELAY` is on, else `null` |
 
 **Errors** use the shape `{ error: { code, message, field?, reason?, missing?, current? } }`. Messages are fixed text and never repeat a submitted value.
 
@@ -208,6 +216,14 @@ T-2 rules, enforced server-side:
 - Render Info as plain text, and show no capability buttons on it.
 - On `null`, use the existing "unavailable" copy.
 - Owner page: show the server's `available` / `reason` / `missing`; show "Live" only after a 200; send `expectedVersion` and a fresh `idempotencyKey` per click.
+- **Lost (v0.10).**
+  - On `{ mode: 'lost' }`, render only the "Found this card?" page with Return to Owner's form. No Business, Info, Connect or emergency element.
+  - For `missing: ['returnToOwner']`, offer the existing Return to Owner opt-in (§10a `settings.set`), then retry.
+- **Draft customer copy for Lost.** The owner approves the exact strings at Session B's gate:
+  - mode menu: "Lost: let someone who finds this card message you privately";
+  - visitor heading: "Found this card?";
+  - button: "Send a message";
+  - safety note: "Your message goes to the owner without showing them your contact details. Don't include sensitive information."
 
 ## 7. Cards (signed in)
 
@@ -644,6 +660,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.10 | 2026-10-25 | **New: Lost mode** (U2; DEC-2026-041 amendment A-1; migration 036).<br>(1) `owner.activate` accepts `lost`. It needs the catalogue (OFF by default), `RESCUE_RELAY=on` and the owner's own Return to Owner opt-in, and never turns that opt-in on.<br>(2) `owner.state` has a third entry, `lost`.<br>(3) P-6 answers `{ mode: 'lost' }` (one key) or `null`, never Business. P-1 is `null` while Lost is active (035's guard).<br>(4) `owner.preview` `lost`: `{}` or `null`.<br>(5) The `needs_setup` message is now "Finish setting up this mode first." and the `invalid_mode` message names lost. No other operation changed. | Handle a third `owner.state` entry; ignore modes you do not render. Render `{ mode: 'lost' }` as "Found this card?" with Return to Owner's form, and nothing else. An unknown mode stays `null` and shows "unavailable". Draft copy in §6. Customer strings need the owner's approval at your gate. |
 | v0.9.2 | 2026-10-25 | Hardening after the OpenCode second review; no new operation, request or response field.<br>(1) `/api/modes`, `/api/connect`, `/api/emergency` and `/api/rescue` answer an `op` that only names an inherited object property (`constructor`, `toString`, `__proto__`, …) with the documented 400 `unknown_op`. Before, a signed-in caller could get a 500 outside the contract.<br>(2) §6: `missing` may also name `detailedInformation` when the stored text is invalid. `owner.info.get`, `owner.preview` and the public reader now use the same check.<br>(3) §6 documents `previousMode: null`.<br>(4) Info writers take their locks in one order (034, revised before any application), so Info cannot go live incomplete under a race.<br>(5) Migration 035 refuses to apply without 034.<br>(6) §10b: `test:connect` has 17 checks. | Type `previousMode` as `TapMode \| null`. If `missing` names `detailedInformation`, show that field as needing attention; only a corrupted record can cause it, never the API. No other change. |
 | v0.9.1 | 2026-10-25 | Wording only: the visitor-initiated alert SMS (§10) now reads "someone using the SHYGON profile of <owner> … Try to reach them directly." It names the owner once, so the DLT template has two variables (name, time), like the owner alert. Wording approved by the owner on 2026-10-25, relayed by the coordination session; DLT registration pending. Visitor alerts stay off (DEC-2026-038 Q2). No request, response or error changed. | None, unless a page shows a preview of that SMS (none does on the frontend's `dce0ec9`: a text search of its `src/` finds no copy, 2026-10-25). |
 | v0.9 | 2026-10-24 | **BQ-1** (DEC-2026-041, migration 035): P-1 `get_public_profile` also returns `null` while the Tap's active mode is not Business. Shape, signature and grants are unchanged. Every Tap without Info is byte-identical (golden), and the admin-contract gate pins the edit to one guard. | Older clients that call only P-1 show their existing "Tap not found" page for a Tap on Info (P-2 still answers `active`). Read P-6 first. `owner.preview` for Business answers `null` while the Tap is on Info. |

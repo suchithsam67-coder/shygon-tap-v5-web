@@ -10,7 +10,7 @@
 | **Accountable Owner (A)** | The repository owner, who holds every role (DEC-2026-018 Option B) |
 | Responsible (R) | Session A (backend). The pure crypto core is being written by OpenCode on `opencode/u1-sun-crypto` (coordinator, 2026-10-25) and comes to Session A as a hand-off |
 | Consulted | Session B (frontend: the verdict page); the coordination session; ChatGPT's U1 threat model (pending, §8) |
-| State | **PROPOSED (draft), ON HOLD for the owner's review.** Docs only. Nothing is built, keyed, personalised or deployed. **Owner, 2026-10-25, in session:** "I'll review DEC-2026-043 first. Hold contract v0.10 and migration 036 until I answer Q1-Q7 and the threat model (T-1 to T-7) is folded in." Until both are done, Session A writes no contract v0.10, no migration 036 and no `/api/verify`. **The threat model is folded in (2026-10-25, revision 2):** T-1 to T-7 come from ChatGPT's draft (unverified) and the coordinator's check (§8). Two claims were checked by Session A against vendor documents. Q8 and Q9 are new questions arising from it |
+| State | **PROPOSED (draft), ON HOLD for the owner's review.** Docs only. Nothing is built, keyed, personalised or deployed. **Owner, 2026-10-25, in session:** "I'll review DEC-2026-043 first. Hold contract v0.10 and migration 036 until I answer Q1-Q7 and the threat model (T-1 to T-7) is folded in." Until both are done, Session A writes no contract v0.11, no migration 037 and no `/api/verify`. **Renumbered 2026-10-26:** Lost mode (U2, DEC-2026-041 A-1) took migration 036 and contract v0.10, so this record now uses 037 and v0.11. The hold is unchanged. **The threat model is folded in (2026-10-25, revision 2):** T-1 to T-7 come from ChatGPT's draft (unverified) and the coordinator's check (§8). Two claims were checked by Session A against vendor documents. Q8 and Q9 are new questions arising from it |
 
 Labels: **OBSERVED** (in this repository or a decision record), **INFERRED** (from public vendor documents or reasoning, not tested here), **PROPOSED**, **PENDING** (waits for an input named in §8).
 
@@ -54,7 +54,7 @@ New AAROH cards carry NTAG 424 DNA chips that put a fresh, signed value in the U
 - **It does not prove:** who holds the card. It never signs anyone in, never unlocks an owner action, never grants access or payment (A0). It adds nothing to what the profile shows.
 
 ### P-2. URL and identifiers
-- **The URL:** `https://<host>/d/<code>?p=<PICCData, 32 hex>&m=<SDMMAC, 16 hex>`. The parameter names are placeholders, fixed in contract v0.10.
+- **The URL:** `https://<host>/d/<code>?p=<PICCData, 32 hex>&m=<SDMMAC, 16 hex>`. The parameter names are placeholders, fixed in contract v0.11.
 - **`<code>`:** the device's public code, at least 64 bits and unguessable, as in doc 08.
   - Never the card id, which may be sequential.
   - Never the activation code, which is a secret.
@@ -136,7 +136,7 @@ The wording is a draft for the owner and must follow the claims register.
   - SHYGON samples every batch, keeps a reference set, and destroys rejects;
   - the manifest is imported by an admin-only function.
 
-### P-7. Data, migration 036 [PROPOSED; not written]
+### P-7. Data, migration 037 [PROPOSED; not written]
 - **A closed table per device** (RLS on, no policy, service role only, like 029–034): `(device, key_epoch, uid_hmac, last_counter, last_verified_at, failure counts)`.
   - `uid_hmac` is an HMAC of the UID under a server pepper, so the table never holds a raw UID.
 - **One server-only function** accepts a counter atomically: it updates only where `last_counter < new` and reports which of the four verdicts applies, race-free.
@@ -157,7 +157,7 @@ The wording is a draft for the owner and must follow the claims register.
   No step reveals to the caller which check failed.
 - **Open dependency:** where the public code lives. Today's `cards` table has no `public_code` (doc 08 proposes one). Q5 decides whether 036 adds it or waits for the device model (M1).
 
-### P-8. Endpoint and switch [PROPOSED; contract v0.10]
+### P-8. Endpoint and switch [PROPOSED; contract v0.11]
 - **`POST /api/verify`** (`tap.verify`), with a host switch `VERIFIED_TAP` that is unset (off) by default, like `CONNECT_PUBLIC`.
 - **Rate limits** use the trusted visitor digest (B-9, `TRUSTED_CLIENT_IP_HEADER`). Errors use the usual `{ error: { code, message } }`.
 - **No parameter value** is ever echoed back.
@@ -200,7 +200,7 @@ The wording is a draft for the owner and must follow the claims register.
 | Q2 | Key custody for production: (a), (b) or (c) in P-5, and which provider? | (b), provider by cost; test-only keys locally |
 | Q3 | Who personalises the chips: in-house station, or a supplier given the keys? | In-house, or a supplier under contract with per-batch epochs |
 | Q4 | The verdict wording in P-4: option 1 ("Genuine SHYGON AAROH") or option 2 ("Verified tap. This card's secure tap was accepted.") | Option 2 for launch: it claims less, needs no counsel sign-off on "genuine", and fits the claims register. Option 1 only after counsel review (DEC-2026-017) |
-| Q5 | Does 036 add `public_code` to `cards`, or wait for the M1 device model? | Add it in 036 (≥ 64-bit, unique, never reused), aligned with doc 08 |
+| Q5 | Does 037 add `public_code` to `cards`, or wait for the M1 device model? | Add it in 037 (≥ 64-bit, unique, never reused), aligned with doc 08 |
 | Q6 | Printed QR on the card back: doc 08 says yes, the 2026-10-18 design says no by default | Card design decides. A QR only ever yields `not_verified` |
 | Q7 | Which batch or edition is the first with NTAG 424 DNA, and is the inlay feasible in the metal and transparent cards (doc 08 §3 cost note)? | Ask the card manufacturer before any order |
 | Q8 (new, revision 2) | Key diversification (P-5): D-a (both keys per chip, by device id) or D-b (meta-read key per epoch, file-read key per chip by UID)? | D-a: it follows doc 08 and leaves no shared key in a cohort. The station must implement the same input exactly (P-6), so confirm it with whoever personalises (Q3) |
@@ -263,8 +263,8 @@ The meta-read-key point is supported by an independent SUN decoder's documentati
 ## 9. What approval would unlock, and what it would not
 
 - **Unlocks (local only):**
-  - contract v0.10 (`/api/verify`);
-  - migration 036 as in P-7;
+  - contract v0.11 (`/api/verify`);
+  - migration 037 as in P-7;
   - the server function on the local stack with `VERIFIED_TAP` off;
   - OpenCode's crypto core taken after review, and the tests in §7.
 - **Does not unlock:**
