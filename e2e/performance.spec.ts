@@ -38,10 +38,12 @@ async function slowPhone(page: Page) {
  * Chromium stops reporting largest-paint candidates at the first real input, so
  * nothing may touch the page before this runs. Settled means: the document has
  * finished loading, every image currently on screen has finished loading, and
- * no new candidate has arrived for three seconds — only then is the last entry
- * the page's true largest paint. On the landing page that is the hero card
- * (about 5.5 s on this profile), not the boot word or the privacy notice that
- * paint inside the first three.
+ * the page has been idle — no request started and no new candidate — for three
+ * seconds. Only then is the last entry the page's true largest paint; the
+ * landing page needs the idle half of that, because its hero card is not in the
+ * DOM until the route chunk has rendered, so its own download is what marks the
+ * end of loading. The cap ends the wait if a resource never settles, so a
+ * broken page fails instead of hanging.
  */
 async function vitals(page: Page) {
   return page.evaluate(
@@ -72,11 +74,19 @@ async function vitals(page: Page) {
           lcp = last.startTime;
           lastPaintAt = performance.now();
           paints += entries.length;
-          const node = (last as { element?: { tagName?: string } | null }).element;
-          element = `${node?.tagName ?? '?'}${last.url ? ` ${last.url.split('/').pop()}` : ''}`;
+          const node = (last as { element?: { tagName?: string; id?: string } | null }).element;
+          element = `${node?.tagName ?? '?'}${node?.id ? '#' + node.id : ''} ${Math.round(last.size)}px${
+            last.url ? ` ${last.url.split('/').pop()}` : ''
+          }`;
         }).observe({ type: 'largest-contentful-paint', buffered: true });
 
         const started = performance.now();
+        /** The time the page last asked for anything. */
+        const lastRequestAt = () =>
+          (performance.getEntriesByType('resource') as PerformanceResourceTiming[]).reduce(
+            (latest, entry) => Math.max(latest, entry.startTime),
+            0,
+          );
         /** No image that is on screen right now is still loading. */
         const imagesSettled = () =>
           Array.from(document.images).every((img) => {
@@ -98,14 +108,12 @@ async function vitals(page: Page) {
             waitedMs: Math.round(performance.now() - started),
           });
         };
-        // Settled: the document loaded, the images on screen are in, and no new
-        // largest-paint candidate for three seconds. The cap ends the wait if a
-        // resource never settles, so a broken page fails instead of hanging.
         const QUIET_MS = 3000;
         const CAP_MS = 30_000;
         const tick = () => {
           const now = performance.now();
-          const quiet = paints > 0 ? now - lastPaintAt >= QUIET_MS : now - started >= QUIET_MS;
+          const lastActivity = Math.max(paints > 0 ? lastPaintAt : 0, lastRequestAt());
+          const quiet = now - (lastActivity || started) >= QUIET_MS;
           if (now - started >= CAP_MS || (document.readyState === 'complete' && imagesSettled() && quiet)) finish();
           else setTimeout(tick, 250);
         };
@@ -124,6 +132,7 @@ test('the public Tap is fast on a slow phone: largest paint under 2.5 s, no layo
   await page.goto(`/t/${data!.slug}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Speedy Owner' })).toBeVisible();
   const result = await vitals(page);
+  await dismissCookieNotice(page);
   console.log(`[perf] /t/<slug> on slow 4G, 4x CPU: ${JSON.stringify(result)}`);
   test.info().annotations.push({ type: 'perf', description: `public Tap ${JSON.stringify(result)}` });
   expect(result.lcp).toBeLessThan(2500);

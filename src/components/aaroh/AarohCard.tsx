@@ -16,8 +16,10 @@ import {
  * mirrored. With reduced motion the faces cross-fade instead (aaroh.css).
  * `sweepKey` replays the light sweep, which sits on each face and so turns
  * with the card. Both faces are real images; if one fails to load, a plain
- * label stands in. With `priority` both load eagerly, the hidden face at low
- * fetch priority so it never competes with the face on show.
+ * label stands in. With `priority` both load eagerly and at high fetch
+ * priority: both faces are painted (the hidden one sits behind the one on
+ * show), so either can be the page's largest paint, and the later of the two
+ * decides when the hero is complete.
  */
 export default function AarohCard({
   edition,
@@ -59,7 +61,7 @@ export default function AarohCard({
             {...AAROH_IMAGE_SIZE}
             decoding="async"
             loading={priority ? 'eager' : 'lazy'}
-            fetchPriority={priority && side !== which ? 'low' : undefined}
+            fetchPriority={priority ? 'high' : undefined}
             onError={() => setFailed((current) => ({ ...current, [key]: true }))}
           />
         )}
