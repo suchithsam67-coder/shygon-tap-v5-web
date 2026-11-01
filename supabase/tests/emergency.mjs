@@ -785,7 +785,8 @@ await t.check('visitor alert: relay only, owner told in-app, 15-minute and per-v
   assertEqual([r.status, r.body.outcome], [202, 'sent'], JSON.stringify(r.body));
   assertEqual(Object.keys(r.body).sort(), ['outcome', 'safety'], 'what the visitor learns');
   assertEqual(sms.messages.length - before, 2, 'texts');
-  assert(/someone using Asha Rao's SHYGON profile reported an emergency/.test(sms.messages.at(-1).body), 'visitor-alert wording');
+  assert(/someone using the SHYGON profile of Asha Rao reported an emergency/.test(sms.messages.at(-1).body), 'visitor-alert wording');
+  assert(/Try to reach them directly\./.test(sms.messages.at(-1).body), 'visitor-alert names the owner once (two DLT variables)');
   const note = (await stack.query(`SELECT title FROM public.notifications WHERE user_id = $1 AND category = 'security'`, [asha.userId])).rows;
   assertEqual(note.map((n) => n.title), ['Your emergency contacts were alerted'], 'owner notified');
   const again = await call({ op: 'public.alert', slug: 'asha-rao', idempotencyKey: newKey(), confirm: true }, { ip: '198.51.100.21' });

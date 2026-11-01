@@ -322,7 +322,8 @@ async function handle(request, log) {
     if (body.op === 'public.status') return await publicStatus(cfg, body);
     if (body.op === 'public.alert') return await publicAlert(cfg, request, body, log);
 
-    const op = OWNER_OPS[body.op];
+    // Own keys only: `constructor`, `toString` or `__proto__` are not operations.
+    const op = Object.hasOwn(OWNER_OPS, body.op) ? OWNER_OPS[body.op] : null;
     if (!op) return fail('unknown_op');
     const user = await currentUser(cfg, request);
     if (!user) {

@@ -16,3 +16,7 @@
 # The live schema dump is the schema of record, kept byte for byte as the
 # owner provided it (its line endings are mixed); the loaders normalize it.
 supabase/baseline/000_live_baseline.sql -text
+# Superseded captures and production evidence are kept byte for byte too, so
+# their recorded checksums stay true.
+supabase/baseline/history/*.sql -text
+docs/governance/evidence/* -text

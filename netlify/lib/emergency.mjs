@@ -114,7 +114,7 @@ export function alertMessage(initiator, ownerName, createdAt) {
   const when = istTime(createdAt);
   const text =
     initiator === 'public'
-      ? `SHYGON emergency alert: someone using ${ownerName}'s SHYGON profile reported an emergency at ${when} IST. SHYGON cannot confirm it. Try to reach ${ownerName} directly. If they may be in danger, call 112.`
+      ? `SHYGON emergency alert: someone using the SHYGON profile of ${ownerName} reported an emergency at ${when} IST. SHYGON cannot confirm it. Try to reach them directly. If they may be in danger, call 112.`
       : `SHYGON emergency alert: ${ownerName} has asked for help and wants you to contact them now (sent ${when} IST). SHYGON does not contact emergency services. If they are in danger, call 112.`;
   return {
     text,

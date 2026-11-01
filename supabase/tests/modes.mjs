@@ -55,10 +55,10 @@ await t.check('only get_public_tap_mode is open to visitors; every modes_* funct
   return `${rows.length - 1} server-only functions, 1 public reader`;
 });
 
-await t.check('the catalogue ships with Business on and Info OFF (switching it on is a per-environment owner decision)', async () => {
+await t.check('the catalogue ships with Business on, Info OFF and Lost OFF (switching either on is a per-environment owner decision)', async () => {
   const rows = (await db.query(`SELECT mode, enabled FROM public.tap_mode_catalog ORDER BY mode`)).rows;
-  assertEqual(rows.map((r) => [r.mode, r.enabled]), [['business', true], ['info', false]], 'catalogue');
-  return 'Info off by default';
+  assertEqual(rows.map((r) => [r.mode, r.enabled]), [['business', true], ['info', false], ['lost', false]], 'catalogue');
+  return 'Info and Lost off by default';
 });
 
 await t.check('the mode audit is append-only, even for the server role', async () => {
@@ -67,6 +67,32 @@ await t.check('the mode audit is append-only, even for the server role', async (
   assertEqual([r.u, r.d], [false, false], 'update/delete');
   return 'insert only';
 });
+
+// OpenCode review 2026-10-25 #4. PGlite has one connection, so the race itself
+// cannot be run here; this pins the fix instead: every writer takes the same
+// row locks in the same order (Tap, mode state, Info record), which is what
+// makes a save and an activation of the same Tap wait for each other.
+await t.check('lock order: activate, save and clear lock Tap, then mode state, then the Info record', async () => {
+  const src = async (fn) => (await db.query(`SELECT prosrc FROM pg_proc WHERE oid = $1::regprocedure`, [fn])).rows[0].prosrc;
+  const at = (text, re, label) => {
+    const m = re.exec(text);
+    assert(m, `${label}: not found`);
+    return m.index;
+  };
+  const TAP = /FROM public\.tap_profiles\b[^;]*FOR UPDATE/;
+  const STATE = /FROM public\.tap_mode_state\b[^;]*FOR UPDATE/;
+  for (const [fn, info] of [
+    ['public.modes_owner_activate(uuid,text,integer,text)', /FROM public\.info_pages\b[^;]*FOR UPDATE/],
+    ['public.modes_info_save(uuid,jsonb,integer)', /FROM public\.info_pages\b[^;]*FOR UPDATE/],
+    ['public.modes_info_clear(uuid)', /DELETE FROM public\.info_pages\b/],
+  ]) {
+    const text = await src(fn);
+    const order = [at(text, TAP, `${fn} Tap lock`), at(text, STATE, `${fn} state lock`), at(text, info, `${fn} Info lock`)];
+    assert(order[0] < order[1] && order[1] < order[2], `${fn}: lock order ${order.join(' < ')}`);
+    assert(!/FROM public\.tap_mode_state\b(?![^;]*FOR UPDATE)[^;]*;/.test(text.slice(order[1] + 1)), `${fn}: reads mode state again without its lock`);
+  }
+  return '3 writers, one order (race not executable on PGlite: static pin)';
+});
 await db.close();
 
 // ---------------------------------------------------------------------------
@@ -74,9 +100,11 @@ t.section('B. Over HTTP on the local stack');
 
 const stack = await startStack();
 const bodies = [];
+const answers = []; // every response, by op, for the success-shape check
 const call = async (body, token) => {
   const r = await callFunction(stack, 'modes', { token, body });
   bodies.push(JSON.stringify(r.body));
+  answers.push({ op: body?.op, status: r.status, body: r.body });
   return r;
 };
 const codeOf = (r) => r.body?.error?.code;
@@ -185,6 +213,8 @@ await t.check('saving: versions guard stale writes; a draft is not public; Busin
     shortDescription: 'How to use the projector in room 204.', category: 'equipment',
     detailedInformation: `1. Press the wall switch.\n2. Wait 30 seconds.\n${DRAFT}` } }, asha.token);
   assertEqual([s2.status, s2.body.publicationStatus, s2.body.info.version], [200, 'ready', 2], 'complete');
+  const got = await call({ op: 'owner.info.get' }, asha.token);
+  same([got.status, got.body.publicationStatus, got.body.info], [200, 'ready', s2.body.info], 'owner.info.get reads back the save');
   const whileDraft = await pub(SLUG);
   same(whileDraft, { mode: 'business', profile: businessView }, 'still Business publicly');
   assert(!JSON.stringify(whileDraft).includes(DRAFT) && !JSON.stringify(await legacy(SLUG)).includes(DRAFT), 'the unpublished draft reached a public read');
@@ -251,6 +281,12 @@ await t.check('fallbacks: Info off, invalid, missing, paused or suspended gives 
   await setInfo(true);
   await stack.query(`UPDATE public.info_pages SET detailed_information = '<b>broken' WHERE owner_user_id = $1`, [asha.userId]);
   assertEqual(await pub(SLUG), null, 'F-3 invalid at read time');
+  // One predicate everywhere (review #6): the owner sees what the visitor gets.
+  const corrupt = await call({ op: 'owner.info.get' }, asha.token);
+  assertEqual(corrupt.body.publicationStatus, 'draft', 'F-3: owner.info.get no longer answers live');
+  assertEqual((await call({ op: 'owner.preview', mode: 'info' }, asha.token)).body.view, null, 'F-3: the preview shows what the visitor gets');
+  same((await call({ op: 'owner.state' }, asha.token)).body.modes.find((m) => m.mode === 'info'),
+    { mode: 'info', available: false, reason: 'needs_setup', missing: ['detailedInformation'] }, 'F-3: owner.state names the invalid field');
   await stack.query(`UPDATE public.info_pages SET detailed_information = 'Press the wall switch.' WHERE owner_user_id = $1`, [asha.userId]);
   assertEqual((await pub(SLUG)).mode, 'info', 'restored');
   const saved = (await stack.query(`SELECT * FROM public.info_pages WHERE owner_user_id = $1`, [asha.userId])).rows[0];
@@ -282,13 +318,140 @@ await t.check('switching back to Business restores the identical Business payloa
   return 'reversible';
 });
 
-await t.check('canaries: no account detail, switched-off field, draft or rejected value in any public output, error or log', async () => {
+// ---------------------------------------------------------------------------
+t.section('C. Lost mode (036, DEC-2026-041 A-1): only "Found this card?" and Return to Owner');
+
+const setLost = (on) => stack.query(`UPDATE public.tap_mode_catalog SET enabled = $1 WHERE mode = 'lost'`, [on]);
+const lostEntry = async () => (await call({ op: 'owner.state' }, asha.token)).body.modes.find((m) => m.mode === 'lost');
+// The finder side of Return to Owner, as /api/rescue serves it; its answers join the canary scan.
+process.env.STACK_SIM_CLIENT_ADDRESS = '1';
+const rescue = async (body, token) => {
+  const r = await callFunction(stack, 'rescue', { token, body, headers: { 'x-shygon-sim-client': '203.0.113.77' } });
+  bodies.push(JSON.stringify(r.body));
+  return r;
+};
+// Business and Info values that must never reach any Lost output.
+const NOT_IN_LOST = ['Asha Rao', 'Designer', 'Room 204 projector', ...Object.values(C)];
+const lostLeaks = (label, value) => NOT_IN_LOST.filter((v) => JSON.stringify(value ?? null).includes(v)).map((v) => `${v} in ${label}`);
+let lostVersion;
+
+await t.check('Lost is off by default, and needs the host relay: not available, activation refused', async () => {
+  same(await lostEntry(), { mode: 'lost', available: false, reason: 'not_available' }, 'catalogue off');
+  await setLost(true);
+  delete process.env.RESCUE_RELAY;
+  same(await lostEntry(), { mode: 'lost', available: false, reason: 'not_available' }, 'relay off');
+  const a = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: key() }, asha.token);
+  assertEqual([a.status, codeOf(a)], [409, 'mode_unavailable'], 'activate while the relay is off');
+  const pv = await call({ op: 'owner.preview', mode: 'lost' }, asha.token);
+  assertEqual(pv.body.view, null, 'preview while the relay is off');
+  return 'catalogue and RESCUE_RELAY both gate it';
+});
+
+await t.check('with the relay on, Lost needs the owner\'s own Return to Owner opt-in; switching never turns it on', async () => {
+  process.env.RESCUE_RELAY = 'on';
+  same(await lostEntry(), { mode: 'lost', available: false, reason: 'needs_setup', missing: ['returnToOwner'] }, 'state');
+  const a = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: key() }, asha.token);
+  assertEqual([a.status, codeOf(a), a.body.error.missing], [409, 'needs_setup', ['returnToOwner']], 'activate');
+  assertEqual((await rescue({ op: 'settings.get' }, asha.token)).body.settings.enabled, false, 'the opt-in is still off');
+  return 'consent stays the owner\'s own step';
+});
+
+await t.check('activate Lost: the reader answers { mode: "lost" } and nothing else; the legacy reader is null', async () => {
+  const on = await rescue({ op: 'settings.set', enabled: true }, asha.token);
+  assertEqual([on.status, on.body.settings.enabled], [200, true], 'Return to Owner on');
+  same(await lostEntry(), { mode: 'lost', available: true, reason: 'ready' }, 'ready');
+  const a = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: key() }, asha.token);
+  assertEqual([a.status, a.body.activeMode, a.body.previousMode, a.body.version], [200, 'lost', 'business', 3], 'activated');
+  lostVersion = a.body.version;
+  const p = await pub(SLUG);
+  same(p, { mode: 'lost' }, 'the whole public answer');
+  assertEqual(await legacy(SLUG), null, 'get_public_profile while Lost is active (035)');
+  assertEqual(await rpc('get_public_tap_state', SLUG), 'active', 'P-2: an older client shows its unavailable page');
+  same((await call({ op: 'owner.preview', mode: 'lost' }, asha.token)).body.view, {}, 'Lost preview');
+  assertEqual((await call({ op: 'owner.preview', mode: 'business' }, asha.token)).body.view, null, 'Business preview while Lost is active');
+  same(await lostEntry(), { mode: 'lost', available: true, reason: 'active' }, 'active');
+  const leaks = lostLeaks('the reader', p);
+  assertEqual(leaks, [], 'Business or Info data in the Lost reader');
+  return 'no Business, Info or owner field';
+});
+
+await t.check('a finder messages the owner from the Lost page; no owner detail in any answer', async () => {
+  const status = await rescue({ op: 'public.status', slug: SLUG });
+  assertEqual([status.status, status.body.available], [200, true], 'public.status');
+  const start = await rescue({ op: 'public.start', slug: SLUG, idempotencyKey: key(), message: 'I found your card at the station' });
+  assertEqual(start.status, 201, `public.start: ${JSON.stringify(start.body?.error ?? null)}`);
+  const leaks = [...lostLeaks('public.status', status.body), ...lostLeaks('public.start', { ...start.body, finderToken: null })];
+  assertEqual(leaks, [], 'owner details in a finder answer');
+  return 'Return to Owner (031) unchanged';
+});
+
+await t.check('kill switch, opt-in off, suspension: Lost gives the neutral null, never Business', async () => {
+  await setLost(false);
+  assertEqual(await pub(SLUG), null, 'Lost switched off by SHYGON');
+  assertEqual(await legacy(SLUG), null, 'and not Business through the legacy reader either');
+  await setLost(true);
+  same(await pub(SLUG), { mode: 'lost' }, 'back on');
+  await rescue({ op: 'settings.set', enabled: false }, asha.token);
+  assertEqual(await pub(SLUG), null, 'the owner turned Return to Owner off');
+  same(await lostEntry(), { mode: 'lost', available: false, reason: 'needs_setup', missing: ['returnToOwner'] }, 'the owner sees why');
+  await rescue({ op: 'settings.set', enabled: true }, asha.token);
+  await stack.query(`UPDATE public.tap_profiles SET suspended_at = now() WHERE user_id = $1`, [asha.userId]);
+  assertEqual(await pub(SLUG), null, 'suspended');
+  await stack.query(`UPDATE public.tap_profiles SET suspended_at = NULL WHERE user_id = $1`, [asha.userId]);
+  same(await pub(SLUG), { mode: 'lost' }, 'restored');
+  return 'fail closed in every case';
+});
+
+await t.check('switching back to Business restores the identical payload; the Return to Owner opt-in is left as the owner set it', async () => {
+  const b = await call({ op: 'owner.activate', mode: 'business', expectedVersion: lostVersion, idempotencyKey: key() }, asha.token);
+  assertEqual([b.status, b.body.activeMode, b.body.previousMode], [200, 'business', 'lost'], 'business');
+  same(await pub(SLUG), { mode: 'business', profile: businessView }, 'identical');
+  same(await legacy(SLUG), businessView, 'legacy reader byte-identical');
+  assertEqual((await rescue({ op: 'settings.get' }, asha.token)).body.settings.enabled, true, 'opt-in unchanged by the mode switches');
+  await rescue({ op: 'settings.set', enabled: false }, asha.token);
+  delete process.env.RESCUE_RELAY;
+  return 'reversible';
+});
+
+// Every owner success answer has exactly the §6 shape, so a new key (an
+// account phone, say) cannot ride along unnoticed (OpenCode review #3).
+await t.check('owner success answers have exactly the contract §6 keys', async () => {
+  const INFO = ['category', 'detailedInformation', 'shortDescription', 'title', 'updatedAt', 'version'];
+  const SHAPES = {
+    'owner.state': ['activeMode', 'changedAt', 'modes', 'version'],
+    'owner.activate': ['activeMode', 'changedAt', 'previousMode', 'replayed', 'version'],
+    'owner.info.get': ['info', 'publicationStatus'],
+    'owner.info.save': ['info', 'publicationStatus'],
+    'owner.info.clear': ['cleared'],
+    'owner.preview': ['mode', 'view'],
+  };
+  const wrong = [];
+  const seen = new Set();
+  const keys = (o) => Object.keys(o ?? {}).sort().join();
+  for (const { op, status, body } of answers.filter((a) => a.status >= 200 && a.status < 300)) {
+    seen.add(op);
+    if (keys(body) !== [...SHAPES[op]].sort().join()) wrong.push(`${op}: ${keys(body)}`);
+    if (body.info && keys(body.info) !== INFO.join()) wrong.push(`${op} info: ${keys(body.info)}`);
+    for (const m of body.modes ?? []) {
+      if (!['available,mode,reason', 'available,missing,mode,reason'].includes(keys(m))) wrong.push(`${op} mode entry: ${keys(m)}`);
+    }
+    if (op === 'owner.preview' && body.mode === 'info' && body.view) {
+      if (keys(body.view) !== 'category,detailedInformation,shortDescription,title,updatedAt') wrong.push(`preview info view: ${keys(body.view)}`);
+    }
+  }
+  assertEqual(wrong, [], 'shapes');
+  const missing = Object.keys(SHAPES).filter((op) => !seen.has(op));
+  assertEqual(missing, [], 'operations never answered with success in this run');
+  return `${answers.filter((a) => a.status < 300).length} success answers over ${seen.size} operations`;
+});
+
+await t.check('canaries: no account detail, switched-off field, draft or rejected value in any public output, response or log', async () => {
   const leaks = [];
   const scan = (label, text) => {
     for (const [name, value] of Object.entries(C)) if (text.includes(value)) leaks.push(`${name} in ${label}`);
   };
   publicReads.forEach((text, i) => scan(`public read #${i}`, text));
-  bodies.filter((b) => b.includes('"error"')).forEach((b, i) => scan(`error body #${i}`, b));
+  bodies.forEach((b, i) => scan(`response body #${i}`, b)); // successes too, not only errors (review #3)
   logLines.forEach((line, i) => scan(`log line #${i}`, line));
   scan('public read while Business', JSON.stringify(await pub(SLUG)));
   assertEqual(leaks, [], 'leaks');

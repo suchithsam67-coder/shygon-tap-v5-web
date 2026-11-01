@@ -559,3 +559,139 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
 - **Verdict unchanged:** B-10 READY FOR REVIEW. Release BLOCKED:
   - P1 and P2 hosted (AP-1–AP-6);
   - G1–G7, G10, G13 and G14.
+
+## 17. 2026-10-25: BQ-1 production variant prepared (V6-106)
+
+- **No fresh production capture.** Session A has no production access and used none. The latest genuine evidence is the owner's of 2026-10-18 (migration record + `VERIFY-LIVE-DRIFT.sql` hash match).
+- **Finding** [INFERRED from OBSERVED evidence]: production's `get_public_profile` differs from the repository baseline (`pageTemplate`, `tier_buttons`, two comments). Applied there, `migrations/035` would remove those.
+- **Prepared:** `supabase/proposed/035_public_profile_respects_mode.production.sql`. It is production's body plus the single guard, with a pre-check that refuses any other body and an exact rollback. It is not in `migrations/` or `APPLY_ALL.sql`.
+- **Evidence:**
+  - `npm run test:bq1-production` 13/13 (the full table is in `docs/v6/aaroh/bq1-production-reconciliation.md` §4);
+  - gates re-run [OBSERVED]: on Node 20.18 every step exit 0: lint; test:push-guard; test:db (RLS matrix 1565, golden 17, admin-contract, rollbacks 16, the bundle applied as one batch and twice); test:modes 17/17; test:bq1-production 13/13. gitleaks 8.30.1 on each new file: 0 findings.
+- **Verdict unchanged:** B-10 READY FOR REVIEW. Release BLOCKED:
+  - P1 and P2 hosted (AP-1–AP-6);
+  - G1–G7, G10, G13 and G14;
+  - the V6-106 fresh capture.
+
+## 18. 2026-10-25: OpenCode hand-off (P1/P2 runners, second review) and the hardening change
+
+**Approval:** the owner, in the coordination session on 2026-10-25: "hand OpenCode's check scripts (48d75fb) and the review findings to the backend and frontend sessions … fix the findings as one hardening change each, and take the scripts after their own full test run". The coordinator relayed it with the owner's words quoted; it was not given in Session A.
+
+**Taken** (cherry-picked with `-x` from `opencode/aaroh-preview-checks`, base `b04a72d`):
+- `b719f9b` (= `48d75fb`): `scripts/release/preview-p1-address.mjs`, `preview-p2-connect.mjs`, `preview-checks.test.mjs` and `docs/v6/aaroh/preview-check-runbook.md`. Read in full first: they refuse production hosts and plain http before any request, use only documentation-range addresses, and print no tokens.
+- `e18c7cc` (= `572127d`): the review, `docs/v6/aaroh/reviews/2026-10-25_opencode-review-info-mode.md`, with Session A's resolution appended (§8 there).
+
+**Hardening (one change, backend lane), findings #1–#4, #6, #7.** Every new or changed check was run against the old code first and failed there [OBSERVED].
+
+| # | Change | Proof |
+|---|---|---|
+| 1 | `Object.hasOwn` op lookup in `modes`, `connect`, `emergency` and `rescue`, and in the local REST emulator's two lookups | `test:security` 12 (new: 4 functions × 5 inherited names × 2 callers → 400 `unknown_op`) |
+| 2 | `admin-contract`: every function a client role can EXECUTE is as on live, or in `APPROVED_CLIENT_EXECUTE` with exactly its roles | admin-contract 17; 66 as on live + 3 approved; a new anon function fails |
+| 3 | `test:modes`: the canary scans every response; the exact key sets of all six owner success answers are pinned | `test:modes` 19 |
+| 4 | 034 revised in place (applied nowhere): one lock order (Tap → mode state → Info) in activate, save and clear | a static pin in `test:modes`. **The race itself is not executable on PGlite (one connection): NOT run.** |
+| 6 | `modes_info_missing` also flags invalid stored detailed information; the reader uses only it | `test:modes` F-3: owner status, preview and `owner.state` agree with the visitor |
+| 7 | 035 refuses to apply without 034 | `test:bq1-production` 14 |
+
+- **Contract AAROH-API v0.9.2:**
+  - `unknown_op` for inherited names;
+  - `missing` may name `detailedInformation`;
+  - `previousMode: null` documented (#8's contract half);
+  - `test:connect` has 17 checks (the §10b drift is fixed).
+- **`APPLY_ALL.sql`** regenerated: it applies as one batch, and twice.
+
+**The P2 runner, decline and block for real** (the coordinator's question 2; Session A's call):
+- With `P2_DECLINE_TOKEN` and `P2_BLOCK_TOKEN`, phase on declines one real request and blocks another. For each, it checks:
+  - the requester sees `declined` with nothing shared;
+  - its grant is revoked;
+  - a new request is refused: 429 `recently_declined` after a decline, 404 `unavailable` after a block.
+- A hosted phase on without them is INCONCLUSIVE before any write.
+- Wired as `npm run test:preview-checks` (in `ci` and `ci.yml`): 13 checks.
+- OpenCode's other choices are accepted: exit codes 0–3, the P1 pre-flight, the INCONCLUSIVE policy, `P2_HOST_LABEL`, and refusing every shygontech.com subdomain.
+
+**Full suite after both changes** [OBSERVED; Node 20.18.0; outbound network denied for the stack suites]. Every step exited 0.
+
+| Group | Results |
+|---|---|
+| Static checks | lint; build; bundle; bundle-secrets; seo; push-guard |
+| `test:db` | verify 21; adversarial 64; RLS matrix 1565; identity 69; admin-notes 12; golden 17; admin-contract 17; rollbacks 16; account-deletion 9; history 2; bundle check |
+| Payments | `payments:ci` 15, and 13 + 1 BLOCKED (Node-20-only; on Node 22.23.4: 15, and 14/0/0) |
+| Stack suites | payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 19; bq1-production 14; local-host 9; admin-edge 11; observability 10; security 12 |
+| Preview checks | 13, on spare ports 4383/54531 (OpenCode's stack uses 4373/54521) |
+| Other | components 23/23; `npm audit --audit-level=high` 0 vulnerabilities |
+
+**Not run:**
+- browser e2e;
+- the hosted P1/P2 themselves (they need AP-1–AP-6).
+
+**Verdict unchanged:** B-10 READY FOR REVIEW. Release BLOCKED:
+- P1 and P2 hosted (AP-1–AP-6);
+- G1–G7, G10, G13 and G14;
+- the V6-106 fresh capture.
+
+## 19. 2026-10-25: OpenCode's review of the production variant (OC-2b) and its fixes
+
+**Approval:** forwarded by the coordinator under the owner's hand-off approval (§18).
+
+**Taken:**
+- `89378f6` (= `10a3855`, report file only). My conflict resolution duplicated earlier sections of the review file.
+- `b9f3a4a` repairs it: the file is now exactly the first review plus the OC-2b section, checked byte for byte. It was fixed forward; no commit was rewritten.
+
+**OpenCode's verdict:** no P0, no P1. Its probes agree with Session A's:
+- the forward statement is the rollback plus the six guard lines;
+- both hashes match;
+- comment and whitespace changes are refused.
+
+**Fixed** (`supabase/proposed/035_…production.sql`, regenerated; the body is unchanged):
+- **P-1:** the pre-check covers volatility, kind and language.
+- **P-2:** the pre-check pins the EXECUTE grants.
+- **P-3:** the ROLLBACK is guarded.
+
+**Evidence** [OBSERVED]:
+- `test:bq1-production` **16/16**. It adds five drift fixtures, each refused with the drift left intact, and the rollback guard.
+- Run against the earlier proposal, the new checks fail: the VOLATILE drift was applied, and the unguarded rollback ran.
+- lint clean.
+- No migration, function or other test changed in this step, so the §18 full-suite results stand for everything else.
+
+**Verdict unchanged:** release BLOCKED (§18). The production variant still waits for the owner's fresh capture (V6-106).
+
+## 20. 2026-10-26: Lost mode (U2) built (migration 036, contract v0.10)
+
+**Approval:**
+- The owner, in the coordination session on 2026-10-25 (relayed with the owner's words): "Approved: U2 = Lost mode (option L1) now, for adults' own cards, reusing Return to Owner, off until release. Keep Return to Owner on the Business page too. Defer Guardian until visitor alerts are reconsidered."
+- In this session on 2026-10-26: "start".
+- Record: DEC-2026-041 amendment A-1, with Session A's design choices L-1 to L-6 for the owner to confirm.
+
+**Built (local):**
+- **`036_lost_mode.sql`**, generated from 034's own text:
+  - a `lost` catalogue row, OFF;
+  - Lost in owner state, activation, preview and the public reader;
+  - its ROLLBACK restores 034's functions verbatim.
+- **`/api/modes`:** applies `RESCUE_RELAY`.
+- **Contract AAROH-API v0.10.**
+- **Unchanged:** `get_public_profile` (035's guard already covers Lost), and Return to Owner (031).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]. Every step exited 0.
+
+| Group | Results |
+|---|---|
+| Static checks | lint; build; bundle; bundle-secrets; seo; push-guard |
+| `test:db` | RLS matrix 1565; golden 18 (a new stage for 036, byte-identical); admin-contract 17 (no new client-executable function); rollbacks 17 (036 restores the schema exactly); bundle check |
+| Payments | `payments:ci` 15, and 13 + 1 known Node-20-only BLOCKED (Node 22: 15, and 14/0/0) |
+| Stack suites | modes **25** (six new for Lost); bq1-production 16; preview-checks 13; security 12; rescue 18; connect 17; emergency 49; and the others as in §18 |
+| Other | components 23/23; audit 0 vulnerabilities |
+
+**What the six Lost checks prove:**
+- Lost is off by default, and gated by `RESCUE_RELAY`.
+- The Return to Owner opt-in is required, and switching never turns it on.
+- The reader answers exactly `{ mode: 'lost' }`, while P-1 is null and P-2 is `active`.
+- A finder can message the owner, and no Business, Info or owner value appears in any answer.
+- The kill switch, the opt-in turned off and suspension each give null, never Business.
+- Switching back restores Business byte-identical, and the opt-in is untouched.
+
+**Not run:**
+- browser e2e (Session B has no Lost page yet);
+- any hosted check.
+
+**Numbering:** U1 (DEC-2026-043, on hold) is renumbered to migration 037 and contract v0.11.
+
+**Verdict unchanged:** release BLOCKED (§18). Lost stays OFF in the catalogue and behind `RESCUE_RELAY` until release.

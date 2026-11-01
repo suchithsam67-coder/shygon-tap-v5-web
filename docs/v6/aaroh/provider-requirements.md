@@ -42,7 +42,7 @@ MSG91 sends only pre-approved templates. The texts used with Twilio are below; r
 
 1. **Verification:** "SHYGON: ##name## wants to add you as an emergency contact. If you agree, give them this code: ##otp##. It expires in 10 minutes. If you do not know them, ignore this message."
 2. **Owner alert:** "SHYGON emergency alert: ##name## has asked for help and wants you to contact them now (sent ##time## IST). SHYGON does not contact emergency services. If they are in danger, call 112."
-3. **Visitor alert:** "SHYGON emergency alert: someone using ##name##'s SHYGON profile reported an emergency at ##time## IST. SHYGON cannot confirm it. Try to reach ##name## directly. If they may be in danger, call 112."
+3. **Visitor alert:** "SHYGON emergency alert: someone using the SHYGON profile of ##name## reported an emergency at ##time## IST. SHYGON cannot confirm it. Try to reach them directly. If they may be in danger, call 112." (Wording approved by the owner on 2026-10-25, relayed by the coordination session: two variables, the same as item 2, and no apostrophe next to a variable.)
 
 `##name##` is the owner's own name, reduced by the database to letters, spaces and `.'-` (30 characters at most). It can carry no link.
 

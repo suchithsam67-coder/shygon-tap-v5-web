@@ -130,6 +130,17 @@
 --
 -- Idempotent: safe to run more than once.
 
+-- Refuse to run without 034. plpgsql resolves tap_mode_state only when the
+-- function first runs, so without this check 035 would install a reader that
+-- fails for every slug (OpenCode review 2026-10-25 #7).
+DO $needs_034$
+BEGIN
+  IF to_regclass('public.tap_mode_state') IS NULL THEN
+    RAISE EXCEPTION '035: needs migration 034 (public.tap_mode_state); nothing changed';
+  END IF;
+END
+$needs_034$;
+
 CREATE OR REPLACE FUNCTION public.get_public_profile(p_slug text)
  RETURNS jsonb
  LANGUAGE plpgsql

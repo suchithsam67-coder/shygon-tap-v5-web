@@ -198,7 +198,8 @@ async function handle(request, log) {
     if (body.op === 'public.start') return await publicStart(cfg, request, body, log);
     if (body.op === 'finder.view') return relayAllowed() ? await finderView(cfg, body) : fail('unavailable');
     if (body.op === 'finder.post') return relayAllowed() ? await finderPost(cfg, body) : fail('unavailable');
-    const op = OWNER_OPS[body.op];
+    // Own keys only: `constructor`, `toString` or `__proto__` are not operations.
+    const op = Object.hasOwn(OWNER_OPS, body.op) ? OWNER_OPS[body.op] : null;
     if (!op) return fail('unknown_op');
     const user = await currentUser(cfg, request);
     if (!user) {

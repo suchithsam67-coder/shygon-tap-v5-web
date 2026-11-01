@@ -186,3 +186,12 @@ Each question takes the option the record recommends. Where the recommendation w
 ## Expected result vs observed result
 
 To be filled at verification. Expected: the decided options hold on a fresh clone (`npm run ci`) and, after the DEC-2026-018 review, on production with the VERIFY ON LIVE queries in 029/030.
+
+## Wording change, 2026-10-25: the visitor-alert SMS (DLT)
+
+- **Approved:** by the owner in the coordination session on 2026-10-25. The approval was relayed to Session A by that session, with the owner's words quoted. It was not given in Session A.
+- **Text, the DLT template being registered:** "SHYGON emergency alert: someone using the SHYGON profile of ##name## reported an emergency at ##time## IST. SHYGON cannot confirm it. Try to reach them directly. If they may be in danger, call 112."
+- **Why:** the old text named the owner twice, giving three DLT slots, with an apostrophe on a variable boundary. The new one has two variables (name, time), the same as the owner alert.
+- **Built locally:** `netlify/lib/emergency.mjs`, `supabase/tests/emergency.mjs`, `docs/v6/aaroh/provider-requirements.md` §3 and contract v0.9.1.
+- **Not done yet:** DLT registration is pending (owner). If the portal requires another change, it is a one-line follow-up.
+- **Unchanged:** Q2 stands, so visitor alerts stay off.

@@ -158,6 +158,29 @@ await t.check('a cross-origin request with credentials is not let in either', as
   assertEqual([response.headers.get('access-control-allow-origin'), response.headers.get('access-control-allow-credentials')], [null, null], 'CORS headers');
 });
 
+// ---------------------------------------------------------------------------
+t.section('Operation names: inherited object keys are not operations');
+
+// OpenCode review 2026-10-25 #1: the op tables are plain objects, so a lookup
+// by name once found `constructor` and `toString` and answered 500 outside
+// the contract. Every name below must be an ordinary 400 unknown_op, signed in
+// or not, on every function that dispatches by `op`.
+await t.check('constructor, toString, __proto__ and hasOwnProperty answer 400 unknown_op on every op-dispatching function', async () => {
+  const wrong = [];
+  for (const name of ['modes', 'connect', 'emergency', 'rescue']) {
+    for (const op of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) {
+      for (const token of [customer.token, null]) {
+        const response = await callFunction(stack, name, { token: token ?? undefined, body: { op } });
+        if (response.status !== 400 || response.body?.error?.code !== 'unknown_op') {
+          wrong.push(`${name} ${op} ${token ? 'signed in' : 'anonymous'}: ${response.status} ${JSON.stringify(response.body)}`);
+        }
+      }
+    }
+  }
+  assertEqual(wrong, [], 'answers outside the contract');
+  return '4 functions x 5 names x 2 callers';
+});
+
 const ok = t.finish();
 await stack.close();
 process.exit(ok ? 0 : 1);
