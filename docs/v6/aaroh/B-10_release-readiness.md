@@ -695,3 +695,43 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
 **Numbering:** U1 (DEC-2026-043, on hold) is renumbered to migration 037 and contract v0.11.
 
 **Verdict unchanged:** release BLOCKED (§18). Lost stays OFF in the catalogue and behind `RESCUE_RELAY` until release.
+
+## 21. 2026-11-01: Verified Tap (U1) built locally (migration 037, contract v0.11)
+
+**Approval:** the owner, in session on 2026-10-31: "Approve local build", answering Session A's recommendations (DEC-2026-043 §11).
+- **Answered:** Q1 option A; Q4 option 2; Q5 a code in 037; Q8 D-a; Q9 counter limit off; Q6 left to card design.
+- **Still open:** Q2, Q3 and Q7.
+- **Scope:** test keys only; `VERIFIED_TAP` off; nothing hosted.
+
+**Built:**
+- `c466dde`: OpenCode's crypto core, cherry-picked after review;
+- `037_verified_tap.sql`: two closed tables and four service-only functions;
+- `/api/verify`;
+- `test:verified-tap` and `test:sun`, both in `ci` and `ci.yml`;
+- contract AAROH-API v0.11, §10d.
+- **Q5 deviation:** the code lives in a closed table, not on `cards`, because four frozen admin functions return whole card rows. The owner should confirm it (DEC-2026-043 §11).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]. Every step exited 0.
+
+| Group | Results |
+|---|---|
+| `test:db` | verify 21; adversarial 64; RLS matrix **1615** (57 tables, the two new ones closed to all 7 callers); identity 69; admin-notes 12; golden **19** (037 byte-identical); admin-contract 17 (no new client-executable function); rollbacks **18** (037 restores exactly); account-deletion 9; history 2; bundle as one batch and twice |
+| Verified Tap | `test:verified-tap` **17**; `test:sun` **27** |
+| Other suites | as in §20, all exit 0: modes 25; bq1-production 16; preview-checks 13; security 12; payments 15, and 13 + 1 Node-20-only BLOCKED (Node 22: 15, and 14/0/0); components 23/23; lint; build |
+
+**Corrected before commit:**
+- My first draft of the Verified Tap test was written to `supabase/tests/verify.mjs`, the existing `db:verify` script, which it overwrote.
+- The full run showed `db:verify` at 17 instead of 21. The original was restored from git, the test moved to `supabase/tests/verified-tap.mjs`, and the script renamed `test:verified-tap`.
+- No commit ever contained the overwrite.
+
+**Not executed:**
+- §7 test 14, a database failure part-way through a transaction: PGlite has a single connection.
+- §7 test 15, a restore rolling the counter back: the external acceptance log waits for Q2.
+- Real phones and real chips.
+- Browser e2e: there is no `/d/` page yet (Session B).
+
+**New findings:**
+- **Secret-scan exception E-1 is PROPOSED** (DEC-2026-043 §11). gitleaks flags seven published test vectors in `netlify/tests/sun.mjs`. They need the owner's approval before their fingerprints are added; until then `test:secrets` reports them, alongside V6-014.
+- **`npm audit`: one new moderate advisory**, `minimatch` GHSA-g3hv-75wg-m249, a denial-of-service risk. It reaches only dev tooling (eslint / typescript-eslint), counted 12 times through the dependency chain. The high gate passes. The fix offered is a forced, breaking `typescript-eslint` upgrade, so it is the owner's decision (compare DEC-2026-042).
+
+**Verdict unchanged:** release BLOCKED (§18). Verified Tap stays off (`VERIFIED_TAP` unset), with no real keys.

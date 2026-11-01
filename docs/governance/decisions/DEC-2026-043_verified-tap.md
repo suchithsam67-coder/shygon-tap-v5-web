@@ -10,7 +10,7 @@
 | **Accountable Owner (A)** | The repository owner, who holds every role (DEC-2026-018 Option B) |
 | Responsible (R) | Session A (backend). The pure crypto core is being written by OpenCode on `opencode/u1-sun-crypto` (coordinator, 2026-10-25) and comes to Session A as a hand-off |
 | Consulted | Session B (frontend: the verdict page); the coordination session; ChatGPT's U1 threat model (pending, §8) |
-| State | **PROPOSED (draft), ON HOLD for the owner's review.** Docs only. Nothing is built, keyed, personalised or deployed. **Owner, 2026-10-25, in session:** "I'll review DEC-2026-043 first. Hold contract v0.10 and migration 036 until I answer Q1-Q7 and the threat model (T-1 to T-7) is folded in." Until both are done, Session A writes no contract v0.11, no migration 037 and no `/api/verify`. **Renumbered 2026-10-26:** Lost mode (U2, DEC-2026-041 A-1) took migration 036 and contract v0.10, so this record now uses 037 and v0.11. The hold is unchanged. **The threat model is folded in (2026-10-25, revision 2):** T-1 to T-7 come from ChatGPT's draft (unverified) and the coordinator's check (§8). Two claims were checked by Session A against vendor documents. Q8 and Q9 are new questions arising from it |
+| State | **APPROVED FOR THE LOCAL BUILD ONLY (2026-10-31), and built locally (§11).** Q2, Q3 and Q7 stay open; real keys, chips and hosting are not approved. History: PROPOSED (draft), ON HOLD for the owner's review. Docs only. Nothing is built, keyed, personalised or deployed. **Owner, 2026-10-25, in session:** "I'll review DEC-2026-043 first. Hold contract v0.10 and migration 036 until I answer Q1-Q7 and the threat model (T-1 to T-7) is folded in." Until both are done, Session A writes no contract v0.11, no migration 037 and no `/api/verify`. **Renumbered 2026-10-26:** Lost mode (U2, DEC-2026-041 A-1) took migration 036 and contract v0.10, so this record now uses 037 and v0.11. The hold is unchanged. **The threat model is folded in (2026-10-25, revision 2):** T-1 to T-7 come from ChatGPT's draft (unverified) and the coordinator's check (§8). Two claims were checked by Session A against vendor documents. Q8 and Q9 are new questions arising from it |
 
 Labels: **OBSERVED** (in this repository or a decision record), **INFERRED** (from public vendor documents or reasoning, not tested here), **PROPOSED**, **PENDING** (waits for an input named in §8).
 
@@ -285,3 +285,60 @@ The meta-read-key point is supported by an independent SUN decoder's documentati
 - [nfc-sun-decoder](https://github.com/johnnyb/nfc-sun-decoder): a diversified key cannot decrypt the SUN metadata (a secondary source for the meta-read-key point).
 - The threat model and the coordinator's check (§8).
 - Repository: doc 07, doc 08 §2–§7, `M1_SECURITY_MODEL.md` (A1 = authenticated chip, OQ-2), the differentiation plan §4–§6, B-9 (client address), DEC-2026-039 A-1 (host-switch pattern).
+
+## 11. Local build approved and built (2026-10-31)
+
+**Approval** [OBSERVED in session, 2026-10-31]. The owner answered "Approve local build" to Session A's question, "Approve Verified Tap's local build on my DEC-2026-043 recommendations?". That question proposed the local build only, on these answers:
+
+| # | Answer |
+|---|---|
+| Q1 | option A |
+| Q4 | option 2 ("Verified tap") |
+| Q5 | a device public code in 037 |
+| Q6 | left to card design |
+| Q8 | D-a: both keys diversified by the device id |
+| Q9 | counter limit off |
+| Q2, Q3, Q7 | **stay open** until the supplier answers (`coordination/GPT-7_result_checked.md`) |
+
+The build uses test-only keys, `VERIFIED_TAP` stays off, and nothing is hosted. The hold recorded in the State row is lifted for the local build only.
+
+**Q5 as built, a deviation the owner should confirm:**
+- The public code lives in the closed table `tap_device_auth` (its primary key), **not as a column on `cards`**.
+- Why: four frozen admin functions (`admin_get_customer`, `admin_get_order`, `admin_get_tap`, `admin_update_card`) return whole `cards` rows with `to_jsonb(c)`. A new column would silently change the Admin APK's frozen return shapes (doc 12 §2).
+- The code row is never deleted (`card_id` is set to null when its card goes), so a code is never reused.
+- Moving the code onto `cards` remains possible if the owner prefers. It would need a frozen-contract decision for those four functions.
+
+**Built** (local; readiness report §21):
+- **`c466dde`:** OpenCode's crypto core (OC-3, `6c7f8db`), cherry-picked after Session A's review, with `test:sun` 27/27.
+- **`037_verified_tap.sql`:**
+  - `tap_device_auth`, closed: code, card, key epoch, `uid_hmac`, last counter, retirement;
+  - `tap_verify_events`, closed and append-only, with 90-day retention;
+  - four service-only functions: register, lookup with rate limits, the atomic result, purge.
+- **`/api/verify`** (`netlify/functions/verify.mjs`, `api/verify.mjs`), behind `VERIFIED_TAP`.
+- **`test:verified-tap`:** 17 checks.
+- **Contract:** AAROH-API v0.11, §10d.
+
+**Settled details:**
+- The URL parameters are `e` (PICC data) and `c` (SDMMAC). These replace the `p` / `m` placeholders in P-2 and P-3.
+- The MAC input is empty, the AN12196 default. OpenCode's notes record that the padding inside `e` is outside the MAC. That is not malleable: all 128 single-bit flips are refused.
+- D-a's input is the 16 bytes of `cards.id`.
+- `uid_hmac` = HMAC-SHA256(`VERIFY_UID_PEPPER`, the UID in lowercase hex). The personalisation station must compute it the same way.
+
+**§7 coverage:**
+
+| Tests | Status |
+|---|---|
+| 1–13, 16–20, 22 | covered by `test:verified-tap` and the gates (RLS matrix 1615, admin-contract, rollbacks) |
+| 21 | covered by `test:sun` |
+| 14: a database failure part-way through a transaction | **not executable on PGlite** |
+| 15: a restore rolling the counter back | **not built.** The external acceptance log waits for Q2 |
+
+**Exception E-1, PROPOSED and needing the owner's approval: the secret scan.**
+- **The findings.** gitleaks reports seven `generic-api-key` findings in `netlify/tests/sun.mjs`, at lines 54, 72, 130, 137, 182, 306 and 351. Each is a **published standard test vector**, not a secret:
+  - the RFC 4493 §4 example key;
+  - AN10922 §2.2.1's example key (twice);
+  - AN12196 §3.4.2.2's example ciphertexts (three lines);
+  - an AN12196 session-key example.
+- **Where they appear.** In commit `c466ddee68d1bcb4a25266e44cfba5af856ac75e` (this branch) and `6c7f8db58f3af5af45c1222bc6ff3681be612981` (`opencode/u1-sun-crypto`).
+- **The proposed fix.** The repository's rule (`.gitleaksignore`) needs an APPROVED decision per fingerprint. Proposed: add the 14 fingerprints, `<commit>:netlify/tests/sun.mjs:generic-api-key:<line>` for both commits and all seven lines, under "E-1: published NXP / IETF test vectors".
+- **Not done yet.** Session A has **not** added them. Until the owner approves, `npm run test:secrets` reports them, alongside the known V6-014 finding.
