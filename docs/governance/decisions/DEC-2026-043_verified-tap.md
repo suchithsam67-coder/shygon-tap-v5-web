@@ -333,7 +333,7 @@ The build uses test-only keys, `VERIFIED_TAP` stays off, and nothing is hosted. 
 | 14: a database failure part-way through a transaction | **not executable on PGlite** |
 | 15: a restore rolling the counter back | **not built.** The external acceptance log waits for Q2 |
 
-**Exception E-1, PROPOSED and needing the owner's approval: the secret scan.**
+**Exception E-1: the secret scan. APPROVED by the owner in session on 2026-11-01 ("Approve E-1"), and applied:** the 14 fingerprints are in `.gitleaksignore` under a comment citing this section.
 - **The findings.** gitleaks reports seven `generic-api-key` findings in `netlify/tests/sun.mjs`, at lines 54, 72, 130, 137, 182, 306 and 351. Each is a **published standard test vector**, not a secret:
   - the RFC 4493 §4 example key;
   - AN10922 §2.2.1's example key (twice);
@@ -341,4 +341,4 @@ The build uses test-only keys, `VERIFIED_TAP` stays off, and nothing is hosted. 
   - an AN12196 session-key example.
 - **Where they appear.** In commit `c466ddee68d1bcb4a25266e44cfba5af856ac75e` (this branch) and `6c7f8db58f3af5af45c1222bc6ff3681be612981` (`opencode/u1-sun-crypto`).
 - **The proposed fix.** The repository's rule (`.gitleaksignore`) needs an APPROVED decision per fingerprint. Proposed: add the 14 fingerprints, `<commit>:netlify/tests/sun.mjs:generic-api-key:<line>` for both commits and all seven lines, under "E-1: published NXP / IETF test vectors".
-- **Not done yet.** Session A has **not** added them. Until the owner approves, `npm run test:secrets` reports them, alongside the known V6-014 finding.
+- **Done.** The fingerprints were added after the owner's approval. `npm run test:secrets` no longer reports them; only the known V6-014 finding remains.
