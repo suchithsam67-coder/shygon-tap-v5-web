@@ -323,6 +323,15 @@ export const PREVIEW_PAGES: boolean = import.meta.env.VITE_AAROH_PREVIEW_PAGES =
  */
 export const INFO_RELEASED = false;
 
+/**
+ * Lost mode (AAROH-API v0.10, DEC-2026-041 A-1): a Tap that shows only "Found
+ * this card?" and Return to Owner's form. Built and switched off: SHYGON's
+ * catalogue has it off, it needs the RESCUE_RELAY host switch, and its wording
+ * waits for the owner's approval. Until it is released, its entry on the
+ * owner's mode page is hidden in a production build.
+ */
+export const LOST_RELEASED = false;
+
 export const OWNER_PAGE: Record<ServerFeature, string> = {
   emergency: '/shygontap/emergency',
   return: '/shygontap/return-to-owner',

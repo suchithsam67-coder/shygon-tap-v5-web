@@ -12,6 +12,8 @@ import { apiCustomer, buyExperience, cspViolations, dismissCookieNotice, eventua
  *   - Return to owner: a finder writes, the owner replies, the finder reads it.
  *   - SHYGON Connect: a signed-in visitor asks from the owner's Tap, the owner
  *     accepts, both see the connection, and removing it revokes the grants.
+ *   - Info mode, and Lost mode (v0.10): the owner turns on Return to Owner,
+ *     confirms the switch; a finder sees only "Found this card?" and writes.
  * Every check that a claim depends on reads the database back.
  *
  * The stand-in and the switches belong to the running stack, so every test
@@ -366,5 +368,93 @@ test('info mode: the owner writes an Info page and shows it; visitors see only t
     await context.close();
   } finally {
     await setInfo(false);
+  }
+});
+
+test('lost mode: Return to Owner first, a confirmed switch; a finder sees only "Found this card?" and writes; relay off, "Tap not found", never Business', async ({ page, request, browser }) => {
+  const db = server();
+  // SHYGON's catalogue switch for Lost (036: off on every database by default),
+  // set with the stack's service key as for Info; the relay through /__sim.
+  const setLost = async (enabled: boolean) => {
+    const { error } = await db.from('tap_mode_catalog').update({ enabled }).eq('mode', 'lost');
+    expect(error).toBeNull();
+  };
+  await setLost(true);
+  await request.post('/__sim/switches', { data: { RESCUE_RELAY: true } });
+  try {
+    const { owner, slug } = await publishedOwner('Lost Card Owner');
+    const { data: tap } = await db.from('tap_profiles').select('id').eq('user_id', owner.userId).single();
+
+    // Lost needs the owner's own Return to Owner opt-in; the mode page sends them to it.
+    await signIn(page, owner.email, owner.password);
+    await page.goto('/shygontap/mode');
+    await expect(page.getByTestId('tm-lost-status')).toHaveText('To use Lost mode, turn on Return to Owner first.');
+    await expect(page.getByRole('button', { name: 'Switch to Lost mode' })).toBeDisabled();
+    await page.getByRole('link', { name: 'Open Return to Owner' }).click();
+    await page.waitForURL('**/shygontap/return-to-owner');
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await expect(page.getByText(/Saved\./)).toBeVisible();
+
+    await page.goto('/shygontap/mode');
+    await expect(page.getByTestId('tm-lost-status')).toHaveText('Ready to show');
+    await page.getByRole('button', { name: 'Switch to Lost mode' }).click();
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog).toContainText('Switch this card to Lost mode?');
+    await dialog.getByRole('button', { name: 'Yes, switch to Lost' }).click();
+    await expect(page.getByText('Your card is now in Lost mode. Taps show only the private message page.')).toBeVisible();
+    await expect(page.getByTestId('tm-active')).toHaveText('Lost mode is on. Taps show only the private message page.');
+    expect(await page.content()).not.toMatch(/\bLive\b/);
+
+    // A finder taps the card, from their own simulated address (B-9).
+    const context = await browser.newContext();
+    await stayLocal(context);
+    await context.setExtraHTTPHeaders({ 'x-shygon-sim-client': '203.0.113.41' });
+    const finder = await context.newPage();
+    const { count: before } = await db.from('tap_events').select('id', { count: 'exact', head: true }).eq('tap_profile_id', tap!.id);
+    await finder.goto(`/t/${slug}?src=nfc&mode=contact`);
+    await expect(finder.getByRole('heading', { level: 1, name: 'Found this card?' })).toBeVisible();
+    expect(await finder.title()).toBe('Found this card? | SHYGON Tap');
+    await expect(finder.getByRole('button')).toHaveCount(1);
+    await expect(finder.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    await finder.getByLabel('Your message').fill('Found your card at the station café.');
+    await finder.getByRole('button', { name: 'Send message' }).click();
+    await expect(finder.getByRole('heading', { name: 'Your message has been sent.' })).toBeVisible();
+    expect(finder.url()).not.toMatch(/rt=/);
+    const html = await finder.content();
+    const storage = await finder.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+    for (const canary of ['Lost Card Owner', owner.email, owner.userId]) {
+      expect(html).not.toContain(canary);
+      expect(storage).not.toContain(canary);
+    }
+    // No visitor counts for a Lost page.
+    await finder.waitForTimeout(500);
+    const { count: after } = await db.from('tap_events').select('id', { count: 'exact', head: true }).eq('tap_profile_id', tap!.id);
+    expect(after).toBe(before);
+
+    // The message reached the owner's Return to Owner inbox, read back from the database too.
+    const { count: threads } = await db.from('rescue_threads').select('id', { count: 'exact', head: true }).eq('owner_user_id', owner.userId);
+    expect(threads).toBe(1);
+    await page.goto('/shygontap/return-to-owner');
+    await page.getByRole('button', { name: /Waiting for your reply/ }).click();
+    await expect(page.getByRole('list', { name: 'Conversation' }).getByText('Found your card at the station café.')).toBeVisible();
+
+    // SHYGON's relay goes off: the neutral "Tap not found", never the Business profile.
+    await request.post('/__sim/switches', { data: { RESCUE_RELAY: false } });
+    await finder.reload();
+    await expect(finder.getByText('Tap not found')).toBeVisible();
+    expect(await finder.content()).not.toContain('Lost Card Owner');
+
+    // On again; the owner confirms the switch back, and visitors see the Business profile.
+    await request.post('/__sim/switches', { data: { RESCUE_RELAY: true } });
+    await page.goto('/shygontap/mode');
+    await page.getByRole('button', { name: 'Show my Business profile instead' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Switch to Business' }).click();
+    await expect(page.getByText('Done. Your Tap now shows your Business profile.')).toBeVisible();
+    await finder.goto(`/t/${slug}`);
+    await finder.keyboard.press('Escape');
+    await expect(finder.getByRole('heading', { level: 1, name: 'Lost Card Owner' })).toBeVisible();
+    await context.close();
+  } finally {
+    await setLost(false);
   }
 });

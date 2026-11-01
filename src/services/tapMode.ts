@@ -2,9 +2,11 @@ import { supabase } from '../lib/supabase';
 import type { InfoCategory, PublicInfo } from '../lib/database.types';
 
 /**
- * The Tap owner's mode control, `POST /api/modes` (AAROH-API v0.8 §6;
- * DEC-2026-041). One mode is active per Tap: `business` (the default) or
- * `info`. Info is a plain-text public page about a thing or a place.
+ * The Tap owner's mode control, `POST /api/modes` (AAROH-API v0.8 §6, Lost
+ * v0.10; DEC-2026-041 and A-1). One mode is active per Tap: `business` (the
+ * default), `info` or `lost`. Info is a plain-text public page about a thing
+ * or a place. Lost shows only "Found this card?" and Return to Owner's form; it
+ * needs the owner's own Return to Owner opt-in, which switching never turns on.
  *
  * Every change carries the version the owner last saw (`expectedVersion`), so
  * an edit made elsewhere in the meantime is refused (`stale_version`) instead
@@ -14,16 +16,19 @@ import type { InfoCategory, PublicInfo } from '../lib/database.types';
  * token alone.
  */
 
-export type TapMode = 'business' | 'info';
+export type TapMode = 'business' | 'info' | 'lost';
 export type ModeReason = 'active' | 'ready' | 'needs_setup' | 'not_available';
 export type PublicationStatus = 'draft' | 'ready' | 'live' | 'unavailable';
 export type InfoField = 'title' | 'shortDescription' | 'category' | 'detailedInformation';
+/** What a mode still needs: Info's fields, or (Lost) the owner's Return to Owner opt-in. */
+export type ModeNeed = InfoField | 'returnToOwner';
 
 export interface ModesState {
   activeMode: TapMode;
   version: number;
   changedAt: string | null;
-  modes: { mode: TapMode; available: boolean; reason: ModeReason; missing?: InfoField[] }[];
+  /** One entry per mode the server knows; the page shows only the ones it renders (§6). */
+  modes: { mode: TapMode; available: boolean; reason: ModeReason; missing?: ModeNeed[] }[];
 }
 
 export interface OwnerInfo extends Omit<PublicInfo, 'title' | 'shortDescription'> {

@@ -17,6 +17,9 @@ import { TapOpening } from './TapOpening';
 import { TapShowroom } from './TapShowroom';
 import './showroom.css';
 
+/** The Lost page (v0.10) ships in this chunk: it reuses the finder view and these styles. */
+export { PublicLostPage } from './PublicLostPage';
+
 /**
  * The public AAROH experience: opening, showroom, a mode, back to the showroom.
  *
@@ -184,7 +187,7 @@ export default function PublicExperience({
         {mode === 'owner' && <OwnerView data={data} />}
         {mode === 'emergency' && (demo ? <EmergencyDemoView /> : <EmergencyPublicView data={data} />)}
         {mode === 'prive' && <PriveDemoView />}
-        {mode === 'return' && <ReturnFinderView data={data} hint={rescue.hint} />}
+        {mode === 'return' && <ReturnFinderView slug={data.slug} ownerName={data.displayName} hint={rescue.hint} />}
       </ModeFrame>
     );
   } else {

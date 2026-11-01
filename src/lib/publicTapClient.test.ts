@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * The public Tap's reader (AAROH-API v0.8 §6): P-6 first, P-1 only when P-6
- * does not exist yet, and never the Business profile for an Info page that
- * the server did not hand out.
+ * The public Tap's reader (AAROH-API v0.8 §6; Lost v0.10): P-6 first, P-1
+ * only when P-6 does not exist yet, and never the Business profile for an Info
+ * or Lost page that the server did not hand out.
  */
 
 type Reply = { status: number; body?: unknown };
@@ -57,6 +57,16 @@ describe('fetchPublicTap', () => {
     const view = await (await reader())('asha');
     expect(view).toEqual({ mode: 'info', info });
     expect(JSON.stringify(view)).not.toMatch(/Asha Rao|canary/);
+    expect(called).toEqual(['get_public_tap_mode']);
+  });
+
+  it('Lost (v0.10): only its name; any other key in the answer is dropped, and P-1 is never asked', async () => {
+    replies = {
+      get_public_tap_mode: { status: 200, body: { mode: 'lost', profile: business, info, displayName: 'Asha Rao', hint: 'canary' } },
+      get_public_profile: { status: 200, body: business },
+    };
+    const view = await (await reader())('asha');
+    expect(view).toEqual({ mode: 'lost' });
     expect(called).toEqual(['get_public_tap_mode']);
   });
 

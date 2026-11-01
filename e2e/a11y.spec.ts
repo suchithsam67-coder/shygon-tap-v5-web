@@ -98,6 +98,30 @@ test('signed-in pages: no serious or critical WCAG 2.2 AA violation', async ({ p
   expect(blocking).toEqual([]);
 });
 
+test('the Lost page (v0.10): no serious or critical WCAG 2.2 AA violation', async ({ page, request }) => {
+  // Lost is off in the catalogue and needs the relay; both go back off afterwards.
+  const setLost = async (enabled: boolean) => {
+    const { error } = await server().from('tap_mode_catalog').update({ enabled }).eq('mode', 'lost');
+    expect(error).toBeNull();
+  };
+  await setLost(true);
+  await request.post('/__sim/switches', { data: { RESCUE_RELAY: true } });
+  try {
+    const { owner, slug } = await publishedTap('Axe Lost Card', 'business');
+    const asOwner = (url: string, data: Record<string, unknown>) =>
+      request.post(url, { headers: { Authorization: `Bearer ${owner.token}` }, data });
+    expect((await asOwner('/api/rescue', { op: 'settings.set', enabled: true })).ok()).toBe(true);
+    const switched = await asOwner('/api/modes', { op: 'owner.activate', mode: 'lost', expectedVersion: 0, idempotencyKey: `axe-lost-${Date.now()}` });
+    expect(switched.ok()).toBe(true);
+    await page.goto(`/t/${slug}`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Found this card?' })).toBeVisible();
+    expect(await audit(page, `/t/${slug} (lost)`)).toEqual([]);
+  } finally {
+    await request.post('/__sim/switches', { data: { RESCUE_RELAY: false } });
+    await setLost(false);
+  }
+});
+
 test('keyboard: the sign-in form is reached in order, and focus is always visible', async ({ page }) => {
   await page.goto('/shygontap/auth');
   await dismissCookieNotice(page);

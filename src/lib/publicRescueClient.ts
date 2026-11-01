@@ -66,11 +66,21 @@ async function post<T>(body: Record<string, unknown>): Promise<T> {
   return result;
 }
 
+export type RescueStatus = { available: boolean; hint: string | null };
+
+/**
+ * The server's answer to `public.status`. A failed call throws: a Lost page
+ * (v0.10) must tell "no answer" (try again) apart from "not available".
+ */
+export async function readRescueStatus(slug: string): Promise<RescueStatus> {
+  const result = await post<{ available?: boolean; hint?: string | null }>({ op: 'public.status', slug });
+  return { available: result.available === true, hint: result.available === true ? (result.hint ?? null) : null };
+}
+
 /** One call per page view, after the profile has rendered. Any failure reads as "not available". */
-export async function fetchRescueStatus(slug: string): Promise<{ available: boolean; hint: string | null }> {
+export async function fetchRescueStatus(slug: string): Promise<RescueStatus> {
   try {
-    const result = await post<{ available?: boolean; hint?: string | null }>({ op: 'public.status', slug });
-    return { available: result.available === true, hint: result.available === true ? (result.hint ?? null) : null };
+    return await readRescueStatus(slug);
   } catch {
     return { available: false, hint: null };
   }

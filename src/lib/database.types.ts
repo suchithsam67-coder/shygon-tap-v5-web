@@ -304,8 +304,15 @@ export interface PublicInfo {
   updatedAt: string | null;
 }
 
-/** What a live Tap shows: its Business profile or its Info page; null when it shows nothing. */
-export type PublicTapView = { mode: 'business'; profile: PublicProfile } | { mode: 'info'; info: PublicInfo } | null;
+/**
+ * What a live Tap shows: its Business profile, its Info page, or its Lost page
+ * (v0.10), which carries no data at all; null when it shows nothing.
+ */
+export type PublicTapView =
+  | { mode: 'business'; profile: PublicProfile }
+  | { mode: 'info'; info: PublicInfo }
+  | { mode: 'lost' }
+  | null;
 
 export interface OrderRow {
   id: string;

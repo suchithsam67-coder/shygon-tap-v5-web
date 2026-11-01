@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import TapMode from './TapMode';
 
-/** The owner's mode page against AAROH-API v0.8 §6 response shapes, with the network replaced at `fetch`. */
+/** The owner's mode page against AAROH-API v0.8 §6 response shapes (Lost: v0.10), with the network replaced at `fetch`. */
 
 vi.mock('../lib/supabase', () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'owner-token' } } }) } },
@@ -30,13 +30,18 @@ const info = {
   updatedAt: '2026-10-24T09:00:00Z',
   version: 2,
 };
-const state = (over: Partial<{ activeMode: string; version: number; reason: string; available: boolean; missing: string[] }> = {}) => ({
+type LostEntry = { available: boolean; reason: string; missing?: string[] };
+const state = (
+  over: Partial<{ activeMode: string; version: number; reason: string; available: boolean; missing: string[]; lost: LostEntry }> = {},
+) => ({
   activeMode: over.activeMode ?? 'business',
   version: over.version ?? 3,
   changedAt: null,
   modes: [
     { mode: 'business', available: true, reason: (over.activeMode ?? 'business') === 'business' ? 'active' : 'ready' },
     { mode: 'info', available: over.available ?? true, reason: over.reason ?? 'ready', ...(over.missing ? { missing: over.missing } : {}) },
+    // v0.10: a third entry. Without it (a backend before v0.10) the page shows no Lost.
+    ...(over.lost ? [{ mode: 'lost', ...over.lost }] : []),
   ],
 });
 const base = (op: string): Reply =>
@@ -155,7 +160,132 @@ describe('what your Tap shows', () => {
   });
 });
 
+describe('Lost mode (AAROH-API v0.10)', () => {
+  const READY: LostEntry = { available: true, reason: 'ready' };
+  const withLost = (lost: LostEntry, over: Parameters<typeof state>[0] = {}) => (op: string) =>
+    op === 'owner.state' ? { status: 200, body: state({ ...over, lost }) } : base(op);
+
+  it('a backend without Lost (before v0.10): no Lost entry at all', async () => {
+    show();
+    await screen.findByTestId('tm-active');
+    expect(screen.queryByTestId('tm-lost')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Switch to Lost mode' })).toBeNull();
+  });
+
+  it('needs Return to Owner first: says so, links to its page, and offers no switch', async () => {
+    handler = withLost({ available: false, reason: 'needs_setup', missing: ['returnToOwner'] });
+    show();
+    const lost = await screen.findByTestId('tm-lost');
+    expect(within(lost).getByText('Let someone who finds your card message you privately.')).toBeTruthy();
+    expect(screen.getByTestId('tm-lost-status').textContent).toBe('To use Lost mode, turn on Return to Owner first.');
+    expect(within(lost).getByRole('link', { name: 'Open Return to Owner' }).getAttribute('href')).toBe('/shygontap/return-to-owner');
+    expect(within(lost).getByRole('button', { name: 'Switch to Lost mode' })).toHaveProperty('disabled', true);
+    // Nothing turns the opt-in on from here: the page sends no Return to Owner call of its own.
+    expect(calls.map((c) => c.op).sort()).toEqual(['owner.info.get', 'owner.state']);
+  });
+
+  it('switched off by SHYGON, or the relay is off: says so, and offers no switch', async () => {
+    handler = withLost({ available: false, reason: 'not_available' });
+    show();
+    expect((await screen.findByTestId('tm-lost-status')).textContent).toBe('Lost mode is not available right now. SHYGON has switched it off.');
+    expect(screen.getByRole('button', { name: 'Switch to Lost mode' })).toHaveProperty('disabled', true);
+  });
+
+  it('switching to Lost asks first; confirmed, it sends mode lost with the version and a key, then shows the server’s state', async () => {
+    let switched = false;
+    handler = (op) => {
+      if (op === 'owner.activate') {
+        switched = true;
+        return { status: 200, body: { activeMode: 'lost', previousMode: 'business', version: 4, changedAt: '2026-10-31T10:00:00Z', replayed: false } };
+      }
+      if (op === 'owner.state')
+        return { status: 200, body: switched ? state({ activeMode: 'lost', version: 4, lost: { available: true, reason: 'active' } }) : state({ lost: READY }) };
+      return base(op);
+    };
+    show();
+    expect((await screen.findByTestId('tm-lost-status')).textContent).toBe('Ready to show');
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to Lost mode' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Switch this card to Lost mode?')).toBeTruthy();
+    expect(
+      within(dialog).getByText(
+        'Taps will show only a page where a finder can message you privately. Your profile stays hidden until you switch back.',
+      ),
+    ).toBeTruthy();
+    expect(sent('owner.activate')).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes, switch to Lost' }));
+    expect(await screen.findByText('Your card is now in Lost mode. Taps show only the private message page.')).toBeTruthy();
+    expect(screen.getByTestId('tm-active').textContent).toBe('Lost mode is on. Taps show only the private message page.');
+    expect(screen.getByTestId('tm-lost-status').textContent).toBe('Showing on your Tap');
+    expect(screen.getByText('Messages from finders arrive on your Return to Owner page.')).toBeTruthy();
+    const [activate] = sent('owner.activate');
+    expect(activate).toMatchObject({ mode: 'lost', expectedVersion: 3 });
+    expect(String(activate!.idempotencyKey)).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
+    expect(document.body.textContent).not.toMatch(/\bLive\b/);
+  });
+
+  it('from Lost back to Business asks first; "Cancel" sends nothing', async () => {
+    handler = withLost({ available: true, reason: 'active' }, { activeMode: 'lost' });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Show my Business profile instead' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Switch back to Business?')).toBeTruthy();
+    expect(within(dialog).getByText("Your card's Business profile will show when someone taps it.")).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Switch to Business' })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(sent('owner.activate')).toHaveLength(0);
+  });
+
+  it('switched off since the page loaded: the refusal is in Lost words, the state is read again, and an Info draft is kept', async () => {
+    let off = false;
+    handler = (op) => {
+      if (op === 'owner.activate') {
+        off = true;
+        return { status: 409, body: { error: { code: 'mode_unavailable', message: 'That mode is not available yet.' } } };
+      }
+      if (op === 'owner.state') return { status: 200, body: state({ lost: off ? { available: false, reason: 'not_available' } : READY }) };
+      return base(op);
+    };
+    show();
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Unsaved title' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to Lost mode' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Yes, switch to Lost' }));
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Lost mode is not available right now. SHYGON has switched it off.');
+    await waitFor(() =>
+      expect(screen.getByTestId('tm-lost-status').textContent).toBe('Lost mode is not available right now. SHYGON has switched it off.'),
+    );
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('Unsaved title');
+    expect(screen.queryByText(/now in Lost mode/)).toBeNull();
+  });
+
+  it('Return to Owner turned off since the page loaded: "turn on Return to Owner first", never shown as switched', async () => {
+    handler = (op) =>
+      op === 'owner.activate'
+        ? { status: 409, body: { error: { code: 'needs_setup', message: 'Finish setting up this mode first.', missing: ['returnToOwner'] } } }
+        : withLost(READY)(op);
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Switch to Lost mode' }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Yes, switch to Lost' }));
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'To use Lost mode, turn on Return to Owner first.');
+    expect(screen.getByTestId('tm-active').textContent).toBe('Your Tap shows your Business profile.');
+  });
+});
+
 describe('your Info page', () => {
+  it('stored detailed information the server cannot show (v0.9.2): named as needing attention, not as missing', async () => {
+    handler = (op) =>
+      op === 'owner.state'
+        ? { status: 200, body: state({ available: false, reason: 'needs_setup', missing: ['detailedInformation'] }) }
+        : base(op);
+    show();
+    expect((await screen.findByTestId('tm-info-status')).textContent).toBe('Setup required: check detailed information');
+    const details = screen.getByLabelText('Detailed information (optional)');
+    expect(details.getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByText('This text cannot be shown. Change it or clear it, then save.')).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/add detailed information/i);
+  });
+
   it('the first save sends version 0 and the fields; a refused field is marked and keeps what was typed', async () => {
     handler = (op) =>
       op === 'owner.info.get'

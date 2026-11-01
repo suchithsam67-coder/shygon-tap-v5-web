@@ -38,6 +38,12 @@ if (['/t/:username', '/tap/:username'].some((path) => matchPath(path, window.loc
 }
 /** A Tap in Info mode: a small page of its own, fetched only when one is shown. */
 const PublicInfoPage = lazy(() => import('../components/info/PublicInfoPage'));
+/** A Tap in Lost mode (v0.10): part of the experience chunk, already on its way. */
+const PublicLostPage = lazy(() =>
+  startExperience()
+    .catch(loadExperience)
+    .then((chunk) => ({ default: chunk.PublicLostPage })),
+);
 
 /**
  * The public Tap page — what a visitor sees after an NFC tap or a QR scan.
@@ -45,8 +51,9 @@ const PublicInfoPage = lazy(() => import('../components/info/PublicInfoPage'));
  * All of it comes from `get_public_tap_mode()` (P-6, AAROH-API v0.8), a
  * SECURITY DEFINER function that answers with the Tap's Business profile
  * (`get_public_profile`'s whitelisted fields, clamped to what the customer
- * owns), its Info page (five plain-text fields), or nothing. It never falls
- * back to the Business profile for an Info page that is off or incomplete. This component never queries `tap_profiles`
+ * owns), its Info page (five plain-text fields), its Lost page (v0.10: no data,
+ * only Return to Owner's form), or nothing. It never falls back to the Business
+ * profile for a mode that is off or incomplete. This component never queries `tap_profiles`
  * directly, so there is no query here that could be broadened into leaking
  * `user_id`, an order, or any other private record — and no entitlement logic
  * of its own, so it cannot upgrade itself.
@@ -88,10 +95,24 @@ function infoMeta(info: PublicInfo, slug: string): PageMeta {
   };
 }
 
+/**
+ * The tab title for a Tap in Lost mode: nothing of the owner's, and never
+ * indexed. DRAFT wording (v0.10 §6), for the owner's approval.
+ */
+function lostMeta(slug: string): PageMeta {
+  return {
+    title: 'Found this card? | SHYGON Tap',
+    description: 'This page only lets you send a private message to the owner of this card.',
+    path: `/t/${slug}`,
+    noindex: true,
+  };
+}
+
 type Outcome =
   | { kind: 'loading' }
   | { kind: 'tap'; data: PublicProfile }
   | { kind: 'info'; info: PublicInfo }
+  | { kind: 'lost'; hint: string | null }
   | { kind: 'state'; state: PublicTapState }
   | { kind: 'offline' }
   | { kind: 'error' };
@@ -114,6 +135,7 @@ export default function PublicTap() {
     useMemo<PageMeta | null>(() => {
       if (outcome.kind === 'tap') return tapMeta(outcome.data);
       if (outcome.kind === 'info') return infoMeta(outcome.info, slug ?? '');
+      if (outcome.kind === 'lost') return lostMeta(slug ?? '');
       if (outcome.kind === 'loading') return null;
       // Paused, missing or failed to load: nothing here should be indexed.
       return {
@@ -138,6 +160,15 @@ export default function PublicTap() {
       const view = await fetchPublicTap(slug);
       if (view?.mode === 'business') return { kind: 'tap', data: view.profile };
       if (view?.mode === 'info') return { kind: 'info', info: view.info };
+      if (view?.mode === 'lost') {
+        // Lost is only Return to Owner's form, so it shows only while that can
+        // take a message; otherwise the neutral "Tap not found" (v0.10 §6). No
+        // answer at all is a connection problem, as below. The client is in the
+        // experience chunk's graph, not the entry bundle.
+        const { readRescueStatus } = await import('../lib/publicRescueClient');
+        const status = await readRescueStatus(slug);
+        return status.available ? { kind: 'lost', hint: status.hint } : { kind: 'state', state: 'unavailable' };
+      }
 
       // Not live. Ask why, so a paused Tap does not read as a dead link.
       try {
@@ -177,7 +208,8 @@ export default function PublicTap() {
 
   // Exactly one 'view' per landing, plus an 'nfc'/'qr' event when the physical
   // card or a QR scan added the matching query parameter. An Info page records
-  // nothing: no visitor counts for Info (DEC-2026-041 PQ-2).
+  // nothing: no visitor counts for Info (DEC-2026-041 PQ-2). Nor does a Lost
+  // page: the contract asks for none (v0.10).
   useEffect(() => {
     if (!slug || outcome.kind !== 'tap' || viewLogged.current) return;
     viewLogged.current = true;
@@ -206,7 +238,7 @@ export default function PublicTap() {
       live = false;
     };
   }, []);
-  const ready = outcome.kind !== 'loading' && (outcome.kind !== 'tap' || chunkReady);
+  const ready = outcome.kind !== 'loading' && ((outcome.kind !== 'tap' && outcome.kind !== 'lost') || chunkReady);
   const minMs = outcome.kind === 'tap' && outcome.data.theme.animation !== 'none' && !searchParams.get('mode') ? OPENING_MS : 0;
 
   return (
@@ -262,6 +294,14 @@ function TapOutcome({ outcome, slug, retry }: { outcome: Outcome; slug: string |
     return (
       <Suspense fallback={<TapLoading />}>
         <PublicInfoPage info={outcome.info} />
+      </Suspense>
+    );
+  }
+
+  if (outcome.kind === 'lost') {
+    return (
+      <Suspense fallback={<TapLoading />}>
+        <PublicLostPage slug={slug ?? ''} hint={outcome.hint} />
       </Suspense>
     );
   }

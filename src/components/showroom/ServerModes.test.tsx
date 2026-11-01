@@ -6,7 +6,8 @@ import { DEFAULT_THEME, type PublicProfile } from '../../lib/database.types';
 
 /**
  * The visitor modes a server switches on: the emergency relay
- * (`/api/emergency` §10.3) and Return to owner (`/api/rescue` §10a). Both are
+ * (`/api/emergency` §10.3) and Return to owner (`/api/rescue` §10a), and the
+ * Lost page (v0.10 §6), which is only Return to owner's form. All are
  * off everywhere today, so on a real Tap they must stay hidden until their
  * `public.status` says otherwise; once shown, every send is one intent with
  * one key, and the page shows only the server's own outcome.
@@ -233,5 +234,160 @@ describe('Return to owner, when the server says it is available', () => {
     expect(await screen.findByRole('heading', { name: 'Sent to the owner. Waiting for a reply.' })).toBeTruthy();
     const [first, second] = sent('/api/rescue', 'public.start');
     expect(first!.idempotencyKey).toBe(second!.idempotencyKey);
+  });
+});
+
+describe('a Tap in Lost mode (AAROH-API v0.10 §6)', () => {
+  const token = 'L'.repeat(43);
+  beforeEach(() => {
+    client.view = { mode: 'lost' };
+    client.fetchPublicProfile.mockClear();
+    client.recordTapEvent.mockClear();
+    routes['rescue:public.status'] = () => ({ status: 200, body: { available: true, hint: 'Please leave it at reception' } });
+  });
+  afterEach(() => {
+    client.view = undefined;
+  });
+
+  const thread = (over = {}) => ({
+    status: 'open',
+    canWrite: true,
+    expiresAt: '2026-11-14T00:00:00Z',
+    messages: [{ from: 'finder', body: 'Found your card at the café.', at: '2026-10-31T10:00:00Z' }],
+    ...over,
+  });
+  const robots = () => document.head.querySelector('meta[name="robots"]')?.getAttribute('content') ?? '';
+
+  it('shows only "Found this card?" and the message form: no owner detail, no other mode, not indexed, no visitor event', async () => {
+    visit('/t/asha?src=nfc&mode=emergency');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Found this card?' })).toBeTruthy();
+    expect(screen.getByText('This card is in Lost mode. This page only lets you send a private message to its owner.')).toBeTruthy();
+    expect(screen.getByText('The owner’s note: “Please leave it at reception”')).toBeTruthy();
+    expect(screen.getByLabelText('Your message').getAttribute('placeholder')).toBe('Write a message (1–500 characters)');
+    expect(screen.getByText('0 / 500')).toBeTruthy();
+    expect(screen.getByText('The owner sees only what you write here. Do not include personal or sensitive details.')).toBeTruthy();
+    expect(screen.getByText('Links are removed automatically from messages.')).toBeTruthy();
+    // The one control is the form's own button; the one link is SHYGON's privacy page.
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Send message']);
+    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/shygontap/privacy-policy']);
+    expect(document.body.textContent).not.toContain('Asha Rao');
+    expect(document.title).toBe('Found this card? | SHYGON Tap');
+    expect(robots()).toContain('noindex');
+    // Return to Owner's status once; nothing of emergency, Connect, P-1 or the visitor counts.
+    await waitFor(() => expect(sent('/api/rescue', 'public.status')).toEqual([{ op: 'public.status', slug: 'asha' }]));
+    expect(calls.map((c) => c.url)).toEqual(['/api/rescue']);
+    expect(client.fetchPublicProfile).not.toHaveBeenCalled();
+    expect(client.recordTapEvent).not.toHaveBeenCalled();
+  });
+
+  it('sends one message with one key, says so in the Lost words, and keeps the link out of the address', async () => {
+    let replied = false;
+    routes['rescue:public.start'] = () => ({ status: 201, body: { finderToken: token, replayed: false, thread: thread() } });
+    routes['rescue:finder.view'] = () => ({
+      status: 200,
+      body: {
+        thread: thread({
+          status: replied ? 'owner_replied' : 'open',
+          messages: [
+            { from: 'finder', body: 'Found your card at the café.', at: '2026-10-31T10:00:00Z' },
+            ...(replied ? [{ from: 'owner', body: 'Thank you!', at: '2026-10-31T10:05:00Z' }] : []),
+          ],
+        }),
+      },
+    });
+    visit('/t/asha');
+    fireEvent.change(await screen.findByLabelText('Your message'), { target: { value: 'Found your card at the café.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(await screen.findByRole('heading', { name: 'Your message has been sent.' })).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Save this private link to return and check for replies. Your access ends 14 days after the last activity. Anyone with the link can read this conversation.',
+      ),
+    ).toBeTruthy();
+    expect(window.location.href).not.toContain(token);
+    expect(window.sessionStorage.getItem('shygon.rescue.asha')).toBe(token);
+    const [start] = sent('/api/rescue', 'public.start');
+    expect(start).toMatchObject({ slug: 'asha', message: 'Found your card at the café.' });
+    expect(String(start!.idempotencyKey)).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
+    replied = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Check for a reply' }));
+    expect(await screen.findByRole('heading', { name: 'There is a reply.' })).toBeTruthy();
+    expect(screen.getByText('Thank you!')).toBeTruthy();
+    // Never a delivery or read receipt the server did not give (GPT-6 "never use").
+    expect(document.body.textContent).not.toMatch(/delivered|has read|was read|seen by/i);
+  });
+
+  it('refusals in the Lost words: too many, unavailable, and a message left empty once links were removed', async () => {
+    const replies = [
+      { status: 429, body: { error: { code: 'rate_limited', message: 'Limited.', retryAfter: 600 } } },
+      { status: 404, body: { error: { code: 'unavailable', message: 'Not available.' } } },
+      { status: 400, body: { error: { code: 'invalid_message', message: 'Invalid.' } } },
+    ];
+    routes['rescue:public.start'] = () => replies.shift()!;
+    visit('/t/asha');
+    const box = await screen.findByLabelText('Your message');
+    const attempt = async (text: string) => {
+      fireEvent.change(box, { target: { value: 'https://example.test' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+      expect(await screen.findByText(text)).toBeTruthy();
+    };
+    await attempt('You have sent too many messages. Please try again later.');
+    await attempt('This service is not available right now. Please try again later.');
+    await attempt('Enter a message before sending.');
+    expect(screen.queryByRole('heading', { name: 'Your message has been sent.' })).toBeNull();
+    // Each refusal ended that intent: three different keys.
+    expect(new Set(sent('/api/rescue', 'public.start').map((b) => b.idempotencyKey)).size).toBe(3);
+  });
+
+  it('three messages without a reply: no form, and the page says why', async () => {
+    window.sessionStorage.setItem('shygon.rescue.asha', token);
+    routes['rescue:finder.view'] = () => ({ status: 200, body: { thread: thread({ canWrite: false }) } });
+    visit('/t/asha');
+    expect(
+      await screen.findByText('You have sent 3 messages without a reply. You cannot send another right now. Check this link for a reply.'),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText(/Your message|Write again/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Send message' })).toBeNull();
+  });
+
+  it('a saved link: expired, gone or blocked, or closed, each in its own words', async () => {
+    window.sessionStorage.setItem('shygon.rescue.asha', token);
+    routes['rescue:finder.view'] = () => ({ status: 410, body: { error: { code: 'thread_expired', message: 'Expired.' } } });
+    visit('/t/asha');
+    expect(await screen.findByText('Your access to this conversation has expired. This link can no longer be used.')).toBeTruthy();
+    expect(window.sessionStorage.getItem('shygon.rescue.asha')).toBeNull();
+    expect(screen.getByLabelText('Your message')).toBeTruthy();
+    cleanup();
+
+    window.sessionStorage.setItem('shygon.rescue.asha', token);
+    routes['rescue:finder.view'] = () => ({ status: 404, body: { error: { code: 'thread_not_found', message: 'Not found.' } } });
+    visit('/t/asha');
+    expect(await screen.findByText('This conversation is not available.')).toBeTruthy();
+    cleanup();
+
+    window.sessionStorage.setItem('shygon.rescue.asha', token);
+    routes['rescue:finder.view'] = () => ({ status: 200, body: { thread: thread({ status: 'closed', canWrite: false }) } });
+    visit('/t/asha');
+    // The finder cannot tell whether the owner closed it or it went quiet, so the page does not say.
+    expect(await screen.findByRole('heading', { name: 'This conversation is closed.' })).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/30 days/);
+  });
+
+  it('Return to Owner cannot take a message: the neutral "Tap not found"; no answer: a retry, never "not found"', async () => {
+    routes['rescue:public.status'] = () => ({ status: 200, body: { available: false, hint: null } });
+    visit('/t/asha');
+    expect(await screen.findByText('Tap not found')).toBeTruthy();
+    expect(screen.queryByText('Found this card?')).toBeNull();
+    expect(document.title).toBe('Tap unavailable | SHYGON Tap');
+    expect(client.fetchPublicTapState).not.toHaveBeenCalled();
+    cleanup();
+
+    routes['rescue:public.status'] = () => ({ status: 500, body: {} });
+    visit('/t/asha');
+    expect(await screen.findByText("We couldn't load this Tap")).toBeTruthy();
+    expect(screen.queryByText('Tap not found')).toBeNull();
+    routes['rescue:public.status'] = () => ({ status: 200, body: { available: true, hint: null } });
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Found this card?' })).toBeTruthy();
   });
 });

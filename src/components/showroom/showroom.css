@@ -362,6 +362,9 @@
 .sr-view-title { margin: 0 0 8px; font-size: clamp(1.9rem, 7vw, 2.6rem); font-weight: 700; letter-spacing: -0.035em; }
 .sr-view-title:focus { outline: none; }
 .sr-view-lead { margin: 0 0 18px; color: rgba(255, 255, 255, 0.74); font-size: 15px; line-height: 1.6; }
+/* The Lost page (v0.10): a mode view on its own, with no showroom bar above it. */
+.sr-lost { padding-top: max(22px, 6svh); }
+.sr-lost .sr-field textarea::placeholder { color: rgba(255, 255, 255, 0.6); }
 
 .sr-rows { display: grid; gap: 10px; margin-bottom: 18px; }
 .sr-row {

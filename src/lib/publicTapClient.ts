@@ -115,13 +115,16 @@ function toInfo(raw: unknown): PublicInfo | null {
 
 /**
  * What the live Tap at this address shows (AAROH-API v0.8 §6, P-6
- * `get_public_tap_mode`): its Business profile, its Info page, or null.
+ * `get_public_tap_mode`): its Business profile, its Info page, its Lost page
+ * (v0.10), or null.
  *
  * Null means show nothing: the caller asks `get_public_tap_state` why, as
  * before. It never turns into the Business profile, including when an Info page
- * is switched off, missing, invalid or of an unknown shape. Only when P-6 does
- * not exist yet (a backend before v0.8, which has no Info) does this read the
- * Business profile through P-1 instead.
+ * is switched off, missing, invalid or of an unknown shape, or a mode is one
+ * this client does not know. Lost carries nothing but its name: any other key
+ * in that answer is dropped. Only when P-6 does not exist yet (a backend before
+ * v0.8, which has no Info) does this read the Business profile through P-1
+ * instead.
  */
 export async function fetchPublicTap(slug: string): Promise<PublicTapView> {
   let view: unknown;
@@ -141,6 +144,7 @@ export async function fetchPublicTap(slug: string): Promise<PublicTapView> {
     const info = toInfo(row.info);
     return info ? { mode: 'info', info } : null;
   }
+  if (row.mode === 'lost') return { mode: 'lost' };
   return null;
 }
 
