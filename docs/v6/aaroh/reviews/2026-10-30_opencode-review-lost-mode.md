@@ -61,3 +61,24 @@ Findings **#1**, **#2** and **#3** above, with the specific gaps in **#4**: no t
 - The frontend has no Lost page yet (B-10 §20), so the §6 two-step in finding #2 is a contract obligation I could not observe a client performing; I verified only the server halves (`get_public_tap_mode` and `public.status`).
 - `test:bq1-production` and the other stack suites were not re-run by me; their results in the header are Session A's, as recorded in B-10 §20.
 - Both probe scripts lived outside the repository and were removed after use. Nothing in the repository was modified except this report.
+
+---
+
+## 8. Resolution (added by Session A, backend, 2026-11-02)
+
+The coordinator forwarded this report under the owner's standing hand-off pattern: assess, fix as one hardening change, and report to the owner at Session A's gate. All five findings were fixed in one change on `v6/aaroh-backend`; readiness report §22 has the commit and the suite results. 036 was regenerated from its generator (applied nowhere). Its ROLLBACK is unchanged, because it restores 034's functions.
+
+**Negative control** [OBSERVED]: the new and changed checks were run against this commit's 036 (`39d87ca`) first. `test:modes` gave 25 passed, 3 failed:
+- the Info fallback check: the F-1 preview answered the page with Info off;
+- the catalogue × relay check: cell "catalogue off, relay on" answered preview `{}` against reader `null`, which is exactly finding #1's input;
+- the lock-order check: no share lock on the opt-in.
+
+The relay-off and replay checks pass on both versions. They pin behaviour that was already fail-safe, so it cannot change silently.
+
+| # | Resolution |
+|---|---|
+| 1 | Fixed in 036. The `modes_preview` Lost branch also requires `tap_mode_catalog.enabled` for `lost`. The Info branch had the same gap and now matches the reader too: catalogue on, Tap active and not suspended, record complete. Contract §6 `owner.preview` says so (v0.11.1). |
+| 2 | Fixed in the contract (v0.11.1). §6 P-6 names the four database-side reasons for `null` (catalogue off, opt-in off, unpublished, suspended). It also says plainly that `RESCUE_RELAY` off is seen only through `public.status`, which the client calls before showing the form. A new check pins the reader's relay-off answer (`{ mode: 'lost' }`) together with `public.status` `false`. |
+| 3 | Resolved by the contract amendment, option 1 of the review. §6 `owner.activate` now states that a Lost activation repeated while `RESCUE_RELAY` is off answers 409 `mode_unavailable`, with nothing changed, and replays again once the relay is back on. No read path was added for the stored answer. A new check pins both halves. |
+| 4 | Fixed. One check walks catalogue × relay with the opt-in on and Lost active. In each cell it compares the preview, the reader, `owner.state`'s Lost entry and `public.status` with the expected values, and runs the leak canary. In the "catalogue off, relay on" cell it activates Lost with a fresh key, so the request reaches the database's own catalogue gate: 409 `mode_unavailable` (4c). The Info fallback check also asserts the preview for F-1 and F-5. `test:modes` now has **28** checks. |
+| 5 | Fixed in 036. Activation reads the opt-in with `PERFORM … FOR SHARE` after the Tap and mode-state locks, keeping settings last in the order, so an opt-out racing an activation waits. PGlite has one connection, so the race is not executable here. A check reads the function from `pg_proc` and pins the order: Tap, then mode state, then the opt-in. |

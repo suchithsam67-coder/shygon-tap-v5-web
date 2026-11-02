@@ -278,6 +278,7 @@ await t.check('fallbacks: Info off, invalid, missing, paused or suspended gives 
   await setInfo(false);
   assertEqual(await pub(SLUG), null, 'F-1 switched off by SHYGON');
   assertEqual(await legacy(SLUG), null, 'F-1: and not Business through the legacy reader either (BQ-2)');
+  assertEqual((await call({ op: 'owner.preview', mode: 'info' }, asha.token)).body.view, null, 'F-1: the preview follows the catalogue too (v0.11.1)');
   await setInfo(true);
   await stack.query(`UPDATE public.info_pages SET detailed_information = '<b>broken' WHERE owner_user_id = $1`, [asha.userId]);
   assertEqual(await pub(SLUG), null, 'F-3 invalid at read time');
@@ -298,7 +299,8 @@ await t.check('fallbacks: Info off, invalid, missing, paused or suspended gives 
   assertEqual(await pub(SLUG), null, 'F-5 paused');
   await stack.query(`UPDATE public.tap_profiles SET status = 'active', suspended_at = now() WHERE user_id = $1`, [asha.userId]);
   assertEqual(await pub(SLUG), null, 'F-5 suspended');
-  const sus = await call({ op: 'owner.activate', mode: 'business', expectedVersion: 1, idempotencyKey: key() }, asha.token);
+  assertEqual((await call({ op: 'owner.preview', mode: 'info' }, asha.token)).body.view, null, 'F-5: and the preview (v0.11.1)');
+  const sus =await call({ op: 'owner.activate', mode: 'business', expectedVersion: 1, idempotencyKey: key() }, asha.token);
   assertEqual([sus.status, codeOf(sus)], [409, 'tap_suspended'], 'no switching while suspended');
   await stack.query(`UPDATE public.tap_profiles SET suspended_at = NULL WHERE user_id = $1`, [asha.userId]);
   assertEqual((await pub(SLUG)).mode, 'info', 'back');
@@ -334,6 +336,7 @@ const rescue = async (body, token) => {
 const NOT_IN_LOST = ['Asha Rao', 'Designer', 'Room 204 projector', ...Object.values(C)];
 const lostLeaks = (label, value) => NOT_IN_LOST.filter((v) => JSON.stringify(value ?? null).includes(v)).map((v) => `${v} in ${label}`);
 let lostVersion;
+let lostKey;
 
 await t.check('Lost is off by default, and needs the host relay: not available, activation refused', async () => {
   same(await lostEntry(), { mode: 'lost', available: false, reason: 'not_available' }, 'catalogue off');
@@ -360,7 +363,8 @@ await t.check('activate Lost: the reader answers { mode: "lost" } and nothing el
   const on = await rescue({ op: 'settings.set', enabled: true }, asha.token);
   assertEqual([on.status, on.body.settings.enabled], [200, true], 'Return to Owner on');
   same(await lostEntry(), { mode: 'lost', available: true, reason: 'ready' }, 'ready');
-  const a = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: key() }, asha.token);
+  lostKey = key();
+  const a = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: lostKey }, asha.token);
   assertEqual([a.status, a.body.activeMode, a.body.previousMode, a.body.version], [200, 'lost', 'business', 3], 'activated');
   lostVersion = a.body.version;
   const p = await pub(SLUG);
@@ -400,6 +404,65 @@ await t.check('kill switch, opt-in off, suspension: Lost gives the neutral null,
   await stack.query(`UPDATE public.tap_profiles SET suspended_at = NULL WHERE user_id = $1`, [asha.userId]);
   same(await pub(SLUG), { mode: 'lost' }, 'restored');
   return 'fail closed in every case';
+});
+
+// One cell per switch setting (OpenCode review of Lost mode, 2026-10-30, #1, #2, #4).
+// The preview never shows a page a visitor would not get. The reader cannot see
+// the host switch: with the catalogue on and RESCUE_RELAY off it still answers
+// { mode: 'lost' }, public.status answers false, and the page shows the neutral copy.
+await t.check('Lost: catalogue × RESCUE_RELAY, cell by cell, for the preview, the reader, owner.state and public.status', async () => {
+  const OFF = { mode: 'lost', available: false, reason: 'not_available' };
+  const cells = [];
+  for (const catalogue of [true, false]) {
+    for (const relay of [true, false]) {
+      await setLost(catalogue);
+      if (relay) process.env.RESCUE_RELAY = 'on'; else delete process.env.RESCUE_RELAY;
+      const label = `catalogue ${catalogue ? 'on' : 'off'}, relay ${relay ? 'on' : 'off'}`;
+      const got = {
+        preview: (await call({ op: 'owner.preview', mode: 'lost' }, asha.token)).body.view,
+        reader: await pub(SLUG),
+        state: await lostEntry(),
+        status: (await rescue({ op: 'public.status', slug: SLUG })).body.available,
+      };
+      same(got, {
+        preview: catalogue && relay ? {} : null,
+        reader: catalogue ? { mode: 'lost' } : null,
+        state: catalogue && relay ? { mode: 'lost', available: true, reason: 'active' } : OFF,
+        // Return to Owner's own switch; the Business page uses it too.
+        status: relay,
+      }, label);
+      assertEqual(lostLeaks(label, got), [], 'Business or Info data in a cell');
+      if (!catalogue && relay) {
+        // The relay is on, so this reaches the database's own catalogue gate (review #4c).
+        const a = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: lostVersion, idempotencyKey: key() }, asha.token);
+        assertEqual([a.status, codeOf(a)], [409, 'mode_unavailable'], `${label}: the database refuses a new activation`);
+      }
+      cells.push(label);
+    }
+  }
+  await setLost(true);
+  process.env.RESCUE_RELAY = 'on';
+  return `${cells.length} cells; the preview never shows what a visitor would not get`;
+});
+
+await t.check('a Lost activation replayed after the relay goes off fails safe (409 mode_unavailable); with it back on, the first answer', async () => {
+  delete process.env.RESCUE_RELAY;
+  const off = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: lostKey }, asha.token);
+  assertEqual([off.status, codeOf(off)], [409, 'mode_unavailable'], 'replay while the relay is off');
+  process.env.RESCUE_RELAY = 'on';
+  const on = await call({ op: 'owner.activate', mode: 'lost', expectedVersion: 2, idempotencyKey: lostKey }, asha.token);
+  assertEqual([on.status, on.body.activeMode, on.body.version, on.body.replayed], [200, 'lost', lostVersion, true], 'replay');
+  return 'the activation itself stands; nothing changed either time';
+});
+
+await t.check('activate share-locks the Return to Owner opt-in after the Tap and mode-state locks (review #5)', async () => {
+  const src = (await stack.query(`SELECT prosrc FROM pg_proc WHERE proname = 'modes_owner_activate'`)).rows[0].prosrc;
+  const at = (s) => src.indexOf(s);
+  const tap = at('FROM public.tap_profiles WHERE user_id = p_user ORDER BY created_at LIMIT 1 FOR UPDATE');
+  const state = at('FROM public.tap_mode_state WHERE tap_profile_id = v_tap.id FOR UPDATE');
+  const optIn = at('FROM public.rescue_settings r WHERE r.user_id = p_user AND r.enabled FOR SHARE');
+  assert(tap > 0 && state > tap && optIn > state, `lock order: tap ${tap}, state ${state}, opt-in ${optIn}`);
+  return 'read from the function, since PGlite has one connection and cannot run the race';
 });
 
 await t.check('switching back to Business restores the identical payload; the Return to Owner opt-in is left as the owner set it', async () => {

@@ -637,3 +637,8 @@ To be filled at verification.
 - Contract AAROH-API v0.10.
 
 Customer copy is drafted in §6 of the contract. The owner approves the exact strings at Session B's gate.
+
+**Hardening, 2026-11-02** (OpenCode's second review of Lost mode, `docs/v6/aaroh/reviews/2026-10-30_opencode-review-lost-mode.md` §8; readiness §22). It does not change L-1 to L-6. It makes L-3 and L-4 hold on every owner surface:
+- The owner's preview now follows the same catalogue switch as the reader, for Lost and for Info. Before, it could show a page a visitor would not get.
+- L-4 is clarified in contract v0.11.1. The database cannot see `RESCUE_RELAY`, so with the relay off and the catalogue on, the reader may still answer `{ mode: 'lost' }`. `public.status` then answers `false`, and the page shows the neutral copy. A retried Lost activation while the relay is off answers `mode_unavailable`, with nothing changed.
+- Activation reads the opt-in (L-1) under a share lock, after the Tap and mode-state locks.

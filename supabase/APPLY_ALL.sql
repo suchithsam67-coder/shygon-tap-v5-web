@@ -4906,9 +4906,13 @@ $function$;
 --   - modes_owner_state lists Lost: not_available while SHYGON has it off;
 --     needs_setup ['returnToOwner'] until the owner's own Return to Owner
 --     opt-in is on; ready / active.
---   - modes_owner_activate: switching to Lost needs that opt-in. It never turns
---     it on: the opt-in on the Business page stays exactly as it is (031).
---   - modes_preview 'lost': {} while Return to Owner can take a message, else null.
+--   - modes_owner_activate: switching to Lost needs that opt-in, read under a
+--     share lock. It never turns it on: the opt-in on the Business page stays
+--     exactly as it is (031).
+--   - modes_preview follows the reader: 'lost' is {} while Lost is on in the
+--     catalogue and Return to Owner can take a message, else null; 'info' is
+--     null while Info is off in the catalogue or the Tap is paused or suspended
+--     (OpenCode review of Lost mode, 2026-10-30).
 --   - get_public_tap_mode: { mode: 'lost' } and nothing else, while Lost is on
 --     in the catalogue and rescue_public_target(slug) answers (opt-in on, Tap
 --     published, account not suspended); otherwise null, never Business.
@@ -5207,9 +5211,14 @@ BEGIN
     END IF;
   END IF;
   -- Lost (036) reuses Return to Owner (031): the owner's own opt-in must be on.
-  -- Switching to Lost never turns it on (DEC-2026-041 amendment A-1).
-  IF p_mode = 'lost' AND NOT EXISTS (SELECT 1 FROM public.rescue_settings r WHERE r.user_id = p_user AND r.enabled) THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'needs_setup', 'missing', jsonb_build_array('returnToOwner'));
+  -- Switching to Lost never turns it on (DEC-2026-041 amendment A-1). The opt-in
+  -- row is share-locked after the Tap and mode-state locks, so an opt-out racing
+  -- this activation waits (031's settings writer takes no Tap or mode lock).
+  IF p_mode = 'lost' THEN
+    PERFORM 1 FROM public.rescue_settings r WHERE r.user_id = p_user AND r.enabled FOR SHARE;
+    IF NOT FOUND THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'needs_setup', 'missing', jsonb_build_array('returnToOwner'));
+    END IF;
   END IF;
 
   IF p_mode <> v_state.active_mode THEN
@@ -5245,12 +5254,16 @@ BEGIN
   ELSIF p_mode = 'info' THEN
     SELECT * INTO v_info FROM public.info_pages WHERE owner_user_id = p_user;
     RETURN jsonb_build_object('ok', true, 'mode', 'info', 'view',
-      CASE WHEN cardinality(public.modes_info_missing(v_info)) > 0 THEN NULL ELSE public.modes_info_public(v_info) END);
+      CASE WHEN NOT COALESCE((SELECT c.enabled FROM public.tap_mode_catalog c WHERE c.mode = 'info'), false)
+             OR v_tap.status <> 'active' OR v_tap.suspended_at IS NOT NULL
+             OR cardinality(public.modes_info_missing(v_info)) > 0 THEN NULL
+           ELSE public.modes_info_public(v_info) END);
   ELSIF p_mode = 'lost' THEN
-    -- The "Found this card?" page carries no data at all; nothing while Return
-    -- to Owner cannot take a message for this Tap.
+    -- The "Found this card?" page carries no data at all; nothing while SHYGON
+    -- has Lost off or Return to Owner cannot take a message for this Tap.
     RETURN jsonb_build_object('ok', true, 'mode', 'lost', 'view',
-      CASE WHEN v_tap.slug IS NOT NULL AND public.rescue_public_target(v_tap.slug) IS NOT NULL
+      CASE WHEN COALESCE((SELECT c.enabled FROM public.tap_mode_catalog c WHERE c.mode = 'lost'), false)
+            AND v_tap.slug IS NOT NULL AND public.rescue_public_target(v_tap.slug) IS NOT NULL
            THEN '{}'::jsonb ELSE NULL END);
   END IF;
   RETURN jsonb_build_object('ok', false, 'code', 'invalid_mode');
