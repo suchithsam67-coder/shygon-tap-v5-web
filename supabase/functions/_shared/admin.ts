@@ -11,6 +11,7 @@
  */
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+import { requestLog } from './log.ts';
 
 export class MissingSecretError extends Error {
   constructor(readonly secretName: string) {
@@ -37,7 +38,7 @@ export const json = (body: unknown, status = 200): Response =>
  */
 export const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-request-id',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -72,15 +73,25 @@ export async function resolveAdmin(
   service: SupabaseClient,
   request: Request,
   permission: string,
+  log = requestLog('admin', request),
 ): Promise<ActingAdmin | null> {
   const header = request.headers.get('authorization') ?? '';
-  if (!header.toLowerCase().startsWith('bearer ')) return null;
+  if (!header.toLowerCase().startsWith('bearer ')) {
+    log.warn('security.admin-refused', { reason: 'no-session' });
+    return null;
+  }
 
   const token = header.slice(7).trim();
-  if (!token) return null;
+  if (!token) {
+    log.warn('security.admin-refused', { reason: 'no-session' });
+    return null;
+  }
 
   const { data, error } = await service.auth.getUser(token);
-  if (error || !data?.user) return null;
+  if (error || !data?.user) {
+    log.warn('security.admin-refused', { reason: 'no-session' });
+    return null;
+  }
 
   const { data: row, error: adminError } = await service
     .from('admin_users')
@@ -89,16 +100,23 @@ export async function resolveAdmin(
     .maybeSingle();
 
   if (adminError) {
-    console.error('admin lookup failed', adminError.message);
+    log.error('admin.lookup-failed', { code: 'admin-lookup-failed' });
+    log.warn('security.admin-refused', { reason: 'not-admin' });
     return null;
   }
-  if (!row || row.is_active !== true) return null;
+  if (!row || row.is_active !== true) {
+    log.warn('security.admin-refused', { reason: 'not-admin' });
+    return null;
+  }
 
   const effective = new Set<string>([
     ...rolePermissions(row.role as string),
     ...((row.permissions as string[] | null) ?? []),
   ]);
-  if (!effective.has(permission)) return null;
+  if (!effective.has(permission)) {
+    log.warn('security.admin-refused', { reason: 'missing-permission' });
+    return null;
+  }
 
   return {
     userId: row.user_id as string,
@@ -159,6 +177,7 @@ export async function audit(
   entityType: string,
   entityId: string,
   metadata: Record<string, unknown>,
+  log: ReturnType<typeof requestLog>,
 ): Promise<void> {
   const { error } = await service.from('admin_audit_log').insert({
     admin_id: adminId,
@@ -169,5 +188,5 @@ export async function audit(
   });
   // An unrecorded privileged action is a real problem, but it must not undo a
   // refund that already left the gateway. Log loudly instead.
-  if (error) console.error('AUDIT WRITE FAILED', action, entityId, error.message);
+  if (error) log.error('admin.audit-write-failed', { code: 'unexpected-error', entityId });
 }

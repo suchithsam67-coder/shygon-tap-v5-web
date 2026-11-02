@@ -19,10 +19,16 @@
  */
 
 import { audit, corsHeaders, json, MissingSecretError, requireEnv, resolveAdmin, serviceClient } from '../_shared/admin.ts';
+import { requestLog } from '../_shared/log.ts';
 
 Deno.serve(async (request: Request) => {
-  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  const log = requestLog('admin-refund', request);
+  const respond = (body: unknown, status = 200) => log.respond(json(body, status));
+  if (request.method === 'OPTIONS') return log.respond(new Response('ok', { headers: corsHeaders }));
+  if (request.method !== 'POST') {
+    log.warn('security.admin-refused', { reason: 'bad-method', status: 405 });
+    return respond({ error: 'Method not allowed' }, 405);
+  }
 
   let service;
   let claimToken: string | null = null;
@@ -33,22 +39,22 @@ Deno.serve(async (request: Request) => {
     const keySecret = requireEnv('RAZORPAY_KEY_SECRET');
     service = serviceClient();
 
-    const admin = await resolveAdmin(service, request, 'orders.refund');
-    if (!admin) return json({ error: 'You are not permitted to issue refunds.' }, 403);
+    const admin = await resolveAdmin(service, request, 'orders.refund', log);
+    if (!admin) return respond({ error: 'You are not permitted to issue refunds.' }, 403);
 
     let body: Record<string, unknown>;
     try {
       body = await request.json();
     } catch {
-      return json({ error: 'Invalid JSON body.' }, 400);
+      return respond({ error: 'Invalid JSON body.' }, 400);
     }
 
     const orderId = typeof body.order_id === 'string' ? body.order_id.trim() : '';
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
     const revokeEntitlements = body.revoke_entitlements !== false;
 
-    if (!orderId) return json({ error: 'An order id is required.' }, 400);
-    if (reason.length < 3) return json({ error: 'A refund reason is required.' }, 400);
+    if (!orderId) return respond({ error: 'An order id is required.' }, 400);
+    if (reason.length < 3) return respond({ error: 'A refund reason is required.' }, 400);
 
     const { data: order, error: orderError } = await service
       .from('orders')
@@ -57,23 +63,23 @@ Deno.serve(async (request: Request) => {
       .maybeSingle();
 
     if (orderError) {
-      console.error('order lookup failed', orderError.message);
-      return json({ error: 'Could not load that order.' }, 500);
+      log.error('order.lookup-failed', { code: 'order-lookup-failed' });
+      return respond({ error: 'Could not load that order.' }, 500);
     }
-    if (!order) return json({ error: 'Order not found.' }, 404);
+    if (!order) return respond({ error: 'Order not found.' }, 404);
 
     if (order.payment_status !== 'paid') {
-      return json({ error: 'Only a paid order can be refunded.' }, 409);
+      return respond({ error: 'Only a paid order can be refunded.' }, 409);
     }
     if (!order.razorpay_payment_id) {
-      return json(
+      return respond(
         { error: 'This order has no captured Razorpay payment, so there is nothing to refund.' },
         409,
       );
     }
     if (order.razorpay_refund_id) {
       // Already refunded, or another operator is mid-refund right now.
-      return json(
+      return respond(
         {
           error: order.razorpay_refund_id.startsWith('pending:')
             ? 'A refund for this order is already in progress.'
@@ -90,10 +96,10 @@ Deno.serve(async (request: Request) => {
       requested === undefined || requested === null ? paidInPaise : Number(requested);
 
     if (!Number.isInteger(amountInPaise) || amountInPaise <= 0) {
-      return json({ error: 'The refund amount must be a positive whole number of paise.' }, 400);
+      return respond({ error: 'The refund amount must be a positive whole number of paise.' }, 400);
     }
     if (amountInPaise > paidInPaise) {
-      return json({ error: 'A refund cannot exceed what the customer paid.' }, 400);
+      return respond({ error: 'A refund cannot exceed what the customer paid.' }, 400);
     }
 
     // --- Claim the refund atomically ---------------------------------------
@@ -109,11 +115,11 @@ Deno.serve(async (request: Request) => {
       .select('id');
 
     if (claimError) {
-      console.error('refund claim failed', claimError.message);
-      return json({ error: 'Could not start the refund.' }, 500);
+      log.error('refund.claim-failed', { code: 'refund-claim-failed', orderId: order.id });
+      return respond({ error: 'Could not start the refund.' }, 500);
     }
     if (!claimed || claimed.length === 0) {
-      return json({ error: 'A refund for this order is already in progress.' }, 409);
+      return respond({ error: 'A refund for this order is already in progress.' }, 409);
     }
     claimedOrderId = order.id;
 
@@ -146,11 +152,10 @@ Deno.serve(async (request: Request) => {
 
     if (!response.ok) {
       // Never echo the gateway body to the client — it can carry key detail.
-      const detail = await response.text();
-      console.error('razorpay refund failed', response.status, detail);
-      await releaseClaim(service, claimedOrderId, claimToken);
+      log.error('razorpay.refund-failed', { code: 'razorpay-rejected', status: response.status, orderId: order.id });
+      await releaseClaim(service, claimedOrderId, claimToken, log);
       claimedOrderId = null;
-      return json(
+      return respond(
         {
           error:
             response.status === 400
@@ -186,12 +191,7 @@ Deno.serve(async (request: Request) => {
       .eq('id', order.id);
 
     if (updateError) {
-      console.error(
-        'REFUND SUCCEEDED AT RAZORPAY BUT THE ORDER WAS NOT UPDATED — reconcile by hand.',
-        order.id,
-        refund.id,
-        updateError.message,
-      );
+      log.error('refund.order-update-failed', { code: 'order-update-failed', orderId: order.id });
     }
 
     // Upsert on the unique provider_payment_id so a retried invocation records
@@ -210,7 +210,7 @@ Deno.serve(async (request: Request) => {
       { onConflict: 'provider_payment_id' },
     );
     if (ledgerError) {
-      console.error('refund ledger write failed — reconcile by hand', order.id, ledgerError.message);
+      log.error('refund.ledger-write-failed', { code: 'refund-ledger-failed', orderId: order.id });
     }
 
     if (revokeEntitlements && fullyRefunded) {
@@ -220,14 +220,14 @@ Deno.serve(async (request: Request) => {
         .from('entitlements')
         .update({ is_active: false })
         .eq('source_order_id', order.id);
-      if (entError) console.error('entitlement revocation failed', entError.message);
+      if (entError) log.error('refund.entitlement-revocation-failed', { code: 'entitlement-revocation-failed', orderId: order.id });
 
       const { error: cardError } = await service
         .from('cards')
         .update({ status: 'suspended' })
         .eq('order_id', order.id)
         .neq('status', 'replaced');
-      if (cardError) console.error('card suspension failed', cardError.message);
+      if (cardError) log.error('refund.card-suspension-failed', { code: 'card-suspension-failed', orderId: order.id });
     }
 
     if (order.user_id) {
@@ -247,9 +247,9 @@ Deno.serve(async (request: Request) => {
       razorpay_refund_id: refund.id,
       reason,
       entitlements_revoked: revokeEntitlements && fullyRefunded,
-    });
+    }, log);
 
-    return json({
+    return respond({
       success: true,
       order_id: order.id,
       refund_id: refund.id,
@@ -258,16 +258,16 @@ Deno.serve(async (request: Request) => {
     });
   } catch (error) {
     if (error instanceof MissingSecretError) {
-      console.error(error.message);
-      return json({ error: 'Refunds are not configured on this server.' }, 503);
+      log.error('config.missing', { code: 'missing-configuration' });
+      return respond({ error: 'Refunds are not configured on this server.' }, 503);
     }
     // The claim is released only when we are certain Razorpay was never
     // reached successfully; the successful path clears claimedOrderId itself.
     if (service && claimedOrderId && claimToken) {
-      await releaseClaim(service, claimedOrderId, claimToken);
+      await releaseClaim(service, claimedOrderId, claimToken, log);
     }
-    console.error('admin-refund error', error);
-    return json({ error: 'The refund could not be completed.' }, 500);
+    log.error('admin-refund.error', { code: 'unexpected-error' });
+    return respond({ error: 'The refund could not be completed.' }, 500);
   }
 });
 
@@ -276,6 +276,7 @@ async function releaseClaim(
   service: any,
   orderId: string,
   claimToken: string,
+  log: ReturnType<typeof requestLog>,
 ): Promise<void> {
   const { error } = await service
     .from('orders')
@@ -283,11 +284,7 @@ async function releaseClaim(
     .eq('id', orderId)
     .eq('razorpay_refund_id', claimToken);
   if (error) {
-    console.error(
-      'FAILED TO RELEASE REFUND CLAIM — this order will refuse further refunds until cleared by hand:',
-      orderId,
-      error.message,
-    );
+    log.error('refund.claim-release-failed', { code: 'claim-release-failed', orderId });
   }
 }
 

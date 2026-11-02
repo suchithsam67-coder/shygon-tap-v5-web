@@ -13,6 +13,7 @@ How to find out what happened, from a customer's "it failed" to the exact log li
 | What did the admin team get alerted about? | `admin_notifications` | Triggers: new support ticket, card activation and deactivation | Pushed to the admin app by `admin-push` |
 | Sign-ins, password changes, token refreshes | The Supabase Auth audit log (dashboard → Authentication → Logs) | Supabase Auth | Not in the public schema |
 | What did a server function do? | The host's function logs (Netlify → Functions → logs; Vercel → Logs) | `netlify/lib/log.mjs`, one JSON line per event | See below. Retention is the hosting plan's. Check it before launch, and add a log drain if it is shorter than you need (owner decision). |
+| What did an admin Edge Function do, or why was a caller refused? | Supabase Edge Function logs | `supabase/functions/_shared/log.ts`, one JSON line per event | `admin-refund` and `admin-push` use `x-request-id` (or a generated UUID), return it on the response, and log only ids, fixed codes, status codes and counts. |
 | What broke in a visitor's browser? | The browser console, plus a `shygon:error` event on `window` | `src/lib/reportError.ts` (render errors via `ErrorBoundary`, uncaught exceptions, unhandled rejections) | **No error-tracking provider is wired in.** Choosing one sends data to a third party, so it is an owner decision. When chosen, it subscribes to `shygon:error` and nothing else changes. |
 | Is the service up? | `GET /api/health` (settings present) and `GET /api/health?deep=1` (the database answers too) | `netlify/functions/health.mjs`, `api/health.mjs` | `200 {"status":"ok"}` or `503 {"status":"degraded","checks":{…}}`. A missing setting is named only in the log (`health.config-missing`), never in the response. |
 
@@ -24,9 +25,9 @@ Every line is one JSON object:
 {"ts":"2026-10-10T08:07:30.257Z","level":"info","fn":"verify-payment","requestId":"3771d276-…","event":"payment.verified","orderId":"ST-MV242XJW-4213","razorpayOrderId":"order_…","razorpayPaymentId":"pay_…","newlyFulfilled":true}
 ```
 
-- **`requestId`:** the caller's `x-request-id` when it is well-formed (8–128 of `A-Z a-z 0-9 . _ : -`), else the id Netlify (`x-nf-request-id`) or Vercel (`x-vercel-id`) stamped on the request, else a new UUID. Every response carries it back as `x-request-id`, so a failed request in the browser's network panel leads straight to its log lines.
+- **`requestId`:** on Netlify/Vercel, the caller's well-formed `x-request-id`, else the host's stamped id, else a new UUID. On the admin Edge Functions, the caller's well-formed `x-request-id`, else a new UUID. Responses carry it back as `x-request-id`, so a failed request in the network panel leads straight to its log lines.
 - **`orderId`** is always the order number the customer and support see (`ST-…`), in every event of every function, so one search finds the whole story of an order.
-- **Never logged:** request bodies, signatures, tokens, keys, passwords, cookies, email addresses, phone numbers, addresses or PIN codes. Values under such keys become `[redacted]` at any depth; long strings are cut at 300 characters; errors keep only their name and message. Log the ids you need to find a record, never its contents.
+- **Never logged:** request bodies, signatures, tokens, keys, passwords, cookies, email addresses, phone numbers, addresses, PIN codes, free-text errors, refund reasons or amounts. Netlify/Vercel logs redact sensitive keys; admin Edge logs use a field allowlist containing only ids, fixed codes, status codes and counts. Log the ids you need to find a record, never its contents.
 - **Proven by:** `npm run test:observability`, which runs a whole purchase, a tampered payment, a forged webhook and a forged signature, and checks that every line written is structured JSON with the right ids and nothing redacted leaks.
 
 ### Event catalogue
@@ -39,7 +40,7 @@ Every line is one JSON object:
 | Webhook (`razorpay-webhook`) | `webhook.processed`, `webhook.duplicate`, `webhook.capture`, `webhook.payment-failed`, `webhook.ignored`, `webhook.unknown-order`, `webhook.ledger-failed`, `webhook.release-failed`, `webhook.error` |
 | Fulfilment | `order.fulfilled`, `fulfilment.tap-provisioned`, `fulfilment.retryable`, `fulfilment.release-failed`, `fulfilment.card-issue-failed`, `fulfilment.edit-window-failed`, `fulfilment.slug-failed`, `fulfilment.slug-assignment-failed`, `fulfilment.tap-provisioning-failed`, `fulfilment.unknown-product-type` |
 | Order texts | `order-sms.not-sent`, `order-sms.unavailable`, `order-sms.error` |
-| **Security events** | `auth.refused` (no valid session), `payment.signature-invalid`, `payment.customer-mismatch` (another customer's payment), `payment.order-mismatch`, `payment.amount-mismatch`, `webhook.rejected` (`unsigned` / `bad-signature`), `webhook.amount-mismatch` (held for review), `config.missing`, `health.config-missing` |
+| **Security events** | `auth.refused` (no valid session), `security.admin-refused` (`no-session`, `not-admin`, `missing-permission`, `bad-method`), `payment.signature-invalid`, `payment.customer-mismatch` (another customer's payment), `payment.order-mismatch`, `payment.amount-mismatch`, `webhook.rejected` (`unsigned` / `bad-signature`), `webhook.amount-mismatch` (held for review), `config.missing`, `health.config-missing` |
 
 ## Tracing a failure
 
@@ -53,4 +54,4 @@ Every line is one JSON object:
 
 - **Error tracking:** no provider (above). Owner decision.
 - **Log retention and alerting:** whatever the hosting plan keeps; no alert rules yet. The security events above are the ones to alert on first (`webhook.rejected`, `payment.signature-invalid`, `payment.customer-mismatch`, `*.amount-mismatch`, `config.missing`, a degraded `/api/health`).
-- **The admin edge functions** (`supabase/functions/admin-refund`, `admin-push`) still log plain text to the Supabase function logs, and do not log a refused caller as a security event. The refusals themselves are proven by `npm run test:admin-edge`. Converting their logs is a follow-up; they are part of the admin app's contract.
+- **Admin Edge Function failures:** `admin-refund` and `admin-push` write structured, redacted-by-allowlist events to Supabase function logs. `security.admin-refused` records refused callers with a fixed reason code. `npm run test:admin-edge` covers the refusal events and canary redaction.

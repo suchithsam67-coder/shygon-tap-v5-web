@@ -72,15 +72,15 @@ const shared = await load('_shared/admin.ts', 'shared');
 await load('admin-refund/index.ts', 'admin-refund');
 await load('admin-push/index.ts', 'admin-push');
 
-const call = async (name, { token, method = 'POST', body } = {}) => {
+const call = async (name, { token, method = 'POST', body, headers = {} } = {}) => {
   const response = await handlers[name](
     new Request(`http://edge.local/functions/v1/${name}`, {
       method,
-      headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...headers },
       body: body === undefined || method === 'GET' || method === 'OPTIONS' ? undefined : JSON.stringify(body),
     }),
   );
-  return { status: response.status, body: await response.json().catch(() => null) };
+  return { status: response.status, body: await response.json().catch(() => null), headers: response.headers };
 };
 
 // --- the people ----------------------------------------------------------------
@@ -180,6 +180,65 @@ await t.check('the edge and the database agree on every role x permission pair',
 
 // ---------------------------------------------------------------------------
 t.section('The functions themselves');
+
+async function captureCall(name, options) {
+  const lines = [];
+  const original = { log: console.log, warn: console.warn, error: console.error };
+  console.log = (...args) => lines.push(args.join(' '));
+  console.warn = (...args) => lines.push(args.join(' '));
+  console.error = (...args) => lines.push(args.join(' '));
+  try {
+    const response = await call(name, options);
+    return { response, lines, events: lines.map((line) => JSON.parse(line)) };
+  } finally {
+    console.log = original.log;
+    console.warn = original.warn;
+    console.error = original.error;
+  }
+}
+
+await t.check('admin edge refusals emit one security event per reason and preserve response status/body', async () => {
+  const cases = [
+    ['admin-refund', {}, 403, 'no-session'],
+    ['admin-refund', { token: customer.token }, 403, 'not-admin'],
+    ['admin-refund', { token: viewer.token }, 403, 'missing-permission'],
+    ['admin-refund', { method: 'GET' }, 405, 'bad-method'],
+    ['admin-push', {}, 403, 'no-session'],
+    ['admin-push', { token: customer.token }, 403, 'not-admin'],
+    ['admin-push', { method: 'GET' }, 405, 'bad-method'],
+  ];
+  for (const [name, options, status, reason] of cases) {
+    const { response, events } = await captureCall(name, options);
+    assertEqual(response.status, status, `${name} ${reason} status`);
+    const security = events.filter((event) => event.event === 'security.admin-refused');
+    assertEqual(security.length, 1, `${name} ${reason} event count`);
+    assertEqual(security[0].reason, reason, `${name} refusal reason`);
+  }
+  assertEqual((await call('admin-refund', { method: 'GET' })).body, { error: 'Method not allowed' }, 'method response body');
+  assertEqual((await call('admin-refund', {})).body, { error: 'You are not permitted to issue refunds.' }, 'refusal response body');
+  return `${cases.length} refusal paths`;
+});
+
+await t.check('admin edge log lines are structured, carry request ids and exclude email, phone and token canaries', async () => {
+  const canaries = ['edge-canary@example.invalid', '+15550101234', 'edge-token-canary-9f41'];
+  for (const name of ['admin-refund', 'admin-push']) {
+    const requestId = 'edge-request-20261102';
+    const { response, lines, events } = await captureCall(name, {
+      body: { email: canaries[0], phone: canaries[1], token: canaries[2] },
+      headers: { 'x-request-id': requestId },
+    });
+    assertEqual(response.headers.get('x-request-id'), requestId, `${name} response request id`);
+    assert(events.length > 0, `${name} emitted a log line`);
+    for (const line of lines) {
+      const event = JSON.parse(line);
+      assertEqual(event.fn, name, `${name} log function`);
+      assertEqual(event.requestId, requestId, `${name} log request id`);
+      assert(event.ts && event.level && event.event, `${name} standard log fields`);
+      for (const canary of canaries) assert(!line.includes(canary), `${name} leaked a canary`);
+    }
+  }
+  return 'both admin functions';
+});
 
 await t.check('admin-refund: no token, a customer and a viewer are refused (403); CORS preflight and wrong method behave', async () => {
   assertEqual((await call('admin-refund', { body: { order_id: 'x', reason: 'test' } })).status, 403, 'no token');
