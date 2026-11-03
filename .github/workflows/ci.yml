@@ -215,6 +215,14 @@ jobs:
       - name: BQ-1 production variant (evidence replay)
         run: npm run test:bq1-production
 
+      # Verified Tap (U1, DEC-2026-043, approved for the local build): the SUN
+      # crypto core against RFC 4493 / AN10922 / AN12196 known answers, then
+      # migration 037 and /api/verify on the local stack with random TEST keys.
+      - name: Verified Tap crypto core (known answers)
+        run: npm run test:sun
+      - name: Verified Tap (local stack)
+        run: npm run test:verified-tap
+
       # The hosted release-check runners P1 / P2 (scripts/release/), exercised
       # against the local stack only, with a negative control (a stand-in host
       # that trusts forged headers) and the production / plain-http refusals.

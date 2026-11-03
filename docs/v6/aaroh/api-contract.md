@@ -1,11 +1,11 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.10
+# SHYGON AAROH backend API contract — AAROH-API v0.11.1
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.10** (2026-10-25): Lost mode (§6; migration 036). v0.9.2 (`2686606`): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
+| Contract version | **AAROH-API v0.11.1** (2026-11-02): §6 hardening after the OpenCode review of Lost mode. The preview follows the catalogue; the relay-off and replay wording is clarified. No new operation, field or error code. v0.11 (`abe6871`): Verified Tap (§10d; migration 037). v0.10 (`39d87ca`): Lost mode (§6; migration 036). v0.9.2 (`2686606`): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041), **036** (APPROVED 2026-10-25, DEC-2026-041 A-1); none applied anywhere. 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041), **036** (APPROVED 2026-10-25, DEC-2026-041 A-1), **037** (APPROVED for the local build 2026-10-31, DEC-2026-043); none applied anywhere. 027 is held aside (DEC-2026-037). |
 | Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
@@ -176,8 +176,13 @@ T-2 rules, enforced server-side:
 **P-6 `rpc('get_public_tap_mode', { p_slug })`** (anon; SECURITY DEFINER; read-only) returns one of:
 - `{ mode: 'business', profile: <the P-1 payload, unchanged> }`;
 - `{ mode: 'info', info: { title, shortDescription, category, detailedInformation, updatedAt } }`, those five keys only;
-- `{ mode: 'lost' }`, that one key only (v0.10). Show "Found this card?" and Return to Owner's form (§10a `public.status` / `public.start`). If `public.status` answers `available: false`, show the neutral "unavailable" copy;
-- `null`: no live Tap (unknown, draft, paused, suspended), **or** the neutral "unavailable" fallback. That covers Info switched off, missing or invalid, and Lost switched off or with Return to Owner unable to take a message.
+- `{ mode: 'lost' }`, that one key only (v0.10). Show "Found this card?" and Return to Owner's form (§10a `public.status` / `public.start`).
+  - **Call `public.status` before showing the form** (v0.11.1). P-6 cannot see the host switch `RESCUE_RELAY`, so while that switch is off P-6 still answers `{ mode: 'lost' }` and `public.status` answers `available: false`.
+  - On `available: false`, show the neutral "unavailable" copy: never the form, never Business;
+- `null`: no live Tap (unknown, draft, paused, suspended), **or** the neutral "unavailable" fallback.
+  - For Info: switched off, missing or invalid.
+  - For Lost, the four reasons the database can see (v0.11.1): SHYGON has Lost off in the catalogue, the owner's Return to Owner opt-in is off, the Tap is unpublished, or the account is suspended.
+  - `RESCUE_RELAY` off is handled by the `public.status` step above, not by P-6.
 
 **It never falls back to the Business profile.** On `null`, ask P-2 why, as today.
 
@@ -186,11 +191,11 @@ T-2 rules, enforced server-side:
 | op | Request | Success |
 |---|---|---|
 | `owner.state` | `{ op }` | 200 `{ activeMode, version, changedAt, modes: [{ mode, available, reason: 'active' \| 'ready' \| 'needs_setup' \| 'not_available', missing? }] }`. `missing` names `title` and `shortDescription` when absent or invalid, and `detailedInformation` when the stored text is invalid (only a direct database write can cause that; `/api/modes` refuses it). Lost (v0.10) is `not_available` while SHYGON has it off or `RESCUE_RELAY` is off, and `needs_setup` with `missing: ['returnToOwner']` until the owner's Return to Owner opt-in is on. Show only the modes you render; ignore any other entry |
-| `owner.activate` | `{ op, mode: 'business' \| 'info' \| 'lost', expectedVersion, idempotencyKey }`. Lost: `mode_unavailable` while it is off or `RESCUE_RELAY` is off; `needs_setup` (`missing: ['returnToOwner']`) without the opt-in | 200 `{ activeMode, previousMode, version, changedAt, replayed }`; `previousMode` is `null` until the Tap has switched at least once (activating the mode it is already on changes nothing). The same key again → the first answer with `replayed: true` |
+| `owner.activate` | `{ op, mode: 'business' \| 'info' \| 'lost', expectedVersion, idempotencyKey }`. Lost: `mode_unavailable` while it is off or `RESCUE_RELAY` is off; `needs_setup` (`missing: ['returnToOwner']`) without the opt-in | 200 `{ activeMode, previousMode, version, changedAt, replayed }`; `previousMode` is `null` until the Tap has switched at least once (activating the mode it is already on changes nothing). The same key again → the first answer with `replayed: true`. One exception (v0.11.1): a Lost activation repeated while `RESCUE_RELAY` is off answers 409 `mode_unavailable`, because the host switch is checked first. Nothing changes; the first activation stands, and the same key replays again once the relay is back on |
 | `owner.info.get` | `{ op }` | 200 `{ info: { title, shortDescription, category, detailedInformation, updatedAt, version } \| null, publicationStatus: 'draft' \| 'ready' \| 'live' \| 'unavailable' }` |
 | `owner.info.save` | `{ op, fields: { title?, shortDescription?, category?, detailedInformation? }, expectedVersion }`. A present key sets the field (null or empty clears it); an absent key leaves it. `expectedVersion` is 0 before the first save | 200, the same shape as `owner.info.get` |
 | `owner.info.clear` | `{ op }` | 200 `{ cleared }` |
-| `owner.preview` | `{ op, mode }` | 200 `{ mode, view }`: exactly what a visitor would get (`null` when it would be unavailable). For `lost`, `view` is `{}` (the page carries no data) while Return to Owner can take a message and `RESCUE_RELAY` is on, else `null` |
+| `owner.preview` | `{ op, mode }` | 200 `{ mode, view }`: exactly what a visitor would get (`null` when it would be unavailable), using the same catalogue switch and Tap checks as P-6 (v0.11.1). For `lost`, `view` is `{}` (the page carries no data) while SHYGON has Lost on, Return to Owner can take a message and `RESCUE_RELAY` is on; otherwise `null`. For `info`, `view` is `null` while SHYGON has Info off, the Tap is not active or is suspended, or the record is incomplete or invalid |
 
 **Errors** use the shape `{ error: { code, message, field?, reason?, missing?, current? } }`. Messages are fixed text and never repeat a submitted value.
 
@@ -607,6 +612,67 @@ Request = { id, demo: true, status: 'received' | 'acknowledged' | 'in_progress' 
 
 ---
 
+## 10d. Verified Tap — `POST /api/verify` (v0.11)
+
+**Status:** LIVE-LOCAL. DEC-2026-043 was approved for the **local build only** on 2026-10-31 (migration 037, `netlify/lib/sun.mjs`).
+- Locally, all keys are **TEST keys only**.
+- **Host switch `VERIFIED_TAP`: unset means off,** and every request answers 404 `unavailable` with nothing read or consumed.
+- Real keys, chips and hosting wait for DEC-2026-043 Q2 (key custody), Q3 (who personalises) and Q7 (the inlay).
+
+**What it proves, and what it never proves.**
+- It proves the card's NTAG 424 DNA chip holds the keys SHYGON issued for its code, and that this read is newer than any accepted before.
+- It never proves who holds the card, never signs anyone in, and never grants anything. A live relay or a stolen card still verifies.
+
+**The card URL** (written at personalisation): `https://<host>/d/<code>?e=<32 hex>&c=<16 hex>`.
+- `code` is 16 characters from `a–z` and `2–7` (80 bits). It is never reused.
+- `e` is the encrypted PICC data and `c` the truncated SDMMAC (AN12196). The MAC input is empty.
+- **Session B's `/d/<code>` page:**
+  - call this endpoint from the page's script after load, never from the server render;
+  - then remove `e` and `c` from the address bar (`history.replaceState`);
+  - load the Tap with P-6 using the `slug` returned;
+  - send `Referrer-Policy: no-referrer` and `Cache-Control: no-store`;
+  - use no third-party script, and generic preview metadata.
+
+**Request:** `{ op: 'tap.verify', code, e?, c? }`. No sign-in. `e` and `c` come together or not at all.
+
+**Success (200):** `{ slug, verdict, edition? }`. The keys are exactly these. `edition` = `{ design, number, of, chapterSize }`, only with `genuine` and a complete card record.
+
+| `verdict` | When | Wording (DEC-2026-043 Q4, option 2; the owner approves the strings at Session B's gate) |
+|---|---|---|
+| `genuine` | the MAC matched and the counter is new. It is consumed, once | "Verified tap. This card's secure tap was accepted." (+ "No. 037 of 100") |
+| `already_checked` | the MAC matched but this counter was already seen (a copied or re-opened link, a repeat read) | "We couldn't confirm this tap as new. Please tap the card again." |
+| `not_confirmed` | decryption, the MAC or the chip UID did not match. The answer never says which | "We couldn't verify this tap. Please tap the card again or contact SHYGON support." |
+| `needs_service` | the card is retired, or at its counter limit | "This card needs service. Please contact SHYGON." |
+| `unavailable` | the server cannot decide now (no keys for the card's key epoch) | "Verification is temporarily unavailable. This tap hasn't been marked as verified." |
+| `not_verified` | no `e` / `c` (a QR, a typed or shared link) | nothing about authenticity |
+| `null` | the Tap is in Lost mode | render the Lost page; no verdict |
+
+- **Never "fake" or "counterfeit".** Any doubt is `unavailable` or `not_confirmed`, never `genuine`.
+
+**Errors** use `{ error: { code, message, retryAfter? } }`.
+
+| HTTP | Code | When |
+|---|---|---|
+| 400 | `invalid_request`, `unknown_op` | a malformed code, `e` / `c` alone or not hex of the right length, an oversized body, any op but `tap.verify` |
+| 404 | `unavailable` | the switch is off; the code is unknown; the card is not active; the Tap is not live; or the host gave no trusted visitor address. These cases are indistinguishable |
+| 405 | `method_not_allowed` | anything but POST. A GET consumes nothing |
+| 429 | `rate_limited` (+`retryAfter`) | 30 checks per visitor per hour, or 20 refused checks per card per hour |
+| 503 | `temporarily_unavailable` | the database failed. Never a positive verdict |
+
+**Rules (`test:verified-tap`, 17 checks; `test:sun`, 27):**
+- **Keys:**
+  - per card, derived (AN10922) from two master keys per key epoch, by the card's device id (D-a: the 16 bytes of `cards.id`);
+  - never stored; never in the browser, a log or an answer.
+- **The UID** is compared only as `uid_hmac` = HMAC-SHA256(`VERIFY_UID_PEPPER`, the UID in lowercase hex). It is never stored or returned.
+- **One `genuine` per counter.** The device row is locked, so concurrent checks are serialised. Counter gaps are accepted.
+- **The verification log** holds the code, the verdict, a daily visitor digest and the time. Nothing else; it is append-only, with 90-day retention (`verify_purge`).
+
+**Frontend impact (Session B):**
+- the `/d/<code>` page as above;
+- the verdict line above the Tap's normal page (Business, Info or Lost from P-6);
+- the edition line only with `genuine`;
+- when `VERIFIED_TAP` is off, `/d/` answers 404, so legacy `/t/<slug>` is the only route.
+
 ## 11. Operations that do not exist (NOT IMPLEMENTED unless stated)
 
 | Feature | Status | Why |
@@ -660,6 +726,8 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.11.1 | 2026-11-02 | Hardening after the OpenCode review of Lost mode (`docs/v6/aaroh/reviews/2026-10-30_opencode-review-lost-mode.md`). No new operation, request field, response field or error code.<br>(1) `owner.preview` now checks the same catalogue switch and Tap state as P-6. Before, a Lost preview answered `{}` while SHYGON had Lost off, and an Info preview answered the page while Info was off or the Tap was paused or suspended; the visitor got `null` in both cases.<br>(2) §6 P-6: the database cannot see `RESCUE_RELAY`. While it is off, P-6 may still answer `{ mode: 'lost' }`, and `public.status` answers `available: false`. The four database-side reasons for `null` are now named.<br>(3) §6 `owner.activate`: a Lost activation repeated while `RESCUE_RELAY` is off answers 409 `mode_unavailable`, not the replay. Nothing changes.<br>(4) Migration 036: the activation reads the Return to Owner opt-in under a share lock, so an opt-out racing it waits. 036 is regenerated; it has not been applied anywhere. | (a) On a Lost page, always call `public.status` before showing the form, and show the neutral "unavailable" copy when it answers `false`. This was already the v0.10 two-step; it is now the only way the relay-off case is visible. (b) `owner.preview` may now answer `view: null` for a mode SHYGON has switched off. Show the same "not available" state as `owner.state`, not an empty page. (c) A 409 `mode_unavailable` on a retried Lost activation means the relay went off: refresh `owner.state`; the Tap is still on Lost. |
+| v0.11 | 2026-10-31 | **New: Verified Tap** (U1; DEC-2026-043, approved for the local build only; migration 037; `netlify/lib/sun.mjs`): §10d `POST /api/verify` (`tap.verify`), behind the host switch `VERIFIED_TAP` (off), with test keys only. Verdicts: genuine, already_checked, not_confirmed, needs_service, unavailable, not_verified; null for a Tap in Lost mode. No earlier operation changed. | Build the `/d/<code>` page as §10d says: script POST after load, strip `e`/`c`, no-referrer, no-store, no third-party script. Show the verdict above the Tap's normal page, the edition line only with genuine, and never "fake". The customer strings need the owner's approval at your gate. |
 | v0.10 | 2026-10-25 | **New: Lost mode** (U2; DEC-2026-041 amendment A-1; migration 036).<br>(1) `owner.activate` accepts `lost`. It needs the catalogue (OFF by default), `RESCUE_RELAY=on` and the owner's own Return to Owner opt-in, and never turns that opt-in on.<br>(2) `owner.state` has a third entry, `lost`.<br>(3) P-6 answers `{ mode: 'lost' }` (one key) or `null`, never Business. P-1 is `null` while Lost is active (035's guard).<br>(4) `owner.preview` `lost`: `{}` or `null`.<br>(5) The `needs_setup` message is now "Finish setting up this mode first." and the `invalid_mode` message names lost. No other operation changed. | Handle a third `owner.state` entry; ignore modes you do not render. Render `{ mode: 'lost' }` as "Found this card?" with Return to Owner's form, and nothing else. An unknown mode stays `null` and shows "unavailable". Draft copy in §6. Customer strings need the owner's approval at your gate. |
 | v0.9.2 | 2026-10-25 | Hardening after the OpenCode second review; no new operation, request or response field.<br>(1) `/api/modes`, `/api/connect`, `/api/emergency` and `/api/rescue` answer an `op` that only names an inherited object property (`constructor`, `toString`, `__proto__`, …) with the documented 400 `unknown_op`. Before, a signed-in caller could get a 500 outside the contract.<br>(2) §6: `missing` may also name `detailedInformation` when the stored text is invalid. `owner.info.get`, `owner.preview` and the public reader now use the same check.<br>(3) §6 documents `previousMode: null`.<br>(4) Info writers take their locks in one order (034, revised before any application), so Info cannot go live incomplete under a race.<br>(5) Migration 035 refuses to apply without 034.<br>(6) §10b: `test:connect` has 17 checks. | Type `previousMode` as `TapMode \| null`. If `missing` names `detailedInformation`, show that field as needing attention; only a corrupted record can cause it, never the API. No other change. |
 | v0.9.1 | 2026-10-25 | Wording only: the visitor-initiated alert SMS (§10) now reads "someone using the SHYGON profile of <owner> … Try to reach them directly." It names the owner once, so the DLT template has two variables (name, time), like the owner alert. Wording approved by the owner on 2026-10-25, relayed by the coordination session; DLT registration pending. Visitor alerts stay off (DEC-2026-038 Q2). No request, response or error changed. | None, unless a page shows a preview of that SMS (none does on the frontend's `dce0ec9`: a text search of its `src/` finds no copy, 2026-10-25). |

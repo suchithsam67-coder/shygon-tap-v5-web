@@ -695,3 +695,84 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
 **Numbering:** U1 (DEC-2026-043, on hold) is renumbered to migration 037 and contract v0.11.
 
 **Verdict unchanged:** release BLOCKED (§18). Lost stays OFF in the catalogue and behind `RESCUE_RELAY` until release.
+
+## 21. 2026-11-01: Verified Tap (U1) built locally (migration 037, contract v0.11)
+
+**Approval:** the owner, in session on 2026-10-31: "Approve local build", answering Session A's recommendations (DEC-2026-043 §11).
+- **Answered:** Q1 option A; Q4 option 2; Q5 a code in 037; Q8 D-a; Q9 counter limit off; Q6 left to card design.
+- **Still open:** Q2, Q3 and Q7.
+- **Scope:** test keys only; `VERIFIED_TAP` off; nothing hosted.
+
+**Built:**
+- `c466dde`: OpenCode's crypto core, cherry-picked after review;
+- `037_verified_tap.sql`: two closed tables and four service-only functions;
+- `/api/verify`;
+- `test:verified-tap` and `test:sun`, both in `ci` and `ci.yml`;
+- contract AAROH-API v0.11, §10d.
+- **Q5 deviation:** the code lives in a closed table, not on `cards`, because four frozen admin functions return whole card rows. The owner should confirm it (DEC-2026-043 §11).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]. Every step exited 0.
+
+| Group | Results |
+|---|---|
+| `test:db` | verify 21; adversarial 64; RLS matrix **1615** (57 tables, the two new ones closed to all 7 callers); identity 69; admin-notes 12; golden **19** (037 byte-identical); admin-contract 17 (no new client-executable function); rollbacks **18** (037 restores exactly); account-deletion 9; history 2; bundle as one batch and twice |
+| Verified Tap | `test:verified-tap` **17**; `test:sun` **27** |
+| Other suites | as in §20, all exit 0: modes 25; bq1-production 16; preview-checks 13; security 12; payments 15, and 13 + 1 Node-20-only BLOCKED (Node 22: 15, and 14/0/0); components 23/23; lint; build |
+
+**Corrected before commit:**
+- My first draft of the Verified Tap test was written to `supabase/tests/verify.mjs`, the existing `db:verify` script, which it overwrote.
+- The full run showed `db:verify` at 17 instead of 21. The original was restored from git, the test moved to `supabase/tests/verified-tap.mjs`, and the script renamed `test:verified-tap`.
+- No commit ever contained the overwrite.
+
+**Not executed:**
+- §7 test 14, a database failure part-way through a transaction: PGlite has a single connection.
+- §7 test 15, a restore rolling the counter back: the external acceptance log waits for Q2.
+- Real phones and real chips.
+- Browser e2e: there is no `/d/` page yet (Session B).
+
+**New findings:**
+- **Secret-scan exception E-1 is PROPOSED** (DEC-2026-043 §11). gitleaks flags seven published test vectors in `netlify/tests/sun.mjs`. They need the owner's approval before their fingerprints are added; until then `test:secrets` reports them, alongside V6-014.
+- **`npm audit`: one new moderate advisory**, `minimatch` GHSA-g3hv-75wg-m249, a denial-of-service risk. It reaches only dev tooling (eslint / typescript-eslint), counted 12 times through the dependency chain. The high gate passes. The fix offered is a forced, breaking `typescript-eslint` upgrade, so it is the owner's decision (compare DEC-2026-042).
+
+**Verdict unchanged:** release BLOCKED (§18). Verified Tap stays off (`VERIFIED_TAP` unset), with no real keys.
+
+## 22. 2026-11-02: OpenCode's second review of Lost mode (OC-5) and its hardening (contract v0.11.1)
+
+**Hand-off:** the coordinator forwarded OpenCode's review of `39d87ca` with the owner's standing pattern for review findings ("assess, fix as one hardening change, owner at your gate"). Session B built Lost against v0.10 (committed 11-01), so it is told about the wording change.
+
+**Taken:** `d20b3da` (= `c62217d`), the review report `docs/v6/aaroh/reviews/2026-10-30_opencode-review-lost-mode.md`, with Session A's resolution appended (§8 there).
+- Its verdict: no P0 or P1, and no leak in any switch combination.
+- Its findings: one P2, two P3s and two nits.
+
+**Hardening (one change, backend lane), findings #1–#5.** The new and changed checks were run against the old 036 first [OBSERVED]: `test:modes` 25 passed, 3 failed (the Info F-1 preview, the catalogue × relay cell "catalogue off, relay on", and the lock order).
+
+| # | Change | Proof |
+|---|---|---|
+| 1 (P2) | 036 `modes_preview` follows the reader. Lost needs the catalogue row on. Info also needs the catalogue on and an active, unsuspended Tap. | The catalogue × relay check; Info fallbacks F-1 and F-5 assert the preview |
+| 2 (P3) | Contract §6 names the four database-side reasons for a `null` Lost answer. `RESCUE_RELAY` off is visible only through `public.status`. | The reader's relay-off answer is pinned: `{ mode: 'lost' }` with `public.status` `false` |
+| 3 (P3) | Contract §6 `owner.activate`: a Lost activation repeated while the relay is off answers 409 `mode_unavailable`, with nothing changed | A replay check: 409 with the relay off; the first answer with `replayed: true` once it is back on |
+| 4 (nit) | One check walks catalogue × relay over the preview, the reader, `owner.state` and `public.status`, with the leak canary in each cell. The "catalogue off, relay on" cell reaches the database's own catalogue gate. | `test:modes` **28** (25 before) |
+| 5 (nit) | 036 activation reads the opt-in `FOR SHARE`, after the Tap and mode-state locks | A static pin read from `pg_proc`. **The race itself is not executable on PGlite (one connection): NOT run.** |
+
+- **Contract AAROH-API v0.11.1:** no new operation, field or error code.
+- **`036_lost_mode.sql`:** regenerated from `gen-036.cjs`. Its ROLLBACK is unchanged (034's functions, verbatim).
+- **`APPLY_ALL.sql`:** regenerated. It applies as one batch, and twice.
+- **Records:** a DEC-2026-041 A-1 note. L-1 to L-6 are unchanged and still await the owner's confirmation.
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]. Every step exited 0.
+
+| Group | Results |
+|---|---|
+| `test:db` | verify 21; adversarial 64; RLS matrix 1615 (57 tables, 7 callers); identity 69; admin-notes 12; golden 19; admin-contract 17; rollbacks 18 (036 restores exactly); account-deletion 9; history 2; bundle as one batch and twice |
+| Affected suites | modes **28**; rescue 18; verified-tap 17; bq1-production 16; sun 27; lint |
+
+**Not run:**
+- the other stack suites, components, build and browser e2e. This change touches only 036, `test:modes` and documents; `netlify/functions/modes.mjs` is unchanged.
+- any hosted check.
+
+**For Session B (v0.11.1):**
+- Always call `public.status` before showing the Lost form.
+- `owner.preview` may answer `null` for a mode SHYGON has switched off.
+- A 409 on a retried Lost activation means the relay went off.
+
+**Verdict unchanged:** release BLOCKED (§18). Lost stays OFF in the catalogue and behind `RESCUE_RELAY`.

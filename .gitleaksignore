@@ -5,3 +5,22 @@
 # DEC-2026-020: Web3Forms access key, public by vendor design, in dead code
 # (src/components/ProjectConsultation.tsx), as committed in v5-baseline.
 8becea30cd584ba636dce662df59a95247f5443c:src/components/ProjectConsultation.tsx:generic-api-key:75
+
+# DEC-2026-043 §11, exception E-1 (approved by the owner 2026-11-01): published
+# standard TEST VECTORS, not secrets, in netlify/tests/sun.mjs: the RFC 4493 §4
+# example key, the AN10922 §2.2.1 example key, AN12196 §3.3 / §3.4.2.2 example
+# session key and ciphertexts. Both commits that carry the file are listed.
+c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:54
+c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:72
+c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:130
+c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:137
+c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:182
+c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:306
+c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:351
+6c7f8db58f3af5af45c1222bc6ff3681be612981:netlify/tests/sun.mjs:generic-api-key:54
+6c7f8db58f3af5af45c1222bc6ff3681be612981:netlify/tests/sun.mjs:generic-api-key:72
+6c7f8db58f3af5af45c1222bc6ff3681be612981:netlify/tests/sun.mjs:generic-api-key:130
+6c7f8db58f3af5af45c1222bc6ff3681be612981:netlify/tests/sun.mjs:generic-api-key:137
+6c7f8db58f3af5af45c1222bc6ff3681be612981:netlify/tests/sun.mjs:generic-api-key:182
+6c7f8db58f3af5af45c1222bc6ff3681be612981:netlify/tests/sun.mjs:generic-api-key:306
+6c7f8db58f3af5af45c1222bc6ff3681be612981:netlify/tests/sun.mjs:generic-api-key:351

@@ -144,6 +144,8 @@ const APPROVED_NEW_RELATIONS = {
     .map((t) => [t, 'DEC-2026-040 Q1-Q5, approved 2026-10-20 (migration 033)'])),
   ...Object.fromEntries(['tap_mode_catalog', 'info_pages', 'tap_mode_state', 'tap_mode_audit']
     .map((t) => [t, 'DEC-2026-041 implementation scope, approved 2026-10-24 (migration 034)'])),
+  ...Object.fromEntries(['tap_device_auth', 'tap_verify_events']
+    .map((t) => [t, 'DEC-2026-043, approved for the local build 2026-10-31 (migration 037)'])),
 };
 
 // New admin_* functions (new names, not overloads), with their decision.
