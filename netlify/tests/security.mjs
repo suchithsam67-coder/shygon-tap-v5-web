@@ -167,7 +167,7 @@ t.section('Operation names: inherited object keys are not operations');
 // or not, on every function that dispatches by `op`.
 await t.check('constructor, toString, __proto__ and hasOwnProperty answer 400 unknown_op on every op-dispatching function', async () => {
   const wrong = [];
-  for (const name of ['modes', 'connect', 'emergency', 'rescue']) {
+  for (const name of ['modes', 'connect', 'emergency', 'rescue', 'account']) {
     for (const op of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) {
       for (const token of [customer.token, null]) {
         const response = await callFunction(stack, name, { token: token ?? undefined, body: { op } });
@@ -178,7 +178,7 @@ await t.check('constructor, toString, __proto__ and hasOwnProperty answer 400 un
     }
   }
   assertEqual(wrong, [], 'answers outside the contract');
-  return '4 functions x 5 names x 2 callers';
+  return '5 functions x 5 names x 2 callers';
 });
 
 const ok = t.finish();

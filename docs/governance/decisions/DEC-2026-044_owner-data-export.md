@@ -10,7 +10,7 @@
 | **Accountable Owner (A)** | The repository owner (the founder), who holds every product role (DEC-2026-018 Option B). Counsel confirms the privacy-notice wording (F-20 is "F + C"); that does not block the local build |
 | Responsible (R) | Session A (backend): the server export, its migration, contract and tests. Session B (frontend): the download page |
 | Consulted | The coordination session (V01 task registry T-10); Session B |
-| State | **PROPOSED, 2026-11-03.** Nothing is built. Session A writes no migration 038, no `/api/account` and no contract change until the owner approves |
+| State | **APPROVED FOR THE LOCAL BUILD, 2026-11-03.** The owner, in Session A's session: "Approve T-10 build", answering "Approve building T-10 locally on DEC-2026-044's recommended answers?". Q1–Q6 are therefore as recommended (§5). Local only: nothing is applied, pushed or deployed. Counsel's review of the privacy-notice wording still applies before release. History: PROPOSED 2026-11-03 (`bec5580`) |
 
 Labels: **OBSERVED** (in this repository or a decision record), **INFERRED** (reasoned, not tested), **PROPOSED**.
 
@@ -115,3 +115,20 @@ No table is opened to a client role. No host switch is added; the export is usef
 ## 7. What the owner approves
 
 To build locally: "Approve T-10 local build" (Q1–Q6 as recommended), or the answers that differ. Session A then writes migration 038, `/api/account` (+ the Vercel adapter), contract v0.12 and `test:account-export`, runs the full gates, commits locally and tells Session B. Nothing is applied, pushed or deployed.
+
+## 8. As built (2026-11-03, local)
+
+Built on `v6/aaroh-backend` to §4 with Q1–Q6 as recommended; readiness report §23 has the evidence. Nothing is applied, pushed or deployed.
+
+- **Migration 038** has two service-only functions:
+  - `account_export_build(p_user)`, STABLE: the whole export from one snapshot;
+  - `account_export_request(p_user)`: the limit, the build, the vCard fields and the `account_events` row, under a per-account advisory lock. It is one call, not the two sketched in §4.5, so the audit row can carry the row counts.
+- **`/api/account` `owner.export`** (+ the Vercel adapter), and `netlify/lib/vcard.mjs`. Contract AAROH-API v0.12, §4a.
+- **Differences from the §4 sketch, each on the side of less data:**
+  - `taps` is a list (one Tap per account in v1), so none is ever dropped.
+  - Orders are matched by `user_id` or `customer_id`; in the baseline, `orders.customer_id` is the auth user.
+  - Left out besides §4.2: the order status-history `note` (written by staff), notification `metadata` (internal routing), the card's programming URLs (`nfc_url`, `qr_code_url`), and the `detail` of the Emergency, Return to Owner and Connect audits (provider ids and refusal codes). Each audit row keeps its actor, action and time.
+- **`test:account-export` 12, in `ci` and `ci.yml`.** It includes the export-parity gate: 47 linked tables; 33 exported, 5 excluded with a reason, 10 staff-only.
+  - Negative control [OBSERVED]: a copy of 038 that leaked the activation code and the finders' words, and added an unclassified table, failed 3 checks (the canaries, the round trip, the classification).
+  - Found before commit: the row cap's `text[] || 'name'` read the name as an array literal. The cap test caught it, and `array_append` fixed it.
+- `test:security` now includes `/api/account` in the inherited-name check (5 functions).

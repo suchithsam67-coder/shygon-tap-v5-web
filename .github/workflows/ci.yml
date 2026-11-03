@@ -216,6 +216,12 @@ jobs:
       - name: Verified Tap (local stack)
         run: npm run test:verified-tap
 
+      # The owner data export (V01 T-10, DEC-2026-044, approved for the local
+      # build): migration 038 and /api/account on the local stack. Includes the
+      # export-parity gate: every table linked to an account must be classified.
+      - name: Owner data export (local stack)
+        run: npm run test:account-export
+
       # The hosted release-check runners P1 / P2 (scripts/release/), exercised
       # against the local stack only, with a negative control (a stand-in host
       # that trusts forged headers) and the production / plain-http refusals.

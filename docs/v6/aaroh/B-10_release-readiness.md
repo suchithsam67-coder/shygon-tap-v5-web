@@ -776,3 +776,41 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
 - A 409 on a retried Lost activation means the relay went off.
 
 **Verdict unchanged:** release BLOCKED (§18). Lost stays OFF in the catalogue and behind `RESCUE_RELAY`.
+
+## 23. 2026-11-03: the owner data export (V01 T-10) built locally (migration 038, contract v0.12)
+
+**Scope:** the founder approved the Version 01 scope on 2026-11-02 ("Approve F-1", relayed by the coordinator with the founder's words; `docs/shygon-os/v01/`). Data export is a V01 row.
+
+**Approval:** the owner, in this session on 2026-11-03: "Approve T-10 build". That answered "Approve building T-10 locally on DEC-2026-044's recommended answers?", so Q1–Q6 are as recommended. Local only. Counsel reviews the privacy-notice wording before release.
+
+**Built:**
+- `038_owner_data_export.sql`: `account_export_build` (STABLE, one snapshot, explicit field lists) and `account_export_request` (5 per 24 hours under a per-account lock; the vCard fields; one `account_events` row). Both service-only; no new table.
+- `/api/account` `owner.export` (+ the Vercel adapter) and `netlify/lib/vcard.mjs` (vCard 3.0, escaped and folded).
+- Contract AAROH-API v0.12, §4a. O-4, the browser export, is superseded.
+- `test:account-export` 12, in `ci` and `ci.yml`. `test:security` covers `/api/account` in the inherited-name check.
+
+**What the owner gets, and what is left out:** see DEC-2026-044 §4.2 and §8.
+- In: the owner's own data from every AAROH table.
+- Out: other people's data (finders' words, the Connect counterpart, contacts' full numbers, visitors, staff) and security values (activation codes, the chip's serial number, hashes, digests, keys).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites].
+
+| Group | Results |
+|---|---|
+| `test:db` | verify 21; adversarial 64; RLS matrix 1615 (no new table); identity 69; admin-notes 12; golden **20** (a new stage for 038, byte-identical); admin-contract 17 (two new service-only functions; the client-executable set is unchanged: 66 as on live + 3 approved); rollbacks **19** (038 restores exactly); account-deletion 9; history 2; bundle as one batch and twice |
+| New | `test:account-export` **12** |
+| Other suites, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 15, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 17; local-host 9; admin-edge 11; observability 10; security 12 (now 5 functions); components 23/23; preview-checks 13 (ports 4383/54531); `npm audit --audit-level=high` exit 0 (12 moderate: the known minimatch advisory) |
+| `test:secrets` | gitleaks 8.30.1 (the pinned version; the earlier copy had been cleared, so Session B's copy was used): only the known V6-014 finding (`9c8caa7`), before and after this commit |
+
+**Negative control** [OBSERVED]: a copy of 038 that leaked the activation code and the finders' words, and added an unclassified table, failed 3 of the 12 checks: the canaries, the round trip and the classification. The clean 038 was restored and compared byte for byte.
+
+**Corrected before commit:** the row cap appended a section name with `text[] || 'name'`, which PostgreSQL read as an array literal. The cap test caught it, and `array_append` fixed it.
+
+**Finding for Session B:** the browser export (V6-072, `src/services/privacy.ts`) cannot read the closed AAROH tables, and its `select('*')` returns `cards.activation_code` and `card_uid`. The page should move to §4a.
+
+**Not run:**
+- two exports racing the limit: PGlite has one connection, so the advisory lock is read from the function instead;
+- browser e2e: Session B has not built the page yet;
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18). The export needs no switch or provider; it is local only, like everything else on this branch.
