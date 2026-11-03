@@ -34,10 +34,12 @@ Nothing here is deployed. Production runs the V5 schema with drift (V6-106).
 | 6 | **SHYGON Verify** | | | ✔ | | doc 03 `credentials`, `verification_records`; doc 10 Phase 3 | issuers (organisations); DEC-037: an AAROH card is not a credential |
 | 7 | **Business Tap / professional profile** | ✔ (local) | | | | `get_public_profile`, Tap editor, add-ons, themes; public-tap 25, golden, identity, matrix | production parity (V6-106) |
 | 8 | **Event Tap** | | seasonal event themes ✔ | event mode | | `tap_event_themes` (admin-managed timed themes) | event-specific profile, attendees: Phase 2 |
-| 9 | **Info** (a public page about a thing or place) / SHYGON Locations | ✔ (local), implementation approved 2026-10-24 (DEC-2026-041); **off in the catalogue** until BQ-1 | Locations ✔ (Phase 4); multiple pages, images, languages and links: not in v1 | | | 034, `/api/modes`, `get_public_tap_mode`, `test:modes` 17 | BQ-1; P1/P2 previews; release track |
+| 9 | **Info** (a public page about a thing or place) / SHYGON Locations | ✔ (local), implementation approved 2026-10-24 (DEC-2026-041); **off in the catalogue** (a per-environment owner switch; BQ-1 built in 035) | Locations ✔ (Phase 4); multiple pages, images, languages and links: not in v1 | | | 034, 035, `/api/modes`, `get_public_tap_mode`, `test:modes` 28 | wording (F-19); Terms (F-13); P1/P2 previews; release track |
 | 10 | **Access Tap** | | | gated (Phase 5) | | doc 10: pen-test, SDM hardware, legal | **Unsupported** for AAROH (DEC-037) |
 | 11 | **SHYGON Privé demo** | ✔ (local), demo only; APPROVED (DEC-2026-040, 2026-10-20) | | real hotel integrations: not built, by decision | | 033, `/api/prive`, `test:prive` 12 | release track; customer wording |
 | 12 | **Cloud Storage** | | | ✔ | | showroom Planned; storage bucket gaps V6-095/V6-108 | no design approved |
+| 13 | **Lost mode** (the owner's own card is missing: "Found this card?" and Return to Owner's form only) | ✔ (local), APPROVED (DEC-2026-041 A-1, 2026-10-25); **off in the catalogue and behind `RESCUE_RELAY`**; hardened after the OpenCode review (contract v0.11.1, 2026-11-02) | Guardian and a lost-item lifecycle: not built, by decision | | | 036, `/api/modes`, `get_public_tap_mode`, `/api/rescue`, `test:modes` 28 | Return to Owner live (hosted P1); wording (F-19); L-1 to L-6 confirmation (F-27); OC-7 frontend review |
+| 14 | **Verified Tap** (NTAG 424 DNA SUN at `/d/<code>`; the verdict and the edition line) | backend ✔ (local), APPROVED FOR THE LOCAL BUILD ONLY (DEC-2026-043, 2026-10-31); **off by host switch `VERIFIED_TAP`**; test keys only | the `/d/` page and badge (Session B): not started | real keys, personalisation, the first chip batch | | 037, `/api/verify`, `netlify/lib/sun.mjs`, `test:verified-tap` 17, `test:sun` 27 | key custody (F-16 Q2), personalisation (Q3), inlay (Q7); the Q5 deviation (F-14); OC-6 review |
 
 Card lifecycle sits under every capability that a physical tap starts. It is partial for V5 cards (activation, OTP, replacement request) and BLOCKED for AAROH: no cards are sold, there is no registry, and `/d/` is not built (contract §3 P-4 and §7).
 
@@ -56,6 +58,8 @@ These describe what a customer could be told if this branch were deployed with i
 | Connect, Verify, Student, Event mode, Info, Locations, Cloud | Coming soon | after their decisions |
 | Access | Unsupported | — |
 | Privé | not shown | Demo, if Q6 = A |
+| Lost mode | Coming soon (switches off) | Available after setup (Return to Owner opt-in), once Return to Owner is live |
+| Verified Tap | not shown (`/d/` answers 404) | Available on new cards from the first personalised batch; older cards keep `/t/` |
 
 ## 3. Process definitions
 
@@ -218,6 +222,41 @@ The conflict is DEC-038 Q6. If the owner chooses demo-only:
 ### 12. Cloud Storage (PLANNED)
 
 No design is approved. The existing storage gaps come first: `profile-images` policies (V6-095) and the bucket missing on production (V6-108). NOT IMPLEMENTED.
+
+### 13. Lost mode (IMPLEMENTED locally, OFF; migration 036, APPROVED, DEC-2026-041 A-1)
+
+- **Actor · Trigger · Preconditions.**
+  - The owner (signed in) switches the Tap to Lost with `/api/modes` `owner.activate`.
+  - A finder (anonymous) opens the Tap and sees only "Found this card?" with Return to Owner's form (§2 above).
+  - Preconditions, all needed: SHYGON has Lost on (`tap_mode_catalog`, OFF by default); the host has `RESCUE_RELAY=on`; the owner's own Return to Owner opt-in is on. Switching to Lost never turns the opt-in on (L-1).
+- **Authorization.** Owner: a verified token, scoped to their own Tap. Finder: Return to Owner's own rules (§2).
+- **Reads / writes.** `tap_mode_state` and `tap_mode_audit` (one row per switch); reads `tap_mode_catalog` and `rescue_settings` (share-locked during activation). Finder messages live in Return to Owner's tables.
+- **States.** Business, Info or Lost: one active mode per Tap. Switching to Business is always allowed; nothing switches while the Tap or the account is suspended.
+- **Response.** The public reader answers `{ mode: 'lost' }` (one key) or `null`, never Business. The owner's preview answers `{}` or `null`, exactly as a visitor would get it.
+- **Failures.** `mode_unavailable` (catalogue or relay off); `needs_setup` with `missing: ['returnToOwner']`; `stale_version`; `tap_suspended`. With the relay off and the catalogue on, the reader may still answer `{ mode: 'lost' }`; `public.status` then answers `false` and the page shows the neutral "unavailable" copy (contract v0.11.1).
+- **Limits.** Return to Owner's finder limits apply unchanged.
+- **Audit.** `tap_mode_audit` (`activate`, with the from and to modes); Return to Owner's audit for messages.
+- **Privacy.** The Lost page carries no Business or Info field, no owner detail and no new public field. P-1 (`get_public_profile`) is `null` while Lost is active (035). Any switch turned off gives the neutral `null`.
+- **Tests.** `test:modes` section C (the catalogue × relay matrix, the relay-off reader, the replay across the relay switch, the lock order); `test:rescue`.
+- **Existing vs new.** A new mode on the 034 machinery; Return to Owner (031) is unchanged.
+- **Not built.** Guardian (deferred with visitor alerts); a lost-item lifecycle tied to the card registry (DEC-2026-028, T-08/T-09).
+
+### 14. Verified Tap (backend IMPLEMENTED locally, OFF; migration 037, APPROVED FOR THE LOCAL BUILD ONLY, DEC-2026-043)
+
+- **Actor · Trigger · Preconditions.**
+  - A visitor (anonymous) taps a new card. The phone opens `/d/<code>?e=…&c=…`, and the page's script calls `/api/verify` `tap.verify` after load.
+  - Preconditions: host `VERIFIED_TAP=on`; keys for the card's key epoch on the host; the card active and its Tap live; the host reports a trusted visitor address (`TRUSTED_CLIENT_IP_HEADER`).
+- **Authorization.** None for the visitor: the proof is the chip's per-tap MAC. Keys are derived per card (AN10922, by the device id, D-a) and never stored, logged or returned.
+- **Reads / writes.** `tap_device_auth` (locked per check: the last counter, last verified and retired dates); `tap_verify_events` (append-only: code, verdict, a daily visitor digest, time). Reads `cards` and the Tap.
+- **States.** Device: ready, then retired (or at its counter limit: `needs_service`). Each counter value can be `genuine` once.
+- **Response.** `{ slug, verdict, edition? }`. Verdicts: `genuine`, `already_checked`, `not_confirmed`, `needs_service`, `unavailable`, `not_verified`; `null` for a Tap in Lost mode. Never "fake".
+- **Failures.** 404 `unavailable` (switch off, unknown code, card or Tap not live, no trusted address: indistinguishable); 400; 405 (a GET consumes nothing); 429; 503 (never a positive verdict).
+- **Limits.** 30 checks per visitor per hour; 20 refused checks per card per hour.
+- **Audit.** `tap_verify_events` (90-day retention, `verify_purge`).
+- **Privacy.** The chip UID is compared only as a keyed digest and is never stored or returned. The page strips `e` and `c`, sends no referrer and is not cached. It proves the chip, never the person holding it.
+- **Tests.** `test:verified-tap` 17 (a simulated chip with random test keys); `test:sun` 27 (published known-answer vectors; secret-scan exception E-1).
+- **Existing vs new.** New. Legacy `/t/<slug>` cards are unaffected.
+- **Not built.** Real keys and their custody (Q2), personalisation (Q3), the first batch and inlay (Q7), the `/d/` page and badge (Session B), card pairing and "report stolen" (T-08/T-09, DEC-2026-028).
 
 ## 4. Order of work (the owner's 2026-10-16 order, applied)
 
