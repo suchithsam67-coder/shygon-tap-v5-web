@@ -104,7 +104,8 @@ export const saveInfo = (fields: InfoFields, expectedVersion: number) => call<In
 export const clearInfo = () => call<{ cleared: boolean }>({ op: 'owner.info.clear' });
 /**
  * What a visitor would get in that mode (`owner.preview`): for Info, the
- * published fields, or null when the page is incomplete. It does not apply
- * SHYGON's catalogue switch, so the page says separately when Info is off.
+ * published fields, or null whenever a visitor would get nothing. Since
+ * v0.11.1 that includes Info switched off by SHYGON and a paused, unpublished
+ * or suspended Tap, not only an incomplete page.
  */
 export const previewInfo = () => call<{ mode: 'info'; view: PublicInfo | null }>({ op: 'owner.preview', mode: 'info' });

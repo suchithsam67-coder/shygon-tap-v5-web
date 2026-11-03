@@ -335,6 +335,18 @@ export default function TapMode() {
     }
   };
 
+  /**
+   * The preview is null whenever a visitor would get nothing (v0.11.1): Info
+   * switched off, the page incomplete, or the Tap paused, unpublished or
+   * suspended. Say which, from the owner's state, rather than show an empty page.
+   */
+  const previewUnavailable = (): string =>
+    infoMode?.reason === 'not_available'
+      ? 'Until SHYGON switches Info pages on, visitors see "Tap not found" instead.'
+      : infoMode?.reason === 'needs_setup'
+        ? 'Your page is not complete, so a visitor would see "Tap not found" instead.'
+        : 'Visitors cannot see this page right now: your Tap is paused, not published or suspended.';
+
   const lostStatus = (): string => {
     switch (lostMode?.reason) {
       case 'active':
@@ -550,13 +562,7 @@ export default function TapMode() {
               <Eye size={19} aria-hidden="true" />
               <div>
                 <h2 id="tm-preview">What visitors see</h2>
-                <p>
-                  {preview.view
-                    ? infoMode?.reason === 'not_available'
-                      ? 'This is your page as saved. Until SHYGON switches Info pages on, visitors see "Tap not found" instead.'
-                      : 'Exactly what a visitor sees when your Tap shows the Info page.'
-                    : 'Your page is not complete, so a visitor would see "Tap not found" instead.'}
-                </p>
+                <p>{preview.view ? 'Exactly what a visitor sees when your Tap shows the Info page.' : previewUnavailable()}</p>
               </div>
             </div>
             {preview.view && (

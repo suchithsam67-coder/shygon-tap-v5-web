@@ -322,19 +322,39 @@ describe('your Info page', () => {
     expect(sent('owner.info.save')[0]).toMatchObject({ expectedVersion: 2, fields: { detailedInformation: 'Screen: HDMI.\nWi-Fi: ask.' } });
   });
 
-  it('the preview is the visitors’ page; while Info is off, it says visitors see "Tap not found"', async () => {
+  it('the preview is the visitors’ page, with no buttons', async () => {
     handler = (op) =>
       op === 'owner.preview'
         ? { status: 200, body: { mode: 'info', view: { title: info.title, shortDescription: info.shortDescription, category: 'place', detailedInformation: null, updatedAt: info.updatedAt } } }
-        : op === 'owner.state'
-          ? { status: 200, body: state({ available: false, reason: 'not_available' }) }
-          : base(op);
+        : base(op);
     show();
     fireEvent.click(await screen.findByRole('button', { name: /Preview what visitors see/ }));
     const preview = await screen.findByTestId('tm-preview');
     expect(within(preview).getByRole('heading', { level: 2, name: 'Meeting room 3' })).toBeTruthy();
-    expect(screen.getByText(/Until SHYGON switches Info pages on, visitors see "Tap not found" instead/)).toBeTruthy();
+    expect(screen.getByText('Exactly what a visitor sees when your Tap shows the Info page.')).toBeTruthy();
     expect(within(preview).queryByRole('button')).toBeNull();
+  });
+
+  it('an empty preview (v0.11.1) says why, from the owner’s state: Info off, the page incomplete, or the Tap paused', async () => {
+    const cases: [Parameters<typeof state>[0], string][] = [
+      [{ available: false, reason: 'not_available' }, 'Until SHYGON switches Info pages on, visitors see "Tap not found" instead.'],
+      [{ available: false, reason: 'needs_setup', missing: ['title'] }, 'Your page is not complete, so a visitor would see "Tap not found" instead.'],
+      // Ready by the owner's state, yet nothing for visitors: the Tap is paused, unpublished or suspended.
+      [{}, 'Visitors cannot see this page right now: your Tap is paused, not published or suspended.'],
+    ];
+    for (const [over, words] of cases) {
+      handler = (op) =>
+        op === 'owner.preview'
+          ? { status: 200, body: { mode: 'info', view: null } }
+          : op === 'owner.state'
+            ? { status: 200, body: state(over) }
+            : base(op);
+      show();
+      fireEvent.click(await screen.findByRole('button', { name: /Preview what visitors see/ }));
+      expect(await screen.findByText(words)).toBeTruthy();
+      expect(screen.queryByTestId('tm-preview')).toBeNull();
+      cleanup();
+    }
   });
 
   it('deleting asks first; deleting the page your Tap is showing is refused in plain words', async () => {
