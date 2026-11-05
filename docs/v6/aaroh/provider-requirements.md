@@ -26,6 +26,7 @@ Set them in the host's environment (Netlify and/or Vercel). **Never prefix them 
 | `MSG91_EMERGENCY_VERIFY_TEMPLATE_ID` | contact verification | DLT template with variables `##name##` (owner name) and `##otp##` (code). Names configurable: `MSG91_EMERGENCY_NAME_VAR`, `MSG91_OTP_VAR` |
 | `MSG91_EMERGENCY_OWNER_TEMPLATE_ID` | owner-initiated alert | Variables `##name##`, `##time##` (`MSG91_EMERGENCY_TIME_VAR`) |
 | `MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID` | visitor-initiated alert | Variables `##name##`, `##time##` |
+| `MSG91_PHONE_VERIFY_TEMPLATE_ID` | account phone verification (DEC-2026-045, contract §4b) | Variable `##otp##` (`MSG91_OTP_VAR`). Until it is registered, `phone.verify.start` answers 503 and `card-otp` refuses every account: card actions need a verified phone |
 | **Twilio:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM` or `TWILIO_MESSAGING_SERVICE_SID` | Twilio | An India sender also needs Twilio's India DLT registration |
 | `MSG91_DLR_SECRET` | MSG91 delivery reports | A random value of 32 or more characters. In MSG91: SMS > Webhook (New) > event "On Report Received", URL `https://<production host>/api/sms-status?provider=msg91`, content type JSON, custom header `x-shygon-dlr-secret: <the same value>`. MSG91 does not sign webhooks, so this header is the only proof a report came from your MSG91 account. Without it, alerts stay `sent` (unconfirmed) |
 | `SMS_STATUS_CALLBACK_URL` | Twilio delivery receipts | Exactly `https://<production host>/api/sms-status`. The signature is checked against this exact string, so it must match the public URL character for character. Without it, alerts stay `sent` (unconfirmed) |
@@ -43,6 +44,7 @@ MSG91 sends only pre-approved templates. The texts used with Twilio are below; r
 1. **Verification:** "SHYGON: ##name## wants to add you as an emergency contact. If you agree, give them this code: ##otp##. It expires in 10 minutes. If you do not know them, ignore this message."
 2. **Owner alert:** "SHYGON emergency alert: ##name## has asked for help and wants you to contact them now (sent ##time## IST). SHYGON does not contact emergency services. If they are in danger, call 112."
 3. **Visitor alert:** "SHYGON emergency alert: someone using the SHYGON profile of ##name## reported an emergency at ##time## IST. SHYGON cannot confirm it. Try to reach them directly. If they may be in danger, call 112." (Wording approved by the owner on 2026-10-25, relayed by the coordination session: two variables, the same as item 2, and no apostrophe next to a variable.)
+4. **Account phone verification** (DEC-2026-045 Q5; wording approved with the build on 2026-11-05): "SHYGON: ##otp## is your code to verify this phone number for your SHYGON account. It expires in 10 minutes. Do not share it with anyone."
 
 `##name##` is the owner's own name, reduced by the database to letters, spaces and `.'-` (30 characters at most). It can carry no link.
 
@@ -68,7 +70,7 @@ A provider accepting a message does not prove it was received or read. The API a
 ## 6. Human actions required (none can be done by Session A)
 
 1. **Owner:** decide DEC-2026-038 Q3 (provider) and Q2 (visitor alerts in production).
-2. **Owner or operator:** create the provider account. For MSG91: register the three DLT templates and the sender ID. For Twilio: India sender registration.
+2. **The adult authorised signatory (F-2), never the founder personally:** create the provider account. For MSG91: register the four DLT templates and the sender ID. For Twilio: India sender registration.
 3. **Operator:** set the §2 variables on the production host (after the B-1 rotation), plus `CRON_SECRET` and the schedule (§4).
    - Before either public switch, set `TRUSTED_CLIENT_IP_HEADER` for that host.
    - **Owner:** on a preview deployment of each host, send a request with a forged `x-nf-client-connection-ip` and a forged `x-vercel-forwarded-for`, and confirm the function receives the platform's address. The method is in `docs/v6/aaroh/B-9_client-address-plan.md` §6.

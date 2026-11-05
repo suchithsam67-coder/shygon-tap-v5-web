@@ -18,7 +18,9 @@ import { sendText, SmsError, smsProvider, toE164 } from '../lib/sms.mjs';
  *     with OTP_SECRET. The table is unreachable from browsers (RLS, no policies).
  *   - 10-minute expiry, 5 attempts per code, 45 s between sends, 5 sends per
  *     hour per account. A code is single-use (consumed with a conditional update).
- *   - The card must belong to the caller; the number is the one on their account.
+ *   - The card must belong to the caller; the number is the one on their account,
+ *     and only once it is verified and past its wait (DEC-2026-045, finding F4):
+ *     409 code 'phone_not_verified' or 'phone_cooling_down' (+ retryAfter) otherwise.
  *
  * Talks to Supabase over HTTP (PostgREST / GoTrue) rather than supabase-js, so
  * it also runs on Node 20 in local development.
@@ -177,6 +179,16 @@ async function requestCode(cfg, user, body, request) {
       { error: 'Add your mobile number in Settings first. The code is sent to that number.', needsPhone: true },
       422,
     );
+  }
+  // DEC-2026-045 (finding F4): the code goes only to a verified account phone, and
+  // a number that replaced a verified one waits 24 hours. Nothing is sent otherwise.
+  const trust = await rest(cfg, 'rpc/account_phone_state', { method: 'POST', body: { p_user: user.id, p_phone_e164: phone } });
+  if (trust?.verified !== true) {
+    return json({ error: 'Verify your mobile number first. The code is sent only to a verified number.', code: 'phone_not_verified' }, 409);
+  }
+  if (trust.usable !== true) {
+    const retryAfter = Math.max(1, Math.ceil((Date.parse(trust.usableFrom) - Date.now()) / 1000));
+    return json({ error: 'Your mobile number was changed recently. For your security, it can confirm card changes 24 hours after it was verified.', code: 'phone_cooling_down', retryAfter }, 409);
   }
 
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();

@@ -43,6 +43,7 @@ const EXPORTED = [
   'rescue_settings', 'rescue_threads', 'rescue_messages', 'rescue_blocks', 'rescue_audit',
   'connect_settings', 'connections', 'consent_grants', 'connect_audit',
   'prive_demo_requests', 'prive_demo_request_events', 'notifications', 'support_tickets', 'support_messages', 'account_events',
+  'account_phone_verifications',
 ];
 const EXCLUDED = {
   card_otp_challenges: 'security: one-time code hashes',
@@ -50,6 +51,7 @@ const EXCLUDED = {
   emergency_delivery_attempts: 'internal: provider delivery records (each alert shows its delivery status)',
   tap_events: 'visitors: analytics about the people who opened the Tap',
   tap_verify_events: 'visitors: the Verified Tap log (daily visitor digests); linked by code, not by a foreign key',
+  account_phone_challenges: 'security: phone verification code hashes and number digests (039)',
 };
 const STAFF_ONLY = {
   admin_users: 'staff accounts', admin_audit_log: 'staff audit', admin_notifications: 'staff inbox',
@@ -117,6 +119,8 @@ function canaries(n) {
     verifyDigest: hex('beef', 15) + String(n).padStart(4, '0'),
     modesIdem: `CANARYIDEMPMODES0000${n}`,
     modesResult: `CANARY-LAST-RESULT-${n}`,
+    phoneCodeDigest: hex('d1e5', 15) + String(n).padStart(4, '0'),
+    phoneCodeHash: hex('c0de', 15) + String(n).padStart(4, '0'),
     benId: ben.userId,
     staffId: sam.userId,
   };
@@ -201,6 +205,9 @@ async function seedOwner(u, n, slug) {
   await q(`INSERT INTO public.card_otp_challenges (user_id, card_id, action, code_hash, expires_at) VALUES ($1, $2, 'activate', $3, now() + interval '5 minutes')`,
     [u.userId, card, C.otpHash]);
   await q(`INSERT INTO public.tap_events (tap_profile_id, event_type, visitor_hash) VALUES ($1, 'view', $2)`, [tap, C.visitorHash]);
+  await q(`INSERT INTO public.account_phone_verifications (user_id, phone_e164) VALUES ($1, '+919812345678')`, [u.userId]);
+  await q(`INSERT INTO public.account_phone_challenges (id, user_id, phone_digest, phone_last4, code_hash, expires_at)
+    VALUES (gen_random_uuid(), $1, $2, '5678', $3, now() + interval '10 minutes')`, [u.userId, C.phoneCodeDigest, C.phoneCodeHash]);
   return { C, code, slug, n };
 }
 
@@ -334,6 +341,7 @@ await t.check('the owner gets their own data in every exported section', async (
     support_tickets: x.support[0]?.reference === 'ST-EXP1AAAA',
     support_messages: x.support[0]?.messages.map((m) => [m.from, m.body]).join('|') === 'customer,My card is not scanning|admin,We have received your request',
     account_events: x.accountEvents.some((e) => e.eventType === 'tap_published'),
+    account_phone_verifications: x.phoneVerification?.last4 === '5678' && typeof x.phoneVerification.verifiedAt === 'string',
   };
   assertEqual(Object.keys(PRESENT).sort(), [...EXPORTED].sort(), 'every exported table has a round-trip check');
   const missing = Object.entries(PRESENT).filter(([, ok]) => !ok).map(([k]) => k);
@@ -427,7 +435,7 @@ await t.check('after the deletion procedure, the export holds only the orders ke
   const left = lists(after).filter(([k, n]) => n > 0 && !['orders', 'excluded'].includes(k));
   assertEqual(left, [], 'lists still holding rows');
   assertEqual([after.account.profile, after.account.customer, after.modes.info, after.emergency.settings, after.returnToOwner.settings,
-    after.returnToOwner.activeBlocks, after.connect.settings], [null, null, null, null, null, 0, null], 'single records');
+    after.returnToOwner.activeBlocks, after.connect.settings, after.phoneVerification], [null, null, null, null, null, 0, null, null], 'single records');
   assertEqual([after.orders.length, after.orders[0].orderId, after.orders[0].items.length], [1, 'ST-EXPORT2-0001', 1], 'the order is kept');
   assertEqual(leaks(D.C, JSON.stringify(after)), [], 'canaries after deletion');
   return 'export and deletion agree table by table';

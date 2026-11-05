@@ -222,6 +222,12 @@ jobs:
       - name: Owner data export (local stack)
         run: npm run test:account-export
 
+      # Account phone verification (V01 T-11, DEC-2026-045, approved for the local
+      # build): migration 039, /api/account phone operations, card-otp and the order
+      # text on the local stack, texts to the SMS stand-in only.
+      - name: Account phone verification (local stack)
+        run: npm run test:phone-verify
+
       # The hosted release-check runners P1 / P2 (scripts/release/), exercised
       # against the local stack only, with a negative control (a stand-in host
       # that trusts forged headers) and the production / plain-http refusals.

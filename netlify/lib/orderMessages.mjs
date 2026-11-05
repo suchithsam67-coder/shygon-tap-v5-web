@@ -4,7 +4,8 @@ import { env, sendText, SmsError, toE164 } from './sms.mjs';
 /**
  * The order confirmation text, sent once a paid order is fulfilled, to the
  * mobile number the customer gave at checkout (or, for an order with no
- * delivery address, the one on their account).
+ * delivery address, the one on their account, but only once it is verified:
+ * DEC-2026-045).
  *
  * Exactly once: the order row is claimed by setting confirmation_sms_at where
  * it is still empty (migration 019), so the browser path and the webhook can
@@ -38,15 +39,23 @@ export async function sendOrderConfirmation(admin, orderId, log = requestLog('or
     const order = claimed?.[0];
     if (!order) return { sent: false, reason: 'already-sent' };
 
-    let phone = order.shipping_phone;
-    if (!phone && order.user_id) {
-      const { data: profile } = await admin.from('profiles').select('phone').eq('id', order.user_id).maybeSingle();
-      phone = profile?.phone ?? null;
-    }
-    const to = toE164(phone);
-
     const record = (status) =>
       admin.from('orders').update({ confirmation_sms_status: status }).eq('id', order.id);
+
+    let to = toE164(order.shipping_phone);
+    if (!order.shipping_phone && order.user_id) {
+      const { data: profile } = await admin.from('profiles').select('phone').eq('id', order.user_id).maybeSingle();
+      const accountPhone = toE164(profile?.phone);
+      if (accountPhone) {
+        // The account phone is typed by the customer: use it only once verified (DEC-2026-045).
+        const { data: state, error: stateError } = await admin.rpc('account_phone_state', { p_user: order.user_id, p_phone_e164: accountPhone });
+        if (stateError || state?.verified !== true) {
+          await record('unverified_phone');
+          return { sent: false, reason: 'unverified-phone' };
+        }
+        to = accountPhone;
+      }
+    }
 
     if (!to) {
       await record('no_phone');

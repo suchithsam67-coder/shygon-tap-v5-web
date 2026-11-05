@@ -10,7 +10,7 @@
 | **Accountable Owner (A)** | The repository owner (the founder), for the product choices. **The SMS template's DLT registration and the provider account are the adult authorised signatory's (F-2, F-10), not the founder's** |
 | Responsible (R) | Session A (backend): the migration, the operations, the change to `card-otp`, the contract and the tests. Session B (frontend): the verify-your-phone screen and the card page's new refusal |
 | Consulted | The coordination session (V01 task registry T-11); Session B |
-| State | **PROPOSED, 2026-11-05.** Docs only. Session A writes no migration 039, no new operation, no change to `card-otp` and no contract change until the owner approves |
+| State | **APPROVED FOR THE LOCAL BUILD, 2026-11-05.** The owner, in Session A's session: "Approve T-11 build", answering "Approve building T-11 locally on DEC-2026-045's recommended answers?". Q1–Q6 are therefore as recommended (§5), which also answers DEC-2026-022 Q3: this is the start of the verified-contact model (M1.3), limited to the account phone; existing accounts verify once, with no grandfathering. Local only: nothing is applied, pushed or deployed. The DLT template and the provider stay with the adult signatory (F-2, F-10). History: PROPOSED 2026-11-05 (`374babc`) |
 
 Labels: **OBSERVED** (in this repository or a decision record), **INFERRED** (reasoned, not tested), **PROPOSED**.
 
@@ -116,3 +116,26 @@ To build locally: "Approve T-11 local build" (Q1–Q6 as recommended), or the an
 - `test:phone-verify`, plus updates to the deletion procedure, the export-parity map and the RLS matrix.
 
 It then runs the full gates, commits locally and tells Session B. Nothing is applied, pushed or deployed. The DLT template and the provider stay with the adult signatory.
+
+## 8. As built (2026-11-05, local)
+
+Built on `v6/aaroh-backend` to §4 with Q1–Q6 as recommended; readiness report §24 has the evidence. Nothing is applied, pushed or deployed, and no real number was texted: every text went to the local stack's SMS stand-in.
+
+- **Migration 039:**
+  - two closed tables;
+  - `account_phone_state`, `_start`, `_abort`, `_confirm` and `_purge`, service-only, under a per-account advisory lock;
+  - `account_export_build` (038) gains `phoneVerification`. 039's ROLLBACK restores 038's text verbatim; the migration is generated from 038's own text with anchored edits.
+- **`/api/account`** has `phone.status`, `phone.verify.start` and `phone.verify.confirm`. `card-otp` sends only to a verified phone past its wait. `orderMessages` falls back to the account phone only when it is verified. The local stack sets `MSG91_PHONE_VERIFY_TEMPLATE_ID` for its MSG91 stand-in.
+- **Deletion and export:**
+  - `docs/runbooks/account-deletion.sql` deletes both tables;
+  - the T-10 parity gate classifies them: verifications exported (last 4 digits), codes excluded.
+- **Contract AAROH-API v0.13:** §4b, §7 C-2, §4a `phoneVerification`.
+- **Differences from the §4 sketch:**
+  - the per-account hourly limit is `verify_rate_limited`, so its message differs from the export's `rate_limited`;
+  - `phone.status` adds `phoneValid`;
+  - there is no `devCode`: locally, the SMS stand-in receives the text, as for the emergency contacts;
+  - an unsent text answers 502 `sms_failed`.
+- **`test:phone-verify` 12,** in `ci` and `ci.yml`. The order-text unit test now covers both fallbacks (verified: sent; unverified: `unverified_phone`, nothing sent).
+  - **Negative control** [OBSERVED]: against the committed `card-otp` and `orderMessages` (`374babc`), 3 checks failed. Unverified: `card-otp` answered 200 and texted. Stolen session: it texted the swapped-in number at once. Order text: it went to an unverified number.
+- **Residual risk, recorded:** an account that has **never** verified a phone has no earlier number to protect. A stolen session can set and verify its own number and then confirm card actions without the 24-hour wait. Q4 accepted this (no grandfathering, first verification without a wait). Step-up authentication, later than V01 per F-1, closes it.
+- **For the admin app:** an order's `confirmation_sms_status` may now read `unverified_phone`.
