@@ -11,7 +11,7 @@
 | Responsible (R) | Session A (backend). Session B (frontend): the card page and the `/d/<code>` "activate" step |
 | Consulted | The coordination session (V01 task registry T-08, T-09: "Draft DEC-028's V01 subset as PROPOSED; no build yet") |
 | Depends on | **F-14** (the founder accepting the Verified Tap Q5 deviation: the code lives in `tap_device_auth`, not on `cards`). This record assumes it is accepted (Q5) |
-| State | **PROPOSED, 2026-11-10.** Docs only. Nothing is built. DEC-2026-028 itself stays PROPOSED; this record answers only what V01 needs from it |
+| State | **APPROVED FOR THE LOCAL BUILD, 2026-11-10.** The owner (the founder), in Session A's session: "Approve T-08/T-09 build", answering "Approve building T-08/T-09 locally on DEC-2026-047's recommended answers?". Q1–Q7 are therefore as recommended (§4). That includes Q5, accepting the Verified Tap Q5 deviation, which is the founder's F-14; the coordinator records it in the founder register. Local only: nothing is applied, pushed or deployed. DEC-2026-028 itself stays PROPOSED outside this V01 subset. History: PROPOSED 2026-11-10 (`196ade4`) |
 
 Labels: **OBSERVED** (in the live baseline, the code or a decision record), **INFERRED**, **PROPOSED**.
 
@@ -126,3 +126,27 @@ To build locally: "Approve T-08/T-09 local build" (Q1–Q7 as recommended), or t
 - `test:card-lifecycle`.
 
 It runs the full gates, commits locally and tells Session B. Nothing is applied, pushed or deployed. No physical card exists yet.
+
+## 7. As built (2026-11-10, local)
+
+Built on `v6/aaroh-backend` to §3 with Q1–Q7 as recommended; readiness report §26 has the evidence. Nothing is applied, pushed or deployed, and no physical card exists: a simulated chip with random test keys stands in.
+
+- **Migration 041**, generated from 037's and 039's own text:
+  - `card_events` (closed, append-only even for the server);
+  - `card_transition()`;
+  - the guard trigger `trg_cards_guard_transition`: any other writer leaves the row unchanged and is logged as refused;
+  - `tap_device_auth.activated_counter`;
+  - `card_owner_list`, `_card`, `_activate` and `_retire`;
+  - `verify_device_lookup` answers `pairing` for a `pending` or `shipped` card issued to an owner;
+  - the export's per-card `history`.
+  - The ROLLBACK restores 037's and 039's text verbatim.
+- **`netlify/lib/possession.mjs`:** an HMAC proof naming the chip's code and accepted counter, 10 minutes. `/api/verify` adds it to a genuine `pairing` answer. **`/api/cards`** (+ the Vercel adapter) adds C-6 to C-8. Contract AAROH-API v0.15.
+- **Differences from §3:**
+  - **a suspended card is not pairable.** Only `pending` and `shipped` cards are, so an owner cannot re-activate a card an administrator suspended (O-7 stays closed for AAROH cards);
+  - the card operations live on `/api/cards`;
+  - the stolen card answers the neutral `unavailable`, as 037 already does for any card that is not active, with no extra "disabled" message.
+- **How the guard recognises `card_transition`:** the transition records its `card_events` row first, stamped with the transaction id. The guard lets a status change through only when an owner or support event for that card and status exists in the same transaction. No client role can write that table.
+  - **Corrected before commit:** a first version used a transaction-local session setting as the bypass. `test:suspension` refused it: no function an API caller reaches may change a session setting, because a guard must not trust what a caller could forge.
+- **`test:card-lifecycle` 9,** in `ci` and `ci.yml`. The T-10 export-parity map now classifies `card_events` (exported with its card). `test:security` covers `/api/cards` (6 functions).
+  - **Negative control** [OBSERVED]: 041 without its guard trigger failed 3 checks. A direct write activated a shipped AAROH card and revived a retired one.
+- **Not built:** support's undo (a new personalisation; Q7); the `/d/` "Activate" step and the card pages (Session B); real chips and keys (DEC-2026-043 Q2, Q3, Q7).

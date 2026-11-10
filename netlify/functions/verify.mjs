@@ -3,6 +3,7 @@ import { env } from '../lib/sms.mjs';
 import { clientAddress, trustedClientIpHeader } from '../lib/client-address.mjs';
 import { config, hmac, rpc } from '../lib/emergency.mjs';
 import { diversifyKey, verifySun } from '../lib/sun.mjs';
+import { possessionProof } from '../lib/possession.mjs';
 
 /**
  * POST /api/verify: Verified Tap (U1; migration 037; DEC-2026-043, approved for
@@ -22,6 +23,9 @@ import { diversifyKey, verifySun } from '../lib/sun.mjs';
  *   unavailable      the server cannot decide now (no keys for the epoch)
  *   not_verified     no SUN values: a QR, a typed or a shared link
  *   null             the Tap is in Lost mode: the lifecycle answer instead
+ * A card issued to an owner but not yet active (DEC-2026-047) answers with
+ * slug null, and a genuine tap adds `possession`: an opaque, 10-minute,
+ * single-use proof for /api/cards owner.card.activate.
  * A failure never says which check failed. The UID, the keys, `e` and `c` never
  * appear in an answer or a log line.
  *
@@ -98,14 +102,19 @@ async function tapVerify(cfg, request, body, log) {
   const device = await rpc(cfg, 'verify_device_lookup', { p_code: code, p_visitor: visitor });
   if (device?.state === 'rate_limited') return fail('rate_limited', { retryAfter: device.retryAfter });
   if (device?.state === 'lost') return json({ slug: device.slug, verdict: null });
-  if (device?.state !== 'ready' && device?.state !== 'retired') return fail('unavailable');
-  if (!hasE) return json({ slug: device.slug, verdict: 'not_verified' });
+  // DEC-2026-047: a card issued to an owner but not yet active ('pairing') is
+  // checked like any other, opens no Tap, and a genuine tap carries a possession
+  // proof for "tap to activate".
+  const pairing = device?.state === 'pairing';
+  if (!pairing && device?.state !== 'ready' && device?.state !== 'retired') return fail('unavailable');
+  const slug = pairing ? null : device.slug;
+  if (!hasE) return json({ slug, verdict: 'not_verified' });
 
   const keys = mastersFor(device.keyEpoch);
   const pepper = env('VERIFY_UID_PEPPER');
   if (!keys || !pepper || pepper.length < 32) {
     log.warn('verify.keys-unavailable', { keyEpoch: device.keyEpoch, pepperSet: Boolean(pepper) });
-    return json({ slug: device.slug, verdict: 'unavailable' });
+    return json({ slug, verdict: 'unavailable' });
   }
   const input = deviceInput(device.cardId);
   const tap = verifySun({
@@ -121,8 +130,10 @@ async function tapVerify(cfg, request, body, log) {
     p_counter: tap.ok ? tap.readCounter : null,
     p_visitor: visitor,
   });
-  log.info('verify.checked', { verdict: result?.verdict ?? 'unavailable', refusal: tap.ok ? null : tap.reason });
-  return json({ slug: device.slug, verdict: result?.verdict ?? 'unavailable', ...(result?.edition ? { edition: result.edition } : {}) });
+  log.info('verify.checked', { verdict: result?.verdict ?? 'unavailable', refusal: tap.ok ? null : tap.reason, pairing });
+  const answer = { slug, verdict: result?.verdict ?? 'unavailable', ...(result?.edition ? { edition: result.edition } : {}) };
+  if (pairing && answer.verdict === 'genuine') answer.possession = possessionProof(cfg.secret, code, tap.readCounter);
+  return json(answer);
 }
 
 async function handle(request, log) {

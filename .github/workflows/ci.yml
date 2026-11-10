@@ -234,6 +234,12 @@ jobs:
       - name: Admin MFA opt-in (local stack)
         run: npm run test:admin-mfa
 
+      # Card pairing ("tap to activate") and report stolen (V01 T-08/T-09,
+      # DEC-2026-047, approved for the local build): migration 041, /api/verify
+      # and /api/cards with a simulated chip and random TEST keys.
+      - name: Card pairing and report stolen (local stack)
+        run: npm run test:card-lifecycle
+
       # The hosted release-check runners P1 / P2 (scripts/release/), exercised
       # against the local stack only, with a negative control (a stand-in host
       # that trusts forged headers) and the production / plain-http refusals.

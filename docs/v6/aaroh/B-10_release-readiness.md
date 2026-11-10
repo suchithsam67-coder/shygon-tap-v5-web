@@ -899,3 +899,45 @@ The two admin edge functions check access on their own.
 - the break-glass runbook (Q5, the adult incident lead).
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 26. 2026-11-10: card pairing and report stolen (V01 T-08, T-09) built locally (migration 041, contract v0.15)
+
+**Approval:** the owner, in this session on 2026-11-10: "Approve T-08/T-09 build". That answered "Approve building T-08/T-09 locally on DEC-2026-047's recommended answers?", so Q1–Q7 are as recommended, including F-14: the Verified Tap code stays in `tap_device_auth`.
+
+**Built:**
+- **Migration 041,** generated from 037's and 039's text:
+  - the append-only `card_events`, `card_transition()` and a guard trigger for AAROH cards;
+  - `verify_device_lookup` answers `pairing` for a `pending` or `shipped` card;
+  - the owner card functions, and each card's history in the export.
+- **The possession proof** (`netlify/lib/possession.mjs`) on a genuine pairing tap.
+- **`/api/cards`:** list, tap to activate, report stolen.
+- **Contract AAROH-API v0.15** (§7 C-6 to C-8, §10d).
+
+**The rules:**
+- An AAROH card becomes active only with a genuine tap of that card plus its owner's own session, and it never expires.
+- Every other writer is refused and logged.
+- A suspended card is not pairable (O-7 stays closed).
+- Report stolen is terminal, and the card then opens nothing.
+- V5 cards keep every live path. `/t/` still opens for them (F3), and the contract says so.
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites; a simulated chip with random test keys].
+
+| Group | Results |
+|---|---|
+| `test:db` | verify 21; adversarial 64; RLS matrix **1729** (61 tables, `card_events` closed to all 7 callers); identity 69; admin-notes 12; golden **23** (a new stage for 041, byte-identical); admin-contract 21 (`card_events` an approved new, closed relation; no new client-executable function); rollbacks **22** (041 restores exactly, 037's lookup and 039's export builder included); account-deletion 9; history 2; the bundle current and applied as one batch and twice |
+| New and changed | `test:card-lifecycle` **9**; `test:account-export` 12 (`card_events` exported with its card); `test:security` 12 (6 functions); `test:verified-tap` 17 (active cards unchanged) |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension **46**; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; account-export 12; phone-verify 12; admin-mfa 9; local-host 9; admin-edge 11; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 (7 moderate) |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`), before and after this commit |
+
+**Negative control** [OBSERVED]: 041 without its guard trigger failed 3 of the 9 checks. A direct write activated a shipped AAROH card and revived a retired one. The real 041 was restored and compared byte for byte.
+
+**Corrected before commit:** the guard first recognised `card_transition` by a transaction-local session setting. `test:suspension` refused it (no reachable function may change a session setting). It now recognises the transition's own `card_events` row, written first in the same transaction, which no client can write. The negative control was re-run on the final design.
+
+**Not run or not built:**
+- two activations racing (PGlite has one connection; the rows are locked `FOR UPDATE`);
+- support's undo (a new personalisation);
+- Session B's pages;
+- real chips and keys (DEC-2026-043 Q2, Q3, Q7);
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).
