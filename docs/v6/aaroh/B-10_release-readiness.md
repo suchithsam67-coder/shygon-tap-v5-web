@@ -859,3 +859,43 @@ The new files were restored and compared byte for byte.
 - any hosted check.
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 25. 2026-11-10: administrator MFA, step 2 (V01 T-12) built locally (migration 040, contract v0.14)
+
+**Assessment first, as the coordinator asked** (DEC-2026-046, `a1863b8`). Requiring a second factor at once would lock every administrator out:
+- the Expo admin app has no MFA screens;
+- it re-runs `admin_me()` on every token refresh;
+- it signs the operator out on 42501.
+
+The two admin edge functions check access on their own.
+
+**Approval:** the owner, in this session on 2026-11-10: "Approve T-12 option A", answering "Approve building step 2 of T-12 (the opt-in database rule) locally?". Q1–Q5 are as recommended.
+
+**Built:**
+- **Migration 040:**
+  - `is_admin` and `admin_has` also need `admin_mfa_satisfied()`;
+  - `require_admin` and `admin_me` refuse with `admin:mfa_required` (P0001, never 42501);
+  - `admin_mfa_status()` for the app; `admin_mfa_set_required()` service-only; the switch row OFF.
+- **The local stack:** `auth.jwt()` and `auth.mfa_factors` in the platform shim. The auth stand-in gains GoTrue's MFA endpoints with RFC 6238 codes and `aal2` sessions.
+- **Contract AAROH-API v0.14 (§12a)**, and the admin-contract approvals for the four frozen edits.
+
+**The rule:** an administrator who has a verified factor must use an `aal2` session for every admin function, the admin read policies and `admin_me`. An administrator without a factor is unaffected until the switch is turned on (step 3).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites].
+
+| Group | Results |
+|---|---|
+| `test:db` | verify 21; adversarial 64; RLS matrix **1704** (60 tables, the switch closed to all 7 callers); identity 69; admin-notes 12 (administrators without a factor, unchanged); golden **22** (a new stage for 040, byte-identical); admin-contract **21** (the four frozen body edits approved exactly; `admin_mfa_status()` the only new client-executable function); rollbacks **21** (040 restores exactly); account-deletion 9; history 2; bundle as one batch and twice |
+| New | `test:admin-mfa` **9** (through supabase-js's MFA API) |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 17; account-export 12; phone-verify 12; local-host 9; admin-edge 11; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 (7 moderate) |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`), before and after this commit |
+
+**Negative control** [OBSERVED]: 040 without its four frozen-function edits failed 2 of the 9 checks. An enrolled administrator's password-only session was accepted, and the switch had no effect. The real 040 was restored and compared byte for byte.
+
+**Open, with their own approvals:**
+- the admin app's MFA screens (DEC-2026-046 Q2: no session owns `../shygon-tap-v5-admin`, and it is not under version control);
+- `admin-refund` and `admin-push`, which still accept a password-only administrator session (Codex, after V6-094);
+- step 3, switching ON (Q4);
+- the break-glass runbook (Q5, the adult incident lead).
+
+**Verdict unchanged:** release BLOCKED (§18).

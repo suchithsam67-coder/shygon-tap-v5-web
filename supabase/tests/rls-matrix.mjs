@@ -239,6 +239,9 @@ const MODEL = {
   // the owner reaches them only through /api/account.
   account_phone_verifications: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   account_phone_challenges: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  // The administrators' mandatory second-factor switch (040, DEC-2026-046 step 2): closed;
+  // set only with the service key (admin_mfa_set_required).
+  admin_security_settings: { owner: NONE, select: sel(NONE, NONE) },
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };

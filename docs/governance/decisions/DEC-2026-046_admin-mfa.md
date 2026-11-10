@@ -10,7 +10,7 @@
 | **Accountable Owner (A)** | The repository owner (the founder), for the product choice. The break-glass recovery belongs with the adult incident lead (F-3) |
 | Responsible (R) | Session A (backend): the database rule, its status function, the local stack and the tests. **The admin app has no owning session** (Q2). Codex: the two admin edge functions, after V6-094 |
 | Consulted | The coordination session (V01 task registry T-12: "FIRST assess the impact on the Expo admin app … Report before building anything") |
-| State | **PROPOSED, 2026-11-10.** Assessment only, read-only. Nothing is built or changed, and no admin account is touched |
+| State | **OPTION A APPROVED; STEP 2 APPROVED FOR THE LOCAL BUILD, 2026-11-10.** The owner, in Session A's session: "Approve T-12 option A", answering "Approve building step 2 of T-12 (the opt-in database rule) locally?". Q1–Q5 are therefore as recommended (§5). Step 2 is built locally only: nothing is applied, pushed or deployed, and no admin account is touched. Step 1 (the app screens; owner to be assigned, Q2), the edge functions (Codex, after V6-094) and step 3 (the mandatory switch, Q4) follow their own approvals. History: PROPOSED 2026-11-10 (`a1863b8`) |
 
 Labels: **OBSERVED** (read in the admin app folder or this repository), **INFERRED** (vendor documentation, not tested here), **PROPOSED**.
 
@@ -113,3 +113,20 @@ To build step 2 locally: "Approve T-12 option A" (Q1–Q5 as recommended), or th
 - `test:admin-mfa` and the admin-contract approvals.
 
 It runs the full gates, commits locally and reports. **Nothing changes for any administrator until someone enrols a factor.** The app screens (Q2), the edge functions (Codex) and step 3 (Q4) follow their own approvals.
+
+## 8. As built: step 2 (2026-11-10, local)
+
+Built on `v6/aaroh-backend` to §4 (database and local stack). Readiness report §25 has the evidence. Nothing is applied, pushed or deployed; no administrator account exists outside the local stack.
+
+- **Migration 040**, generated from the live baseline's own text:
+  - `is_admin()` and `admin_has()` gain `AND public.admin_mfa_satisfied()`;
+  - `require_admin()` and `admin_me()` raise `admin:mfa_required` (P0001) for an active administrator who is not satisfied;
+  - five new functions (`admin_mfa_required`, `_satisfied`, `_pending`, `_status`, `_set_required`) and the closed switch row `admin_security_settings` (OFF).
+  - The ROLLBACK restores the four baseline bodies, CR-normalised. The live dump keeps CRLF inside them; 040 writes LF, as the harness loads the baseline and as the 035 production variant hashes bodies. The VERIFY ON LIVE md5 is taken the same way.
+- **Admin-contract gate:** the four body edits are approved exactly (`T12_*` replacements). `admin_mfa_status()` is the only new client-executable function. The five new `admin_*` names are listed; the switch table is an approved new, closed relation.
+- **Local stack:**
+  - `supabase/tests/live-platform-shim.sql` gains `auth.jwt()` and `auth.mfa_factors`, as on a hosted project;
+  - `supabase/local/auth.mjs` gains GoTrue's MFA endpoints (enrol, challenge, verify, unenrol): TOTP per RFC 6238 (`supabase/local/totp.mjs`, checked against Appendix B), `aal2` sessions kept on refresh, `insufficient_aal` to add or remove a factor from `aal1`, and the user's factors on sign-in so supabase-js's `getAuthenticatorAssuranceLevel()` reports the next level.
+- **`test:admin-mfa` 9,** in `ci` and `ci.yml`, driven through supabase-js's own MFA API (the admin app's client).
+  - **Negative control** [OBSERVED]: 040 without its four frozen-function edits failed 2 checks: an enrolled administrator's password-only session was accepted, and the switch had no effect.
+- **Not built (their own approvals):** step 1 (the admin app's screens; Q2, no owner yet); the edge functions (Codex, after V6-094); step 3 (switching ON; Q4); the break-glass runbook (Q5). **Until the edge functions follow, refunds and push accept a password-only administrator session even when a factor is enrolled.**

@@ -228,6 +228,12 @@ jobs:
       - name: Account phone verification (local stack)
         run: npm run test:phone-verify
 
+      # Administrator MFA, opt-in (V01 T-12, DEC-2026-046 step 2, approved for the
+      # local build): migration 040 through supabase-js's MFA API against the local
+      # stand-in's TOTP factors.
+      - name: Admin MFA opt-in (local stack)
+        run: npm run test:admin-mfa
+
       # The hosted release-check runners P1 / P2 (scripts/release/), exercised
       # against the local stack only, with a negative control (a stand-in host
       # that trusts forged headers) and the production / plain-http refusals.
