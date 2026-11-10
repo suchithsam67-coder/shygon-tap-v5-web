@@ -30,10 +30,11 @@ function startExperience() {
   return experienceChunk;
 }
 const PublicExperience = lazy(() => startExperience().catch(loadExperience));
-// Opened at a Tap address (the card, a QR scan): start now rather than wait
-// for React's first render. These are the paths App.tsx routes here; one
-// missing from this list only loses the head start.
-if (['/t/:username', '/tap/:username'].some((path) => matchPath(path, window.location.pathname))) {
+// Opened at a Tap address (the card, a QR scan, a verified tap): start now
+// rather than wait for React's first render. These are the paths App.tsx
+// routes here (/d/ through VerifiedTap); one missing from this list only loses
+// the head start.
+if (['/t/:username', '/tap/:username', '/d/:code'].some((path) => matchPath(path, window.location.pathname))) {
   startExperience();
 }
 /** A Tap in Info mode: a small page of its own, fetched only when one is shown. */
@@ -117,12 +118,14 @@ type Outcome =
   | { kind: 'offline' }
   | { kind: 'error' };
 
-export default function PublicTap() {
+/** `slug`: the Tap to show when the address does not name it, as on a verified tap (/d/<code>). */
+export default function PublicTap({ slug: given }: { slug?: string } = {}) {
   // When the address check above did not start it, as after an in-app
   // navigation here. In render, not an effect: the download is under way
   // before the profile request this render's effect sends.
   startExperience();
-  const { username: slug } = useParams();
+  const { username } = useParams();
+  const slug = given ?? username;
   const [searchParams] = useSearchParams();
 
   const [outcome, setOutcome] = useState<Outcome>(() =>
@@ -282,11 +285,7 @@ function TapOutcome({ outcome, slug, retry }: { outcome: Outcome; slug: string |
         message="The owner has paused this Tap. It should be back shortly."
       />
     ) : (
-      <TapStatePage
-        icon={<SearchX size={24} />}
-        title="Tap not found"
-        message="This Tap is not available. Check the link on your card, or ask the owner to share it again."
-      />
+      <TapNotFound />
     );
   }
 
@@ -340,7 +339,18 @@ function TapOutcome({ outcome, slug, retry }: { outcome: Outcome; slug: string |
   );
 }
 
-function TapLoading() {
+/** The neutral page for a Tap that is missing, a draft, archived or suspended: all of them read the same. */
+export function TapNotFound() {
+  return (
+    <TapStatePage
+      icon={<SearchX size={24} />}
+      title="Tap not found"
+      message="This Tap is not available. Check the link on your card, or ask the owner to share it again."
+    />
+  );
+}
+
+export function TapLoading() {
   return (
     <main className="tap-state-page">
       <div>
@@ -353,7 +363,7 @@ function TapLoading() {
   );
 }
 
-function TapStatePage({
+export function TapStatePage({
   icon,
   title,
   message,

@@ -1,0 +1,22 @@
+/* A verified tap (/d/<code>): one calm line above the Tap's own page (v0.11 §10d). */
+
+.vt-verdict {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0b1324;
+  color: #fff;
+  font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.vt-verdict svg { flex: none; margin-top: 1px; }
+.vt-verdict p { display: grid; gap: 2px; max-width: 60ch; margin: 0; }
+.vt-ok { background: #0c2419; }
+.vt-ok svg { color: #6ee7a8; }
+.vt-caution { background: #261d0c; }
+.vt-caution svg { color: #fbbf24; }
+.vt-edition { color: rgba(255, 255, 255, 0.82); font-weight: 600; letter-spacing: 0.04em; }

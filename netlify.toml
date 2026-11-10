@@ -29,6 +29,15 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), browsing-topics=(), payment=(self \"https://api.razorpay.com\")"
 
+# A verified tap's address carries the chip's one-time values (?e=…&c=…), so it
+# is never sent on as a Referer and never cached (AAROH-API v0.11 §10d). This
+# comes after "/*", so its Referrer-Policy is the one that applies.
+[[headers]]
+  for = "/d/*"
+  [headers.values]
+    Referrer-Policy = "no-referrer"
+    Cache-Control = "no-store"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
@@ -306,6 +315,12 @@
 
 [[redirects]]
   from = "/tap/*"
+  to = "/index.html"
+  status = 200
+
+# A verified tap: the address an AAROH card's secure chip writes (v0.11 §10d).
+[[redirects]]
+  from = "/d/*"
   to = "/index.html"
   status = 200
 

@@ -24,6 +24,8 @@ import BrandLoader from './components/BrandLoader';
 const AccountApp = lazy(() => import('./AccountApp'));
 /** The AAROH demo showroom: public, no session, its own chunk (FE-D7). */
 const AarohExperienceDemo = lazy(() => import('./pages/AarohExperienceDemo'));
+/** A verified tap, the address an AAROH card's secure chip writes (v0.11 §10d): public, no session, its own chunk. */
+const VerifiedTap = lazy(() => import('./pages/VerifiedTap'));
 
 function AppFallback() {
   return <BrandLoader label="Loading SHYGON Tap…" />;
@@ -40,6 +42,14 @@ export default function App() {
         */}
         <Route path="/t/:username" element={<PublicTap />} />
         <Route path="/tap/:username" element={<PublicTap />} />
+        <Route
+          path="/d/:code"
+          element={
+            <Suspense fallback={<AppFallback />}>
+              <VerifiedTap />
+            </Suspense>
+          }
+        />
         <Route
           path="/aaroh/experience"
           element={
