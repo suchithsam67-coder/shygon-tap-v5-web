@@ -26,6 +26,7 @@ const CLIENTS: Record<string, string[]> = {
   '/api/connect': ['src/services/connect.ts', 'src/lib/publicConnectClient.ts'],
   '/api/modes': ['src/services/tapMode.ts'],
   '/api/verify': ['src/lib/publicVerifyClient.ts'],
+  '/api/account': ['src/services/account.ts'],
 };
 const PUBLIC_TAP = 'src/lib/publicTapClient.ts';
 const PUBLIC_RPCS = ['get_public_profile', 'get_public_tap_mode', 'get_public_tap_state', 'record_tap_event'];
@@ -132,7 +133,7 @@ describe('every server call is in the published contract', () => {
   it('nothing outside those clients calls the AAROH endpoints or PostgREST functions directly', () => {
     const allowed = new Set([...Object.values(CLIENTS).flat(), PUBLIC_TAP]);
     const strays = sourceFiles('src').filter(
-      (file) => !allowed.has(file) && /['"`]\/api\/(emergency|rescue|connect|modes|prive|verify)['"`]|rest\/v1\/rpc/.test(code(file)),
+      (file) => !allowed.has(file) && /['"`]\/api\/(emergency|rescue|connect|modes|prive|verify|account)['"`]|rest\/v1\/rpc/.test(code(file)),
     );
     expect(strays).toEqual([]);
   });

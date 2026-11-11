@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   CheckCircle2,
-  Download,
   Eye,
   KeyRound,
   Loader2,
@@ -28,7 +27,8 @@ import { supabase, describeError } from '../lib/supabase';
 import { TAP_STATUS_HINTS, TAP_STATUS_LABELS, setTapStatus, tapUrl } from '../services/tap';
 import { APP_NAME, APP_VERSION, BUILD_DATE, COMPANY } from '../lib/version';
 import { EXPERIENCE_LABELS } from '../services/tap';
-import { downloadJson, exportMyData, requestAccountDeletion } from '../services/privacy';
+import { requestAccountDeletion } from '../services/privacy';
+import { DataExport } from '../components/app/DataExport';
 import { TIERS_PATH } from '../lib/commerce';
 
 /**
@@ -59,7 +59,6 @@ export default function Settings() {
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
   const [requestingDeletion, setRequestingDeletion] = useState(false);
 
@@ -197,21 +196,6 @@ export default function Settings() {
       toast.error('Could not change visibility', describeError(err));
     } finally {
       setStatusBusy(false);
-    }
-  }
-
-  /** V6-072: a copy of everything the account can read about itself. */
-  async function downloadMyData() {
-    if (!user) return;
-    setExporting(true);
-    try {
-      const data = await exportMyData({ id: user.id, email: user.email });
-      downloadJson(`shygon-account-${new Date().toISOString().slice(0, 10)}.json`, data);
-      toast.success('Your data is downloading', 'A JSON file with your account, Tap, orders and messages.');
-    } catch (err) {
-      toast.error('Could not prepare your data', describeError(err));
-    } finally {
-      setExporting(false);
     }
   }
 
@@ -603,15 +587,12 @@ export default function Settings() {
                 deletion is handled by a person: we confirm what we delete, and anything the law
                 requires us to keep, such as payment records.
               </p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => void downloadMyData()} disabled={exporting}>
-                  {exporting ? <Loader2 size={14} className="spin" /> : <Download size={14} />}
-                  Download your data
-                </button>
+              {/* The copy is built by the server (v0.12 §4a): see DataExport. */}
+              <DataExport>
                 <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDeletion(true)}>
                   <Trash2 size={14} /> Ask us to delete your account
                 </button>
-              </div>
+              </DataExport>
             </div>
           </div>
         </section>

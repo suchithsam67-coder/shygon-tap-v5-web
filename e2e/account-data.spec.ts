@@ -4,9 +4,10 @@ import { apiCustomer, buyExperience, dismissCookieNotice, server, stayLocal, csp
 
 /**
  * A customer's own data (V6-072), on the local stack: they download a copy of
- * it, and ask for their account to be deleted. The copy holds only their rows;
- * the request is a privacy ticket that a person handles, and deletes nothing
- * by itself (docs/runbooks/RUNBOOK-account-deletion.md).
+ * it, built by the server (AAROH-API v0.12 §4a), with their Business profile
+ * as a contact card, and ask for their account to be deleted. The copy holds
+ * only their rows; the request is a privacy ticket that a person handles, and
+ * deletes nothing by itself (docs/runbooks/RUNBOOK-account-deletion.md).
  */
 
 test.beforeEach(async ({ context }) => {
@@ -41,7 +42,7 @@ test('a customer downloads their own data, then asks for deletion; nothing is de
   await buyExperience(me, 'business');
   await signIn(page, me.email, me.password);
 
-  // The download: a JSON file of everything the account can read about itself.
+  // The download: the server's export (AAROH-API v0.12 §4a), saved as JSON on the click.
   await page.goto('/shygontap/settings');
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download your data' }).click();
@@ -49,17 +50,37 @@ test('a customer downloads their own data, then asks for deletion; nothing is de
   expect(download.suggestedFilename()).toMatch(/^shygon-account-\d{4}-\d{2}-\d{2}\.json$/);
   const data = JSON.parse(fs.readFileSync((await download.path())!, 'utf8'));
 
-  expect(data.format).toBe('shygon-account-export/1');
-  expect(data.account).toEqual({ id: me.userId, email: me.email });
-  expect(data.profile.id).toBe(me.userId);
-  expect(data.tap.user_id).toBe(me.userId);
+  expect(data.format).toBe('shygon-account-export/2');
+  expect(data.accountId).toBe(me.userId);
+  expect(data.taps).toHaveLength(1);
   expect(data.orders).toHaveLength(1);
-  expect(data.orderItems.map((item: { sku: string }) => item.sku)).toEqual(['plan-business']);
+  expect(data.orders[0].items.map((item: { sku: string }) => item.sku)).toEqual(['plan-business']);
   expect(data.entitlements.map((e: { key: string }) => e.key)).toEqual(['business']);
   expect(data.notifications.length).toBeGreaterThan(0);
+  // The closed AAROH sections are there too, which the old browser export could not read.
+  for (const section of ['modes', 'emergency', 'returnToOwner', 'connect', 'cards']) expect(data).toHaveProperty(section);
   const text = JSON.stringify(data);
   expect(text).not.toContain(someoneElse.userId);
   expect(text).not.toContain(someoneElse.email);
+  // Security values are left out by rule, and the page says what is left out, and why.
+  expect(text).not.toMatch(/activation_?code|card_?uid/i);
+  expect(data.excluded.length).toBeGreaterThan(0);
+  await expect(page.getByText('What the file leaves out, and why')).toBeVisible();
+  await expect(page.getByText(`${data.excluded[0].what}.`)).toBeVisible();
+
+  // The Business profile as a contact card: its own click.
+  const card = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save your Business profile as a contact card (.vcf)' }).click();
+  const vcf = await card;
+  expect(vcf.suggestedFilename()).toMatch(/^shygon-tap-\d{4}-\d{2}-\d{2}\.vcf$/);
+  const vcard = fs.readFileSync((await vcf.path())!, 'utf8');
+  expect(vcard.startsWith('BEGIN:VCARD\r\nVERSION:3.0\r\n')).toBe(true);
+  expect(vcard.trimEnd().endsWith('END:VCARD')).toBe(true);
+
+  // Each export is recorded in the account's own history (the format and counts only).
+  const { data: exports } = await server().from('account_events').select('detail').eq('user_id', me.userId).eq('event_type', 'data_export');
+  expect(exports).toHaveLength(1);
+  expect(exports![0].detail.format).toBe('shygon-account-export/2');
 
   // The deletion request: one privacy ticket, with the customer's message.
   await askForDeletion(page);
