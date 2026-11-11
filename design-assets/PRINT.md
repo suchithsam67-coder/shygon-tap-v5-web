@@ -38,6 +38,8 @@ The PDFs were checked in Microsoft Edge's built-in Acrobat viewer. Before any ru
 
 ## Serial numbers and the card registry (owner decision, 2026-10-16)
 
+**Chip: NXP MIFARE DESFire only (owner, 2026-11-10). Generation and memory size to confirm with the inlay maker; Verified Tap needs Secure Dynamic Messaging (SUN) on the chosen generation.**
+
 Cards are made as pre-numbered stock and tracked in a registry. Each physical card has four separate values:
 
 | Field | Purpose |
@@ -66,5 +68,5 @@ Pre-numbered stock needs an inventory state, a `card_code`, and a serial fixed a
 
 **Rules for the registry design** (2026-10-18, with the clean back):
 - **`card_code` alone authorises nothing.** Anyone who has seen or held the card may know it. It must never be enough to claim, transfer or change a page, or for any other ownership action. A visit to `/d/<card_code>` is unauthenticated; a tap is not authentication (B6).
-- **A printed QR is static.** If the QR back is ever used, its QR can carry only the static `/d/<card_code>`. It cannot carry the chip's per-tap SUN/CMAC signature (NTAG 424 DNA), so the server treats a QR visit as unauthenticated.
+- **A printed QR is static.** If the QR back is ever used, its QR can carry only the static `/d/<card_code>`. It cannot carry the chip's per-tap SUN/CMAC signature (the DESFire chip's Secure Dynamic Messaging), so the server treats a QR visit as unauthenticated.
 - **Keep `serial_number` as a registry column.** On the clean back `card_code` is never printed, so the printed serial is how support finds a card.
