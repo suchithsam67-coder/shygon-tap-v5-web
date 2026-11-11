@@ -73,7 +73,7 @@ Status vocabulary from the brief:
 | Events, event identity (§7) | NOT IMPLEMENTED; OUT OF CURRENT RELEASE SCOPE | Only platform seasonal themes exist |
 | Locations / objects (§7) | NOT IMPLEMENTED; OUT OF CURRENT RELEASE SCOPE | Planned |
 | Privé / Hospitality demo (§7) | **BLOCKED BY APPROVAL** | Owner 2026-10-16: Privé outside launch scope and removed from the store. The 10-19 brief asks for a demo. Conflict, FE-D5 |
-| `/d/<code>` NTAG 424 DNA resolve | BLOCKED BY DEPENDENCY | Card registry schema and SDM keys; card release deferred (DEC-035/037). Session A: reserved stub only |
+| `/d/<code>` Verified Tap (chip: NXP MIFARE DESFire only, owner 2026-11-10; was NTAG 424 DNA) | 2026-10-19: BLOCKED BY DEPENDENCY. **Updated 2026-11-11:** IMPLEMENTED LOCALLY, OFF | Built in `6dc5fc9` (V01 T-07, AAROH-API v0.11 §10d), behind the host switch `VERIFIED_TAP` (off). The server's SUN check still follows the NTAG 424 DNA application notes; its review for DESFire is Session A's (DEC-2026-043). No real keys or chips yet; card release deferred (DEC-035/037) |
 | Owner authentication | IMPLEMENTED AND VERIFIED | Supabase Auth; e2e journeys |
 | Owner opening experience | NOT IMPLEMENTED | |
 | Owner dashboard (overview) | IMPLEMENTED AND VERIFIED | `/shygontap/account` |

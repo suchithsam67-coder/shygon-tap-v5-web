@@ -7,9 +7,14 @@ import { diversifyKey, sdmMac, sdmSessionMacKey } from '../netlify/lib/sun.mjs';
 
 /**
  * Verified Tap (AAROH-API v0.11 §10d) in a real browser on the local stack:
- * a simulated NTAG 424 DNA chip, keyed with this run's TEST keys
- * (playwright.config.ts), taps the card's /d/ address. Every claim that
- * depends on the server reads the verification log back.
+ * a simulated chip, keyed with this run's TEST keys (playwright.config.ts),
+ * taps the card's /d/ address. Every claim that depends on the server reads
+ * the verification log back.
+ *
+ * The card's chip is NXP MIFARE DESFire only (owner, 2026-11-10; it was
+ * NTAG 424 DNA). The simulation follows the server's current SUN code
+ * (netlify/lib/sun.mjs, written to AN12196). Its review for DESFire is
+ * Session A's (DEC-2026-043), and this test follows what that review settles.
  */
 
 const META = process.env.VERIFY_META_MASTER_1 ?? '';
