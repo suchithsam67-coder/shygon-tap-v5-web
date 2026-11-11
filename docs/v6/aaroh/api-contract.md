@@ -1,11 +1,11 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.11.1
+# SHYGON AAROH backend API contract — AAROH-API v0.12
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.11.1** (2026-11-02): §6 hardening after the OpenCode review of Lost mode. The preview follows the catalogue; the relay-off and replay wording is clarified. No new operation, field or error code. v0.11 (`abe6871`): Verified Tap (§10d; migration 037). v0.10 (`39d87ca`): Lost mode (§6; migration 036). v0.9.2 (`2686606`): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
+| Contract version | **AAROH-API v0.12** (2026-11-03): the owner data export (§4a; migration 038; V01 task T-10). v0.11.1 (`2e1acab`): §6 hardening after the OpenCode review of Lost mode. v0.11 (`abe6871`): Verified Tap (§10d; migration 037). v0.10 (`39d87ca`): Lost mode (§6; migration 036). v0.9.2 (`2686606`): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041), **036** (APPROVED 2026-10-25, DEC-2026-041 A-1), **037** (APPROVED for the local build 2026-10-31, DEC-2026-043); none applied anywhere. 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041), **036** (APPROVED 2026-10-25, DEC-2026-041 A-1), **037** (APPROVED for the local build 2026-10-31, DEC-2026-043), **038** (APPROVED for the local build 2026-11-03, DEC-2026-044); none applied anywhere. 027 is held aside (DEC-2026-037). |
 | Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
@@ -120,10 +120,64 @@ Reserved shape for v0.x, not implemented: `GET /d/<card_code>` → server resolv
 | O-1 | `from('profiles').select('id, customer_id, email, full_name, phone, bio, website, whatsapp, instagram, linkedin, profile_image_url, location, company, job_title, notify_order_updates, notify_tap_activity, created_at, updated_at').eq('id', uid).maybeSingle()` | RLS: own row only (`id = auth.uid()`); admins with `customers.read` | LIVE-LOCAL (`test:rls-matrix`, `test:identity`) |
 | O-2 | `from('profiles').upsert({ id: uid, customer_id: uid, email, full_name, phone, company, job_title }, { onConflict: 'id' })` | Own row only. `customer_id` must be the caller's own: the user id is mapped to `customers.id` by 021; any other value is refused 42501. Suspension columns refused 42501 (020/028) | LIVE-LOCAL |
 | O-3 | `from('profiles').update({ notify_order_updates \| notify_tap_activity: boolean }).eq('id', uid)` | Own row only | LIVE-LOCAL |
-| O-4 | Data export: client-side JSON of what RLS lets the account read (`src/services/privacy.ts`) | — | LIVE-LOCAL (Stage 4) |
+| O-4 | Data export: client-side JSON of what RLS lets the account read (`src/services/privacy.ts`) | — | **Superseded by §4a `owner.export` (v0.12).** It cannot read the closed AAROH tables, and its `select('*')` returns `cards.activation_code` and `card_uid`. Remove it when the page moves to §4a |
 | O-5 | Deletion request: `support_tickets` insert, category `privacy`, subject `Account deletion request` | Own ticket; status must be `open`. Deletion itself is the manual runbook (D-12) | LIVE-LOCAL |
 
 `profiles.phone` is self-entered and **unverified** (DEC-2026-005 / F4). Never present it as verified.
+
+---
+
+## 4a. The owner's data export — `POST /api/account` (v0.12)
+
+**Status:** LIVE-LOCAL. DEC-2026-044 was approved for the **local build** on 2026-11-03 (migration 038, `netlify/functions/account.mjs`, `netlify/lib/vcard.mjs`). No host switch: it works wherever it is deployed and needs no provider. Counsel reviews the privacy-notice wording before release.
+
+**Request:** `{ op: 'owner.export' }` with `Authorization: Bearer <access token>`. The account comes only from the token.
+
+**Success (200):** `{ export, vcard }`, `cache-control: no-store`.
+- `vcard`: a vCard 3.0 of the owner's Business profile, CRLF lines folded at 75 octets, or `null` without a Tap. Save it as `.vcf`.
+  - Only the fields the owner's privacy switches show publicly (the same rule as P-1), whatever the mode: name, company, title (designation, else headline), shown phone, WhatsApp, email, location and links.
+  - The Tap address line (`<SITE_URL>/t/<slug>`) appears only while the Tap is live (active, not suspended).
+- `export`: format `shygon-account-export/2`. Keys:
+
+| Key | Holds |
+|---|---|
+| `format`, `exportedAt`, `accountId` | the format name, the time, the account id |
+| `account` | `{ profile, customer }`: the profile fields and privacy switches, the customer record |
+| `taps` | a list (one Tap per account in v1): every field the owner edits, theme, status and dates |
+| `customizations` | purchased customisations |
+| `modes` | `{ states, info, audit }` (§6) |
+| `cards` | each card's id, type, edition, nickname, status and dates, and `verifiedTap` `{ code, keyEpoch, lastVerifiedAt, retiredAt, registeredAt }` or `null` |
+| `orders` | each order with its shipping details, payment and refund references, `items` and `statusHistory` |
+| `entitlements` | type, key, active, granted |
+| `emergency` | `{ settings, contacts, alerts, audit }`. A contact shows `last4`, never the full number. Each alert lists its recipients' names and delivery status |
+| `returnToOwner` | `{ settings, threads, activeBlocks, audit }`. Each thread has `finderMessages` (a count) and `messages`: the owner's own replies and SHYGON's notices only |
+| `connect` | `{ settings, connections, consentGiven, consentReceived, audit }`. A connection shows `role` (`requested` / `received`), status, dates, the owner's own note and `endedBy` (`you` / `other`); never the other person. Received grants carry no grantor |
+| `prive` | demo requests and their steps |
+| `notifications`, `support`, `accountEvents` | as the dashboard shows them; a support message shows `from` (the author's role), never a staff identity |
+| `truncated` | the lists that hit the 2,000-row cap (newest first). Usually `[]` |
+| `excluded` | `[{ what, why }]`: the plain-language list of what is left out and why. Show it on the page |
+
+**Left out, by rule** (DEC-2026-044 §4.1): other people's data (finders' words, the Connect counterpart, contacts' full numbers, visitor statistics and verification checks, staff records) and security values (activation codes, the chip's serial number, code and token hashes, digests, idempotency keys, provider ids).
+
+**Errors** use `{ error: { code, message, retryAfter? } }`.
+
+| HTTP | Code | When |
+|---|---|---|
+| 401 | `unauthenticated` | no or invalid token |
+| 400 | `invalid_request`, `unknown_op` | a malformed body; any op but `owner.export`, inherited names (`constructor`, …) included |
+| 405 | `method_not_allowed` | anything but POST |
+| 429 | `rate_limited` (+`retryAfter`, seconds) | a sixth export within 24 hours |
+| 500 | `internal`, `server_misconfigured` | |
+
+**Rules (`test:account-export`, 12 checks):**
+- **5 exports per account per 24 hours**, allowed while suspended. Each is recorded as one `account_events` row (`data_export`; the format and row counts only), so it appears in the owner's account history.
+- **Export parity:** every table linked to an account is classified as exported, excluded with a reason, or staff-only; a new table fails the gate until classified. After the deletion procedure, the export holds only the orders kept for tax law.
+- **Server only:** both functions are executable by `service_role` only; the builder reads one snapshot and never copies a whole row.
+
+**Frontend impact (Session B):**
+- Point "Download your data" (`src/pages/Settings.tsx`) at `owner.export`. Save `export` as JSON and `vcard` (when not null) as `.vcf`.
+- Show `excluded` in plain words, and the 429 wait calmly. Remove the browser export (O-4).
+- Customer strings need the owner's approval at your gate.
 
 ---
 
@@ -726,6 +780,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.12 | 2026-11-03 | **New: the owner data export** (V01 task T-10; DEC-2026-044, approved for the local build; migration 038): §4a `POST /api/account` (`owner.export`) → `{ export, vcard }`. The owner's own data from every AAROH table, without other people's data or security values; 5 per 24 hours; audited in `account_events`. O-4 (the browser export) is superseded. No earlier operation changed. | Move "Download your data" to §4a and remove the browser export (O-4). Save the JSON and the `.vcf`. Show `excluded` and the 429 wait. Customer strings need the owner's approval at your gate. |
 | v0.11.1 | 2026-11-02 | Hardening after the OpenCode review of Lost mode (`docs/v6/aaroh/reviews/2026-10-30_opencode-review-lost-mode.md`). No new operation, request field, response field or error code.<br>(1) `owner.preview` now checks the same catalogue switch and Tap state as P-6. Before, a Lost preview answered `{}` while SHYGON had Lost off, and an Info preview answered the page while Info was off or the Tap was paused or suspended; the visitor got `null` in both cases.<br>(2) §6 P-6: the database cannot see `RESCUE_RELAY`. While it is off, P-6 may still answer `{ mode: 'lost' }`, and `public.status` answers `available: false`. The four database-side reasons for `null` are now named.<br>(3) §6 `owner.activate`: a Lost activation repeated while `RESCUE_RELAY` is off answers 409 `mode_unavailable`, not the replay. Nothing changes.<br>(4) Migration 036: the activation reads the Return to Owner opt-in under a share lock, so an opt-out racing it waits. 036 is regenerated; it has not been applied anywhere. | (a) On a Lost page, always call `public.status` before showing the form, and show the neutral "unavailable" copy when it answers `false`. This was already the v0.10 two-step; it is now the only way the relay-off case is visible. (b) `owner.preview` may now answer `view: null` for a mode SHYGON has switched off. Show the same "not available" state as `owner.state`, not an empty page. (c) A 409 `mode_unavailable` on a retried Lost activation means the relay went off: refresh `owner.state`; the Tap is still on Lost. |
 | v0.11 | 2026-10-31 | **New: Verified Tap** (U1; DEC-2026-043, approved for the local build only; migration 037; `netlify/lib/sun.mjs`): §10d `POST /api/verify` (`tap.verify`), behind the host switch `VERIFIED_TAP` (off), with test keys only. Verdicts: genuine, already_checked, not_confirmed, needs_service, unavailable, not_verified; null for a Tap in Lost mode. No earlier operation changed. | Build the `/d/<code>` page as §10d says: script POST after load, strip `e`/`c`, no-referrer, no-store, no third-party script. Show the verdict above the Tap's normal page, the edition line only with genuine, and never "fake". The customer strings need the owner's approval at your gate. |
 | v0.10 | 2026-10-25 | **New: Lost mode** (U2; DEC-2026-041 amendment A-1; migration 036).<br>(1) `owner.activate` accepts `lost`. It needs the catalogue (OFF by default), `RESCUE_RELAY=on` and the owner's own Return to Owner opt-in, and never turns that opt-in on.<br>(2) `owner.state` has a third entry, `lost`.<br>(3) P-6 answers `{ mode: 'lost' }` (one key) or `null`, never Business. P-1 is `null` while Lost is active (035's guard).<br>(4) `owner.preview` `lost`: `{}` or `null`.<br>(5) The `needs_setup` message is now "Finish setting up this mode first." and the `invalid_mode` message names lost. No other operation changed. | Handle a third `owner.state` entry; ignore modes you do not render. Render `{ mode: 'lost' }` as "Found this card?" with Return to Owner's form, and nothing else. An unknown mode stays `null` and shows "unavailable". Draft copy in §6. Customer strings need the owner's approval at your gate. |
