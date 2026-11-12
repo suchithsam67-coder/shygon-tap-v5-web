@@ -31,6 +31,7 @@
     "test:verified-tap": "node --import ./scripts/ci/deny-network.mjs supabase/tests/verified-tap.mjs",
     "test:sun": "node --import ./scripts/ci/deny-network.mjs netlify/tests/sun.mjs",
     "test:account-export": "node --import ./scripts/ci/deny-network.mjs supabase/tests/account-export.mjs",
+    "test:phone-verify": "node --import ./scripts/ci/deny-network.mjs supabase/tests/phone-verify.mjs",
     "test:preview-checks": "node --import ./scripts/ci/deny-network.mjs scripts/release/preview-checks.test.mjs",
     "test:local-host": "node --import ./scripts/ci/deny-network.mjs supabase/tests/local-host.mjs",
     "test:admin-edge": "node --import ./scripts/ci/deny-network.mjs supabase/tests/admin-edge.mjs",
@@ -54,7 +55,7 @@
     "test:push-guard": "node supabase/tests/db-push-guard.mjs",
     "test:bundle": "node scripts/check-bundle-size.mjs",
     "test:secrets": "node scripts/ci/secret-scan.mjs",
-    "ci": "npm run lint && npm run build && npm run test:bundle && npm run test:bundle-secrets && npm run test:seo && npm run test:push-guard && npm run test:db && npm run test:payments:ci && npm run test:payment-chain && npm run test:aaroh && npm run test:public-tap && npm run test:suspension && npm run test:emergency && npm run test:rescue && npm run test:connect && npm run test:prive && npm run test:modes && npm run test:bq1-production && npm run test:sun && npm run test:verified-tap && npm run test:account-export && npm run test:preview-checks && npm run test:local-host && npm run test:admin-edge && npm run test:observability && npm run test:security && npm run test:components && npm run test:secrets && npm audit --audit-level=high"
+    "ci": "npm run lint && npm run build && npm run test:bundle && npm run test:bundle-secrets && npm run test:seo && npm run test:push-guard && npm run test:db && npm run test:payments:ci && npm run test:payment-chain && npm run test:aaroh && npm run test:public-tap && npm run test:suspension && npm run test:emergency && npm run test:rescue && npm run test:connect && npm run test:prive && npm run test:modes && npm run test:bq1-production && npm run test:sun && npm run test:verified-tap && npm run test:account-export && npm run test:phone-verify && npm run test:preview-checks && npm run test:local-host && npm run test:admin-edge && npm run test:observability && npm run test:security && npm run test:components && npm run test:secrets && npm audit --audit-level=high"
   },
   "dependencies": {
     "@fontsource/geist": "^5.3.0",

@@ -132,6 +132,9 @@ for (const [u, n] of [[A, 1], [B, 2]]) {
     INSERT INTO public.tap_device_auth (public_code, card_id, key_epoch, uid_hmac)
     VALUES ('mxcodeaaaaaaaaa${'xyz'[n]}', '0${n}000000-0000-4000-8000-0000000000e${n}', 1, repeat('${n}', 64));
     INSERT INTO public.tap_verify_events (public_code, verdict) VALUES ('mxcodeaaaaaaaaa${'xyz'[n]}', 'genuine');
+    INSERT INTO public.account_phone_verifications (user_id, phone_e164) VALUES ('${u}', '+9198000000${n}${n}');
+    INSERT INTO public.account_phone_challenges (id, user_id, phone_digest, phone_last4, code_hash, expires_at)
+    VALUES ('1${n}000000-0000-4000-8000-0000000000f${n}', '${u}', repeat('${n}', 64), '000${n}', repeat('${n}', 64), now() + interval '10 minutes');
   `);
 }
 
@@ -232,6 +235,10 @@ const MODEL = {
   // verification log belong to no customer and are reachable only through /api/verify.
   tap_device_auth: { owner: NONE, select: sel(NONE, NONE) },
   tap_verify_events: { owner: NONE, select: sel(NONE, NONE) },
+  // Account phone verification (039, DEC-2026-045, approved for the local build 2026-11-05): closed;
+  // the owner reaches them only through /api/account.
+  account_phone_verifications: { owner: OWN('user_id'), select: sel(NONE, NONE) },
+  account_phone_challenges: { owner: OWN('user_id'), select: sel(NONE, NONE) },
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };

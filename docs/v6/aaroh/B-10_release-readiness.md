@@ -814,3 +814,48 @@ Browser e2e was not re-run: no frontend or app-host change since the 14/14 run t
 - any hosted check.
 
 **Verdict unchanged:** release BLOCKED (§18). The export needs no switch or provider; it is local only, like everything else on this branch.
+
+## 24. 2026-11-05: account phone verification (V01 T-11, finding F4) built locally (migration 039, contract v0.13)
+
+**Approval:** the owner, in this session on 2026-11-05: "Approve T-11 build". That answered "Approve building T-11 locally on DEC-2026-045's recommended answers?", so Q1–Q6 are as recommended. This also answers DEC-2026-022 Q3. Local only. The DLT template and the SMS provider are the adult authorised signatory's (F-2, F-10).
+
+**Built:**
+- `039_account_phone_verification.sql`, generated from 038's text:
+  - two closed tables;
+  - five service-only functions under a per-account lock;
+  - the export's `phoneVerification` section.
+- `/api/account`: `phone.status`, `phone.verify.start` and `phone.verify.confirm`.
+- `card-otp`: a code only to a verified phone past its wait.
+- `orderMessages`: the account-phone fallback only when verified.
+- `account-deletion.sql`: deletes both tables.
+- Contract AAROH-API v0.13 (§4b, §7 C-2, §4a); provider requirements gain the fourth DLT template.
+
+**The rule:** the account phone is verified only while `profiles.phone`, in E.164, equals the number verified by a code. A number that replaces a verified one waits 24 hours before it can confirm card actions, and the owner is told in the app.
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites; texts only to the SMS stand-in].
+
+| Group | Results |
+|---|---|
+| `test:db` | verify 21; adversarial 64; RLS matrix **1669** (59 tables, the two new ones closed to all 7 callers); identity 69; admin-notes 12; golden **21** (a new stage for 039, byte-identical); admin-contract 17 (two approved new relations; the client-executable set is unchanged); rollbacks **20** (039 restores exactly, 038's export builder included); account-deletion 9; history 2; bundle as one batch and twice |
+| New and changed | `test:phone-verify` **12**; `test:account-export` 12 (the parity map now holds 49 linked tables); `test:payments:ci` **16** (the order-text fallback: sent when verified, not when unverified), and 13 + 1 known Node-20-only BLOCKED |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 17; local-host 9; admin-edge 11; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 (7 moderate, 12 on 11-03; not examined here) |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`), before and after this commit |
+
+**Negative control** [OBSERVED]: the suite was run against the committed `card-otp` and `orderMessages` (`374babc`), and 3 checks failed:
+- unverified: `card-otp` answered 200 and texted;
+- **a stolen session that swapped the number received a card code at once** (finding F4 reproduced);
+- the order text went to an unverified number.
+
+The new files were restored and compared byte for byte.
+
+**Residual risk:** an account that has never verified a phone has no earlier number to protect. A stolen session can verify its own number and confirm card actions without the wait (DEC-2026-045 §8; Q4 accepted it). Step-up authentication, after V01, closes it.
+
+**Consequence to plan for:** until the DLT template and a provider exist, `phone.verify.start` answers 503, and therefore **`card-otp` refuses every account**. No AAROH card is sold (DEC-037); V5 cards on a future V6 deployment would be affected.
+
+**Not run:**
+- two requests racing the limits (PGlite has one connection; the lock is read from the functions);
+- a real SMS;
+- browser e2e (Session B has no screen yet);
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).

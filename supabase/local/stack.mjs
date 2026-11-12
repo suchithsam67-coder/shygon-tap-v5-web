@@ -165,7 +165,7 @@ export async function startStack({
   function useSms(provider, { receipts = true } = {}) {
     for (const name of ['SMS_PROVIDER', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM', 'MSG91_AUTH_KEY',
       'SMS_STATUS_CALLBACK_URL', 'MSG91_EMERGENCY_VERIFY_TEMPLATE_ID', 'MSG91_EMERGENCY_OWNER_TEMPLATE_ID',
-      'MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID', 'MSG91_DLR_SECRET']) setEnv(name, undefined);
+      'MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID', 'MSG91_PHONE_VERIFY_TEMPLATE_ID', 'MSG91_DLR_SECRET']) setEnv(name, undefined);
     if (provider === 'twilio') {
       setEnv('SMS_PROVIDER', 'twilio');
       setEnv('TWILIO_ACCOUNT_SID', secrets.twilioAccountSid);
@@ -178,6 +178,7 @@ export async function startStack({
       setEnv('MSG91_EMERGENCY_VERIFY_TEMPLATE_ID', 'tmpl_emergency_verify');
       setEnv('MSG91_EMERGENCY_OWNER_TEMPLATE_ID', 'tmpl_emergency_owner');
       setEnv('MSG91_EMERGENCY_PUBLIC_TEMPLATE_ID', 'tmpl_emergency_public');
+      setEnv('MSG91_PHONE_VERIFY_TEMPLATE_ID', 'tmpl_phone_verify');
       if (receipts) setEnv('MSG91_DLR_SECRET', secrets.msg91DlrSecret);
     }
   }

@@ -26,7 +26,8 @@
 --   the Return-to-Owner settings, conversations (with their messages), blocks
 --   and audit trail; where 032 is applied, Connect settings, connections (both
 --   directions), the consent grants on them, and the Connect audit trail;
---   where 033 is applied, the Privé demo requests (with their steps).
+--   where 033 is applied, the Privé demo requests (with their steps); where 039
+--   is applied, the verified account phone and its verification codes.
 -- Kept ("orders, invoices and payment records ... up to 8 years"):
 --   orders, their items, payments and status history. A card stays as a
 --   hardware record, unlinked from the account and retired, so it opens nothing.
@@ -96,6 +97,11 @@ BEGIN
   -- Privé demo requests (migration 033), only where they exist; steps go with them.
   IF to_regclass('public.prive_demo_requests') IS NOT NULL THEN
     DELETE FROM public.prive_demo_requests WHERE user_id = target;
+  END IF;
+  -- The verified account phone and its codes (migration 039), only where they exist.
+  IF to_regclass('public.account_phone_verifications') IS NOT NULL THEN
+    DELETE FROM public.account_phone_verifications WHERE user_id = target;
+    DELETE FROM public.account_phone_challenges WHERE user_id = target;
   END IF;
   -- Modes and Info (migration 034), only where they exist.
   IF to_regclass('public.info_pages') IS NOT NULL THEN

@@ -121,10 +121,17 @@ await test('payment-mode reports the server key mode and never a key', async () 
 console.log('\n=== Order confirmation text: once per order, to the checkout number ===');
 
 /** A stand-in for the few supabase-js calls orderMessages makes. */
-function fakeAdmin(order, profilePhone = null) {
-  const state = { ...order, updates: [] };
+function fakeAdmin(order, profilePhone = null, phoneVerified = false) {
+  const state = { ...order, updates: [], rpcs: [] };
   const admin = {
     state,
+    // DEC-2026-045: account_phone_state answers whether the account phone is verified.
+    rpc(name, args) {
+      state.rpcs.push({ name, args });
+      return Promise.resolve(name === 'account_phone_state'
+        ? { data: { verified: phoneVerified, usable: phoneVerified }, error: null }
+        : { data: null, error: { message: 'unknown function' } });
+    },
     from(table) {
       const q = { patch: null, isNull: null };
       // Every builder method returns the chain; awaiting it runs the query,
@@ -198,12 +205,22 @@ await test('no provider set: the order is marked not_configured, nothing thrown'
   assert.equal(admin.state.confirmation_sms_status, 'not_configured');
 });
 
-await test('no phone on the order: falls back to the account number', async () => {
+await test('no phone on the order: falls back to the account number once it is verified (DEC-2026-045)', async () => {
   process.env.SMS_PROVIDER = 'twilio';
   const calls = fakeFetch([[(u) => u.includes('api.twilio.com'), { status: 201, body: {} }]]);
-  const admin = fakeAdmin({ ...baseOrder, shipping_phone: null }, '+91 98450 12345');
+  const admin = fakeAdmin({ ...baseOrder, shipping_phone: null }, '+91 98450 12345', true);
   await sendOrderConfirmation(admin, 'o1');
   assert.equal(new URLSearchParams(calls[0].body).get('To'), '+919845012345');
+  assert.deepEqual(admin.state.rpcs[0], { name: 'account_phone_state', args: { p_user: 'u1', p_phone_e164: '+919845012345' } });
+});
+
+await test('no phone on the order and an unverified account number: nothing is sent', async () => {
+  process.env.SMS_PROVIDER = 'twilio';
+  const calls = fakeFetch([[(u) => u.includes('api.twilio.com'), { status: 201, body: {} }]]);
+  const admin = fakeAdmin({ ...baseOrder, shipping_phone: null }, '+91 98450 12345', false);
+  const result = await sendOrderConfirmation(admin, 'o1');
+  assert.deepEqual([result.sent, result.reason, calls.length], [false, 'unverified-phone', 0]);
+  assert.equal(admin.state.confirmation_sms_status, 'unverified_phone');
 });
 
 await test('the provider refusing: marked failed, nothing thrown', async () => {
