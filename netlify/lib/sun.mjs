@@ -1,7 +1,10 @@
 import crypto from 'node:crypto';
 
 /**
- * The SUN (Secure Unique NFC) crypto core for NTAG 424 DNA cards — U1 "Verified Tap".
+ * The SUN (Secure Unique NFC) crypto core for AAROH's MIFARE DESFire EV3 cards — U1
+ * "Verified Tap". NXP states EV3's Secure Dynamic Messaging is "compatible with NTAG
+ * DNA" (MF3D(H)x3 short data sheet Rev 3.1 §2.1.6), so the scheme below is AN12196's;
+ * the byte-level match to EV3 is INFERRED until DEC-2026-043 §12 gates G-1 and G-2.
  *
  * Every AAROH tap opens `…/d/<code>?e=…&c=…`: the card appends encrypted PICC data
  * (the UID plus the read counter) and a truncated AES-CMAC. This module re-derives

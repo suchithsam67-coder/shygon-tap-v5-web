@@ -5326,7 +5326,8 @@ $$;
 -- ###########################################################################
 
 -- 037: Verified Tap (U1). Device codes for /d/<code>, the per-device SUN state
--- (NTAG 424 DNA) and an append-only verification log, read and written only by
+-- (MIFARE DESFire EV3 SDM; DEC-2026-043 A-1, was NTAG 424 DNA) and an append-only
+-- verification log, read and written only by
 -- the server (/api/verify). Nothing here is reachable by a client role.
 --
 -- Decision:  DEC-2026-043, approved for the LOCAL BUILD by the owner in session
@@ -7258,7 +7259,7 @@ END $$;
 --            028-040. Needs 037 (Verified Tap) and 039 (the export builder).
 --
 -- WHAT AN AAROH CARD IS HERE: a cards row with a tap_device_auth row (a
--- personalised NTAG 424 DNA chip). V5 cards (no chip) keep every live path.
+-- personalised MIFARE DESFire EV3 chip). V5 cards (no chip) keep every live path.
 --
 -- CHANGES
 --   card_events              append-only: every move of an AAROH card's status

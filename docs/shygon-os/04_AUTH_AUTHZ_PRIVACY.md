@@ -37,7 +37,7 @@ Consequences encoded in the design:
 | Level | Meaning | How reached |
 |---|---|---|
 | **A0** anonymous / static tap | Nothing proven | Plain NFC URL, QR, no session |
-| **A1** authenticated tap | Chip authenticity proven (cloning-resistant), *still no person identified* | NTAG 424 DNA SDM CMAC valid + fresh counter (optional hardware) |
+| **A1** authenticated tap | Chip authenticity proven (cloning-resistant), *still no person identified* | MIFARE DESFire EV3 SDM CMAC valid + fresh counter (optional hardware; DEC-2026-043 A-1, was NTAG 424 DNA) |
 | **A2** session | Known account | Valid Supabase session |
 | **A3** step-up | Account + recent second factor | Session + OTP/passkey/TOTP within last 10 min |
 | **A4** bound | A3 + A1 on the same device in the same request | Session + step-up + authenticated tap |

@@ -1,7 +1,7 @@
 // Card pairing ("tap to activate") and "report stolen" (V01 T-08, T-09):
 // migration 041, /api/verify's pairing answer and /api/cards on the local stack,
 // against DEC-2026-047 (approved for the local build 2026-11-10). A simulated
-// NTAG 424 DNA chip (as in test:verified-tap) with random TEST keys.
+// SDM chip (DESFire EV3, as in test:verified-tap) with random TEST keys.
 //
 //   A. Closure.
 //   B. Pairing: a shipped card's genuine tap opens no Tap and carries a proof.

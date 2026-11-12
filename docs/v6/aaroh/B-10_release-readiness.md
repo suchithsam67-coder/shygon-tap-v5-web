@@ -941,3 +941,45 @@ The two admin edge functions check access on their own.
 - any hosted check.
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 27. 2026-11-11: the chip is MIFARE DESFire EV3 (DEC-2026-043 amendment A-1; contract v0.15.1)
+
+**The decision:**
+- **The owner, 2026-11-10:** "use desfare only, update it everywhere". The store session recorded it in `ea13379` and relayed it.
+- **In this session:** the owner answered "Start DESFire change".
+
+**The crypto review** (DEC-2026-043 §12.1, §12.2):
+- **What NXP's public documents show** [OBSERVED]:
+  - only DESFire EV3 has Secure Dynamic Messaging; NXP's documents say EV1 and EV2 have none;
+  - NXP calls EV3's SUN "compatible with NTAG DNA";
+  - the byte layouts are only in the restricted EV3 data sheet.
+- **So no logic changed.** The built core (`sun.mjs`, 037, `/api/verify`, 041's possession proof) stands, and is **INFERRED** to match EV3 until gates G-1 (the data sheet) and G-2 (a real EV3 known answer) pass.
+- **New personalisation duties on DESFire** (§12.4): change the PICC master key, forbid unauthenticated format and application changes, and write-lock the NDEF file.
+
+**Changed:**
+- labels and comments in code, tests and the 037 and 041 headers (`APPLY_ALL.sql` rebuilt);
+- the contract (v0.15.1, wording only);
+- DEC-2026-043 §12, `DECISIONS.md` (DEC-2026-015 answered), backlog V6-133;
+- the capability matrix, the differentiation plan, the U1 notes;
+- SHYGON OS docs 00, 01, 02, 04, 07, 08 and 11.
+
+**Evidence** [OBSERVED, Node 20.18.0]:
+
+| Check | Result |
+|---|---|
+| `db:bundle` | rebuilt (3 lines: the 037 and 041 header comments); no 001–019 history; applies as one batch and twice |
+| `db:bundle:check` | exit 0 |
+| `lint` | exit 0 |
+| `test:sun` | 27 passed, 0 failed (AN12196 vectors; the suite now names them as NTAG 424 DNA's) |
+| `test:verified-tap` | 17 passed, 0 failed |
+| `test:card-lifecycle` | 9 passed, 0 failed |
+| `test:security` | 12 passed, 0 failed |
+| `test:db` | verify 21; adversarial 64; RLS matrix 1729 (61 tables, 7 callers); identity 69; admin-notes 12; golden 23; admin-contract 21; rollbacks 22; account-deletion 9; history 2; all 0 failed |
+| `test:secrets` | run after the commit; result recorded in the commit report |
+
+**Not done:**
+- G-1 to G-3;
+- the owner's D-1 to D-4;
+- Session B's and the coordinator's copies, which are relayed to them.
+
+**Verdict unchanged:** release BLOCKED (§18).

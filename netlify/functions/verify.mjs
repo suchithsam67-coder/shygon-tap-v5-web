@@ -12,7 +12,7 @@ import { possessionProof } from '../lib/possession.mjs';
  * Body: { op: 'tap.verify', code, e?, c? }. No sign-in. The /d/<code> page's
  * script calls it after the page has loaded, never on a plain GET, so link
  * previews and prefetch consume no counter. `e` (32 hex) and `c` (16 hex) are
- * the NTAG 424 DNA SUN values the chip appends; without them the answer is
+ * the SUN values the MIFARE DESFire EV3 chip appends (SDM); without them the answer is
  * `not_verified` and nothing is consumed.
  *
  * Answers { slug, verdict, edition? }:

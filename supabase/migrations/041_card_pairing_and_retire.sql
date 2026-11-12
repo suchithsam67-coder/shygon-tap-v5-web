@@ -15,7 +15,7 @@
 --            028-040. Needs 037 (Verified Tap) and 039 (the export builder).
 --
 -- WHAT AN AAROH CARD IS HERE: a cards row with a tap_device_auth row (a
--- personalised NTAG 424 DNA chip). V5 cards (no chip) keep every live path.
+-- personalised MIFARE DESFire EV3 chip). V5 cards (no chip) keep every live path.
 --
 -- CHANGES
 --   card_events              append-only: every move of an AAROH card's status

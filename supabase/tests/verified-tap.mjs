@@ -1,5 +1,5 @@
 // Verified Tap (U1): migration 037 and /api/verify on the local stack, against
-// DEC-2026-043 §7. A simulated NTAG 424 DNA chip (AN12196 §3.4, built from
+// DEC-2026-043 §7. A simulated SDM chip (DESFire EV3; AN12196 §3.4, built from
 // netlify/lib/sun.mjs) produces the SUN values; the keys are random per run,
 // TEST KEYS ONLY, and never leave this process.
 //
