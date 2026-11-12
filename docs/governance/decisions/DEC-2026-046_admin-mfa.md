@@ -130,3 +130,26 @@ Built on `v6/aaroh-backend` to §4 (database and local stack). Readiness report 
 - **`test:admin-mfa` 9,** in `ci` and `ci.yml`, driven through supabase-js's own MFA API (the admin app's client).
   - **Negative control** [OBSERVED]: 040 without its four frozen-function edits failed 2 checks: an enrolled administrator's password-only session was accepted, and the switch had no effect.
 - **Not built (their own approvals):** step 1 (the admin app's screens; Q2, no owner yet); the edge functions (Codex, after V6-094); step 3 (switching ON; Q4); the break-glass runbook (Q5). **Until the edge functions follow, refunds and push accept a password-only administrator session even when a factor is enrolled.**
+
+## 9. As built: the edge functions (2026-11-12, local)
+
+**Approval** [OBSERVED]: the owner, in session on 2026-11-12, answered "Approve both" to "Approve building both: the review fixes (migration 043) and Codex's admin logs with the two-factor check?".
+
+**What came in:**
+- Codex's V6-094, structured admin edge logs: `17c4a56` on `codex/admin-edge-logging`.
+- The coordinator fetched it, checked it and handed it over on 2026-11-12.
+- It was merged into this branch unchanged, with no conflicts.
+
+**What Session A added:** this decision's rule, at the edge.
+- **Why the edge needs it:** `resolveAdmin` checks administrators with the service key, which cannot see the token's assurance level. So it now asks the database in the caller's own session (`admin_mfa_status`, the same rule as `is_admin` and `require_admin`).
+- **If the factor is required and missing:** both functions answer `403` with `code: 'admin:mfa_required'`. The message does not match the current admin app's sign-out rule.
+- **If the database cannot be asked:** the ordinary 403 refusal.
+- **Logging:** each refusal writes one `security.admin-refused` line, with the reason `mfa-required` or `mfa-check-failed`.
+- **Contract:** AAROH-API v0.16 (§12a).
+
+**Tests:** `test:admin-edge`, with a negative control (see the readiness report §30).
+
+**Still not built:**
+- step 1 (the admin app's screens: the Admin APK session, F-28);
+- step 3 (switching the rule on for everyone: Q4);
+- the break-glass runbook (Q5).

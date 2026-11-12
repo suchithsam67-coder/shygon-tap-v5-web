@@ -15,6 +15,8 @@ const FIXED_CODES = new Set([
   'notification-lookup-failed', 'device-lookup-failed', 'notification-stamp-failed',
   'expo-rejected', 'expo-request-failed', 'dead-token-revoke-failed',
   'missing-configuration', 'unexpected-error',
+  // DEC-2026-046 at the edge (contract §12a, v0.16).
+  'mfa-required', 'mfa-check-failed',
 ]);
 
 function requestIdOf(request: Request): string {

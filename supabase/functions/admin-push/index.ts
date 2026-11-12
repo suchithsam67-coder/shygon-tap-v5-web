@@ -21,11 +21,14 @@
  *      Sends one notification to that admin's own devices only. Nothing else.
  *
  * Secrets required (Supabase > Edge Functions > Secrets):
- *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY;
+ *   SUPABASE_ANON_KEY (Supabase provides it) for the second-factor check (contract §12a)
  * Expo's push service needs no key for tokens obtained by the app itself.
  */
 
-import { corsHeaders, json, MissingSecretError, requireEnv, resolveAdmin, serviceClient } from '../_shared/admin.ts';
+import {
+  corsHeaders, json, MFA_REQUIRED, mfaRequiredBody, MissingSecretError, requireEnv, resolveAdmin, serviceClient,
+} from '../_shared/admin.ts';
 import { requestLog } from '../_shared/log.ts';
 
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
@@ -67,6 +70,7 @@ Deno.serve(async (request: Request) => {
     // Not the dispatcher — the only other caller allowed is an administrator
     // asking to test their own device.
     const admin = await resolveAdmin(service, request, 'orders.read', log);
+    if (admin === MFA_REQUIRED) return respond(mfaRequiredBody, 403);
     if (!admin) return respond({ error: 'Not permitted.' }, 403);
 
     let body: Record<string, unknown> = {};

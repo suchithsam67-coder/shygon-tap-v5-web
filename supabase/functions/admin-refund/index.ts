@@ -15,10 +15,13 @@
  *     revoke_entitlements?: boolean }
  *
  * Secrets required (Supabase > Edge Functions > Secrets — never in the APK):
- *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
+ *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET;
+ *   SUPABASE_ANON_KEY (Supabase provides it) for the second-factor check (contract §12a)
  */
 
-import { audit, corsHeaders, json, MissingSecretError, requireEnv, resolveAdmin, serviceClient } from '../_shared/admin.ts';
+import {
+  audit, corsHeaders, json, MFA_REQUIRED, mfaRequiredBody, MissingSecretError, requireEnv, resolveAdmin, serviceClient,
+} from '../_shared/admin.ts';
 import { requestLog } from '../_shared/log.ts';
 
 Deno.serve(async (request: Request) => {
@@ -40,6 +43,7 @@ Deno.serve(async (request: Request) => {
     service = serviceClient();
 
     const admin = await resolveAdmin(service, request, 'orders.refund', log);
+    if (admin === MFA_REQUIRED) return respond(mfaRequiredBody, 403);
     if (!admin) return respond({ error: 'You are not permitted to issue refunds.' }, 403);
 
     let body: Record<string, unknown>;

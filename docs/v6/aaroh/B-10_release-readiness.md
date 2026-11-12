@@ -1051,3 +1051,32 @@ The two admin edge functions check access on their own.
 - any hosted check.
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 30. 2026-11-12: the admin edge functions take V6-094's logs and the second-factor rule (contract v0.16)
+
+**Approval:** the owner, in session on 2026-11-12: "Approve both".
+
+**What changed:**
+- **Codex's V6-094** (`17c4a56`; structured, privacy-safe admin edge logs) is merged unchanged. The coordinator checked it and handed it over.
+- **The second-factor rule at the edge.** Session A added DEC-2026-046's rule to `resolveAdmin`:
+  - it asks the database in the caller's own session (`admin_mfa_status`);
+  - when the factor is required and missing, both functions answer `403` with `code: 'admin:mfa_required'`;
+  - if the check cannot run, the ordinary 403 refusal (fail closed).
+- Records: contract v0.16 and DEC-2026-046 §9.
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]:
+
+| Group | Results |
+|---|---|
+| `test:admin-edge` | **16 passed** (13 from Codex; 3 new: opt-in at aal1/aal2 on both functions with the database agreeing, the mandatory switch, fail-closed) |
+| Negative control | `resolveAdmin` without the check: exactly the 3 new checks failed (an aal1 session, and the switch-on case, were accepted as administrator; the fail-closed case allowed). The good file was restored and compared byte for byte |
+| `test:db` | verify 21; adversarial 64; RLS matrix 1729 (61 tables, 7 callers); identity 69; admin-notes 12; golden 24; admin-contract 21; rollbacks 23; account-deletion 9; history 2 |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 20; account-export 12; phone-verify 12; admin-mfa 9; card-lifecycle 9; local-host 9; admin-edge 16; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 (7 moderate) |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`) |
+
+**Not built:**
+- the admin app's screens (the Admin APK session);
+- the switch turned on for everyone (Q4);
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).

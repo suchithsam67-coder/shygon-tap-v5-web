@@ -12,8 +12,9 @@
 //   E. The mandatory switch (step 3), service only, and enrolment that stays open.
 //   F. The authenticator codes (RFC 6238) and the stand-in's factor rules.
 //
-// Not claimed: the two admin edge functions (Codex, after V6-094), which do not
-// use is_admin(); the admin app's screens (DEC-2026-046 Q2).
+// The two admin edge functions apply the same rule through admin_mfa_status
+// (contract v0.16); test:admin-edge covers them. Not claimed: the admin app's
+// screens (DEC-2026-046 Q2; the Admin APK session).
 //
 //   node --import ./scripts/ci/deny-network.mjs supabase/tests/admin-mfa.mjs
 import { startStack } from '../local/stack.mjs';

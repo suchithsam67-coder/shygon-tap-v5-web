@@ -14,11 +14,15 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { ROOT } from './lib/live-db.mjs';
 import { startStack } from '../local/stack.mjs';
-import { assert, assertEqual, createHarness, signUp } from '../local/testkit.mjs';
+import { assert, assertEqual, createHarness, signUp, supabaseClient } from '../local/testkit.mjs';
+import { totp } from '../local/totp.mjs';
 
 const t = createHarness('Admin boundary at the edge (Edge Functions on the local stack)');
 const stack = await startStack();
 const sql = async (text, params) => (await stack.query(text, params)).rows;
+// A hosted project gives every Edge Function its anon key; the second-factor
+// check (contract §12a) asks the database in the caller's own session with it.
+process.env.SUPABASE_ANON_KEY = stack.keys.anonKey;
 
 // --- the Deno runtime, substituted --------------------------------------------
 const handlers = {};
@@ -169,7 +173,8 @@ await t.check('the edge and the database agree on every role x permission pair',
   let pairs = 0;
   for (const account of [customer, viewer, support, inactive, full]) {
     for (const permission of permissions) {
-      const edge = (await resolve(`Bearer ${account.token}`, permission)) !== null;
+      const answer = await resolve(`Bearer ${account.token}`, permission);
+      const edge = answer !== null && answer !== shared.MFA_REQUIRED;
       const { data: db } = await account.client.rpc('admin_has', { p_permission: permission });
       assertEqual(edge, db === true, `${account.email} ${permission}`);
       pairs++;
@@ -260,6 +265,85 @@ await t.check('admin-push: no token and a customer are refused; an admin may onl
   assertEqual(notTest.status, 400, 'admin without { test: true }');
   const noDevice = await call('admin-push', { token: viewer.token, body: { test: true } });
   assertEqual(noDevice.status, 409, 'admin with no registered device');
+});
+
+// ---------------------------------------------------------------------------
+t.section('DEC-2026-046 at the edge: the second factor (migration 040; contract §12a, v0.16)');
+
+const PASSWORD = 'local-test-pass-1';
+/** A fresh password sign-in: a new client with an aal1 session. */
+async function signIn(account) {
+  const client = supabaseClient(stack);
+  const { error } = await client.auth.signInWithPassword({ email: account.email, password: PASSWORD });
+  if (error) throw new Error(`sign-in: ${error.message}`);
+  return client;
+}
+const tokenOf = async (client) => (await client.auth.getSession()).data.session.access_token;
+/** Enrols and verifies a TOTP factor through supabase-js, as the admin app would; the client ends at aal2. */
+async function enrolAndVerify(client) {
+  const { data: enrolled, error } = await client.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Phone' });
+  if (error) throw new Error(`enroll: ${error.message}`);
+  const { data: challenge, error: challengeError } = await client.auth.mfa.challenge({ factorId: enrolled.id });
+  if (challengeError) throw new Error(`challenge: ${challengeError.message}`);
+  const { error: verifyError } = await client.auth.mfa.verify({ factorId: enrolled.id, challengeId: challenge.id, code: totp(enrolled.totp.secret) });
+  if (verifyError) throw new Error(`verify: ${verifyError.message}`);
+}
+const MFA_BODY = { error: 'Enter your authenticator code to continue.', code: 'admin:mfa_required' };
+async function refusal(name, options) {
+  const { response, events } = await captureCall(name, options);
+  const reasons = events.filter((event) => event.event === 'security.admin-refused').map((event) => event.reason);
+  return [response.status, response.body, reasons];
+}
+
+const secured = await admin('admin');
+const aal2Client = await signIn(secured);
+await enrolAndVerify(aal2Client);
+const aal2 = await tokenOf(aal2Client);
+const aal1Client = await signIn(secured);
+const aal1 = await tokenOf(aal1Client);
+
+await t.check('an administrator with a verified factor: admin:mfa_required at aal1 on both functions, accepted at aal2; the database agrees', async () => {
+  assertEqual(await resolve(`Bearer ${aal1}`, 'orders.refund'), shared.MFA_REQUIRED, 'resolveAdmin at aal1');
+  assertEqual((await resolve(`Bearer ${aal2}`, 'orders.refund'))?.role, 'admin', 'resolveAdmin at aal2');
+  assertEqual((await aal1Client.rpc('admin_has', { p_permission: 'orders.refund' })).data, false, 'admin_has at aal1');
+  assertEqual((await aal2Client.rpc('admin_has', { p_permission: 'orders.refund' })).data, true, 'admin_has at aal2');
+  for (const name of ['admin-refund', 'admin-push']) {
+    assertEqual(await refusal(name, { token: aal1, body: { test: true, reason: 'test' } }), [403, MFA_BODY, ['mfa-required']], `${name} at aal1`);
+  }
+  const refund = await call('admin-refund', { token: aal2, body: { reason: 'test' } });
+  assertEqual([refund.status, refund.body?.error], [400, 'An order id is required.'], 'admin-refund at aal2');
+  assertEqual((await call('admin-push', { token: aal2, body: { test: true } })).status, 409, 'admin-push at aal2 (no device)');
+  // The refusal is not the one the current admin app signs out on (DEC-2026-046).
+  assert(!/administrator access|does not permit/i.test(MFA_BODY.error), 'the app would sign out');
+  return 'opt-in, exactly as the admin RPCs';
+});
+
+await t.check('the mandatory switch (step 3): every administrator needs aal2 at the edge; switched off, one without a factor works as before', async () => {
+  const on = (await sql(`SELECT public.admin_mfa_set_required(true, true, 'test:admin-edge') AS r`))[0].r;
+  assertEqual(on.ok, true, 'switched on');
+  try {
+    assertEqual(await resolve(`Bearer ${full.token}`, 'orders.refund'), shared.MFA_REQUIRED, 'no factor, switch on');
+    assertEqual(await refusal('admin-refund', { token: full.token, body: { reason: 'test' } }), [403, MFA_BODY, ['mfa-required']], 'admin-refund, switch on');
+    assertEqual((await resolve(`Bearer ${aal2}`, 'orders.refund'))?.role, 'admin', 'aal2 still accepted');
+  } finally {
+    await sql(`SELECT public.admin_mfa_set_required(false, false, 'test:admin-edge')`);
+  }
+  assertEqual((await resolve(`Bearer ${full.token}`, 'orders.refund'))?.role, 'admin', 'switched off: as before');
+  return 'step 3 works and ships OFF';
+});
+
+await t.check('the check fails closed: when the database cannot answer, the ordinary refusal, logged as mfa-check-failed', async () => {
+  // Test-only: the caller's session may not ask, so the database gives no answer.
+  await sql(`REVOKE EXECUTE ON FUNCTION public.admin_mfa_status() FROM authenticated`);
+  try {
+    assertEqual(await resolve(`Bearer ${full.token}`, 'orders.refund'), null, 'resolveAdmin');
+    assertEqual(await refusal('admin-refund', { token: full.token, body: { reason: 'test' } }),
+      [403, { error: 'You are not permitted to issue refunds.' }, ['mfa-check-failed']], 'admin-refund');
+  } finally {
+    await sql(`GRANT EXECUTE ON FUNCTION public.admin_mfa_status() TO authenticated`);
+  }
+  assertEqual((await resolve(`Bearer ${full.token}`, 'orders.refund'))?.role, 'admin', 'restored');
+  return 'never allowed on doubt';
 });
 
 const ok = t.finish();

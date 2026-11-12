@@ -40,7 +40,7 @@ Every line is one JSON object:
 | Webhook (`razorpay-webhook`) | `webhook.processed`, `webhook.duplicate`, `webhook.capture`, `webhook.payment-failed`, `webhook.ignored`, `webhook.unknown-order`, `webhook.ledger-failed`, `webhook.release-failed`, `webhook.error` |
 | Fulfilment | `order.fulfilled`, `fulfilment.tap-provisioned`, `fulfilment.retryable`, `fulfilment.release-failed`, `fulfilment.card-issue-failed`, `fulfilment.edit-window-failed`, `fulfilment.slug-failed`, `fulfilment.slug-assignment-failed`, `fulfilment.tap-provisioning-failed`, `fulfilment.unknown-product-type` |
 | Order texts | `order-sms.not-sent`, `order-sms.unavailable`, `order-sms.error` |
-| **Security events** | `auth.refused` (no valid session), `security.admin-refused` (`no-session`, `not-admin`, `missing-permission`, `bad-method`), `payment.signature-invalid`, `payment.customer-mismatch` (another customer's payment), `payment.order-mismatch`, `payment.amount-mismatch`, `webhook.rejected` (`unsigned` / `bad-signature`), `webhook.amount-mismatch` (held for review), `config.missing`, `health.config-missing` |
+| **Security events** | `auth.refused` (no valid session), `security.admin-refused` (`no-session`, `not-admin`, `missing-permission`, `bad-method`, and since v0.16 `mfa-required`, `mfa-check-failed`), `payment.signature-invalid`, `payment.customer-mismatch` (another customer's payment), `payment.order-mismatch`, `payment.amount-mismatch`, `webhook.rejected` (`unsigned` / `bad-signature`), `webhook.amount-mismatch` (held for review), `config.missing`, `health.config-missing` |
 
 ## Tracing a failure
 
@@ -54,4 +54,4 @@ Every line is one JSON object:
 
 - **Error tracking:** no provider (above). Owner decision.
 - **Log retention and alerting:** whatever the hosting plan keeps; no alert rules yet. The security events above are the ones to alert on first (`webhook.rejected`, `payment.signature-invalid`, `payment.customer-mismatch`, `*.amount-mismatch`, `config.missing`, a degraded `/api/health`).
-- **Admin Edge Function failures:** `admin-refund` and `admin-push` write structured, redacted-by-allowlist events to Supabase function logs. `security.admin-refused` records refused callers with a fixed reason code. `npm run test:admin-edge` covers the refusal events and canary redaction.
+- **Admin Edge Function failures:** `admin-refund` and `admin-push` write structured, redacted-by-allowlist events to Supabase function logs. `security.admin-refused` records refused callers with a fixed reason code. `npm run test:admin-edge` covers the refusal events and canary redaction. Since contract v0.16 (DEC-2026-046 §9) both functions also require the second factor as the admin RPCs do: `mfa-required` when it is missing, `mfa-check-failed` (plus `admin.mfa-check-failed`) when the database could not be asked.
