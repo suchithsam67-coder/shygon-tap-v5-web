@@ -59,7 +59,7 @@ A premium NFC card that opens the owner's page in any browser, with no app. The 
 | SHYGON Connect | **V01** | P3 | BUILT AND VERIFIED, OFF | Hosted P2 PASS; counsel; wording | A/B |
 | Emergency owner alerts | **V01** | P3 | BUILT AND VERIFIED, BLOCKED | DLT + MSG91 (F-10); phone verification; supervised smoke test; counsel | A/B + Adult |
 | Emergency visitor alerts | Later | P8 | BUILT, OFF by decision | DEC-038 Q2 re-decided after owner alerts run | — |
-| Verified Tap | **V01** | P1 (backend) / P3 (badge) | Backend BUILT AND VERIFIED, OFF; badge NOT STARTED | Key custody (F-16 Q2); production keys; the first NTAG batch personalised and batch-verified; the badge built; OC-6 review fixed | A/B + Adult |
+| Verified Tap | **V01** | P1 (backend) / P3 (badge) | Backend BUILT AND VERIFIED, OFF; badge NOT STARTED | Key custody (F-16 Q2); production keys; the first DESFire EV3 batch personalised and batch-verified; the badge built; OC-6 review fixed | A/B + Adult |
 | Edition provenance ("No. 037 of 100") | **V01** (as part of the Verified Tap verdict) | P3 | BUILT (verdict edition field) | Card records complete for the batch | A/B |
 | Privé | Later (demo only) | P8 | PROTOTYPE | Real partners decision | — |
 | Guardian | Later | P8 | DOCUMENTED ONLY | Visitor alerts decision | — |
@@ -73,7 +73,7 @@ A premium NFC card that opens the owner's page in any browser, with no app. The 
 |---|---|---|---|---|---|
 | Dashboard, analytics, orders, settings, notifications, support | **V01** | P2 | BUILT AND VERIFIED (V5) | Review mobile + a11y (acceptance §3) | B |
 | Mode management | **V01** | P2 | BUILT AND VERIFIED | Merge v0.11.1; Lost wording | B |
-| Card activation + status | **V01** | P2 | BUILT AND VERIFIED (V5 OTP) | Status for NTAG cards (`/d/` code ↔ owner) | A/B |
+| Card activation + status | **V01** | P2 | BUILT AND VERIFIED (V5 OTP) | Status for DESFire EV3 cards (`/d/` code ↔ owner) | A/B |
 | Card pairing / registry | **V01 (minimal)** | P2 | PARTIALLY IMPLEMENTED | Bind a personalised card (code + epoch) to an owner at activation; DEC-028 lifecycle states | A/B |
 | Lost-card protection ("report stolen / disable card") | **V01** | P2 | PARTIALLY IMPLEMENTED | An owner action that retires a card (Verified Tap → `needs_service`) | A/B |
 | Safety settings (Emergency, Return to Owner, Connections pages) | **V01** | P2 | BUILT AND VERIFIED, hidden | Unhide per feature as it is released | B |
