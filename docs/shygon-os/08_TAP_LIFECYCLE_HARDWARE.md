@@ -23,10 +23,10 @@ Supported forms, one model: **card** (PVC/metal/transparent, existing), **tag/st
 |---|---|---|---|---|
 | Baseline | NTAG213/215/216 (static NDEF, locked) | none (T0) | Yes, trivially | Business/personal cards, location tags where a clone is harmless |
 | New AAROH cards (owner 2026-11-10) | **MIFARE DESFire EV3** (SDM: encrypted UID+counter+CMAC in the NDEF URL; NXP: "compatible with NTAG DNA") | T1 authenticated tap | Clone yields stale/replayed URL → rejected | Rescue tags, badges, anything with ownership meaning; **required for any future Access** |
-| Access-grade (Phase 5) | A separate application on the same DESFire EV3 chip (or a secure element), read by a door reader, **not** the phone URL | Mutual auth | No | Physical access (doors): out of scope of the tap-URL model; integrates via a controller. Needs memory headroom (DEC-2026-043 D-2) and its own keys |
+| Access-grade (Phase 5) | A separate application on the same DESFire EV3 chip (or a secure element), read by a door reader, **not** the phone URL | Mutual auth | No | Physical access (doors): out of scope of the tap-URL model; integrates via a controller. V01 chips are 2 kB (DEC-2026-043 D-2, approved 2026-11-12), so a second application needs a new decision, more memory and its own keys |
 | Not usable for Verified Tap | NTAG 424 DNA (the earlier recommendation, replaced 2026-11-10); DESFire EV1 and EV2 (no SDM) | — | — | Static `/d/<code>` only, no authenticity claim |
 
-Cost note (for the owner to price): DESFire EV3 inlays cost more than NTAG21x, and metal-card encoding needs an ISO-compliant, RF-tested layout. The adult signatory confirms with the inlay maker the memory size (2, 4, 8 or 16 kB), the input capacitance (17 pF or 70 pF) and whether the current metal/transparent designs can carry an EV3 inlay (DEC-2026-043 D-2, Q7).
+Cost note (for the owner to price): DESFire EV3 inlays cost more than NTAG21x, and metal-card encoding needs an ISO-compliant, RF-tested layout. The adult signatory confirms with the inlay maker the memory size (2 kB approved, DEC-2026-043 D-2), the input capacitance (17 pF or 70 pF) and whether the current metal/transparent designs can carry an EV3 inlay (DEC-2026-043 D-2, Q7).
 
 ## 4. Lifecycle state machine
 

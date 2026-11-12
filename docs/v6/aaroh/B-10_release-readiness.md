@@ -983,3 +983,24 @@ The two admin edge functions check access on their own.
 - Session B's and the coordinator's copies, which are relayed to them.
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 28. 2026-11-12: the DESFire questions D-1 to D-4 approved (DEC-2026-043 §12.7)
+
+**Approval:** the owner, in session on 2026-11-12, answered "Approve D-1 to D-4" to "Approve D-1 to D-4 (EV3, 2 kB, Random ID off, adopt the gates)?".
+
+**Approved:**
+- D-1: the chip is MIFARE DESFire EV3;
+- D-2: 2 kB;
+- D-3: Random ID off;
+- D-4: G-1 to G-3 and the §12.4 personalisation duties are conditions before any real key or chip.
+
+**Changed:** records only, with no code, schema or contract change:
+- DEC-2026-043 §12.7;
+- `DECISIONS.md`, backlog V6-133;
+- the capability matrix and doc 08.
+
+**Not done:**
+- G-1 (the EV3 data sheet), G-2 (a real EV3 known answer), G-3 (real phones);
+- Q2, Q3 and Q7.
+
+**Verdict unchanged:** release BLOCKED (§18).

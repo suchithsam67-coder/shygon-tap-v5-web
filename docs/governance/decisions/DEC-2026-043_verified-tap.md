@@ -1,6 +1,6 @@
 # DEC-2026-043: Verified Tap (SUN at `/d/<code>`; chip MIFARE DESFire EV3 since amendment A-1, was NTAG 424 DNA)
 
-> **Amended 2026-11-11 (A-1, §12).** The owner decided on 2026-11-10: "use desfare only, update it everywhere". The chip is **MIFARE DESFire**, and Verified Tap needs **EV3**. Where §1–§11 say NTAG 424 DNA about AAROH's chip, §12 supersedes them. They stay as written, as the record of what was decided then. Where they cite NTAG 424 DNA documents (AN12196, NT4H2421Gx) for the SUN scheme, they still apply: NXP calls EV3's SUN "compatible with NTAG DNA" (§12.1).
+> **Amended 2026-11-11 (A-1, §12).** The owner decided on 2026-11-10: "use desfare only, update it everywhere". The chip is **MIFARE DESFire**, and Verified Tap needs **EV3**. Where §1–§11 say NTAG 424 DNA about AAROH's chip, §12 supersedes them. They stay as written, as the record of what was decided then. Where they cite NTAG 424 DNA documents (AN12196, NT4H2421Gx) for the SUN scheme, they still apply: NXP calls EV3's SUN "compatible with NTAG DNA" (§12.1). The owner approved D-1 to D-4 on 2026-11-12 (§12.7).
 
 | Field | Value |
 |---|---|
@@ -359,7 +359,7 @@ The build uses test-only keys, `VERIFIED_TAP` stays off, and nothing is hosted. 
 
 **State of this amendment:**
 - The chip change itself, and the sweep in §12.6, follow the owner's instruction.
-- §12.3 to §12.5 are **PROPOSED**, for the owner's answer.
+- §12.3 to §12.5 were PROPOSED. The owner **APPROVED D-1 to D-4 on 2026-11-12** (§12.7).
 - Nothing is keyed, personalised, ordered or deployed. The release stays BLOCKED.
 
 ### 12.1 What NXP's public documents say [OBSERVED 2026-11-11, read from NXP's own PDFs]
@@ -392,7 +392,7 @@ The build uses test-only keys, `VERIFIED_TAP` stays off, and nothing is hosted. 
 - Verified Tap on EV3 rests on NXP's statement that its SUN is compatible. That remains INFERRED until G-1 and G-2 pass.
 - If G-1 finds a difference, it becomes a code change through this decision, with tests first.
 
-### 12.3 Gates before any real key or chip [PROPOSED]
+### 12.3 Gates before any real key or chip [APPROVED 2026-11-12 as D-4]
 
 - **G-1. The EV3 data sheet.** The adult authorised signatory (F-2), never the founder, obtains DS4870xx under NXP's terms. Alternatively, the personalisation bureau (Q3) confirms it in writing. Then check it against `sun.mjs`, item by item:
   - the PICCData tag byte and layout;
@@ -407,7 +407,7 @@ The build uses test-only keys, `VERIFIED_TAP` stays off, and nothing is hosted. 
   - The sample's keys stay test-only. The sample is then kept as a reference or destroyed.
 - **G-3. Real phones** (P-9, unchanged). At least one current iPhone and two Androids, with the card's metal or transparent build and the chosen inlay.
 
-### 12.4 What personalisation adds on DESFire (P-6) [PROPOSED]
+### 12.4 What personalisation adds on DESFire (P-6) [APPROVED 2026-11-12 as D-4]
 
 NTAG 424 DNA arrives with its NDEF application and files already in place. A blank DESFire EV3 holds nothing until the station creates it, and it has a card-level master key that NTAG 424 DNA does not have. P-6 therefore adds the following.
 1. **Change the PICC master key** from its transport value to a diversified key, in its own key domain (D-a).
@@ -425,7 +425,7 @@ NTAG 424 DNA arrives with its NDEF application and files already in place. A bla
 
 The configuration record (P-6 step 2) is written byte for byte against DS4870xx (G-1).
 
-### 12.5 Questions for the owner [PROPOSED]
+### 12.5 Questions for the owner [APPROVED 2026-11-12, §12.7]
 
 | # | Question | Recommendation |
 |---|---|---|
@@ -455,3 +455,24 @@ Q2 (key custody), Q3 (who personalises) and Q7 (inlay feasibility) stay open, no
   - The coordinator (`coord/v01-scope`): `docs/shygon-os/v01/` (the inventory's Verified Tap row, risk R-16, the technical architecture's chip line).
   - The store session already changed the print package (`ea13379`).
 - **Not changed:** NTAG21x mentions (V5's legacy cards), and the competitor research that names NTAG 424 DNA.
+
+### 12.7 Approval of D-1 to D-4 (2026-11-12) [OBSERVED in session]
+
+The owner answered "Approve D-1 to D-4" to Session A's question, "Approve D-1 to D-4 (EV3, 2 kB, Random ID off, adopt the gates)?".
+
+| # | Answer |
+|---|---|
+| D-1 | **MIFARE DESFire EV3** |
+| D-2 | **2 kB.** The adult signatory still confirms two things with the inlay maker (Q7): the input capacitance (17 pF or 70 pF) and whether the metal and transparent builds can carry the inlay. A second application on the chip (doc 08's Phase 5) would need a new decision and more memory |
+| D-3 | **Random ID off** |
+| D-4 | **G-1 to G-3 and §12.4 are conditions** before any real key or chip |
+
+**What this unlocks:** nothing physical. It fixes two things:
+- what the adult signatory asks the inlay maker and the personalisation bureau for: EV3, 2 kB, SDM, and the §12.4 configuration;
+- what must pass before any key or chip exists.
+
+**Still open:**
+- Q2 (key custody), Q3 (who personalises) and Q7 (inlay fit);
+- G-1 to G-3.
+
+No order, key, personalisation or hosting is approved. The release stays BLOCKED.
