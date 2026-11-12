@@ -88,7 +88,7 @@ test('signed-in pages: no serious or critical WCAG 2.2 AA violation', async ({ p
     '/shygontap/account', '/shygontap/tap', '/shygontap/tiers', '/shygontap/customize', '/shygontap/qr', '/shygontap/cards',
     '/shygontap/customizations', '/shygontap/orders', '/shygontap/analytics', '/shygontap/notifications', '/shygontap/support',
     '/shygontap/settings', '/shygontap/experience', '/shygontap/emergency', '/shygontap/return-to-owner', '/shygontap/connections',
-    '/shygontap/mode',
+    '/shygontap/mode', '/shygontap/phone',
   ];
   const blocking: string[] = [];
   for (const path of pages) {

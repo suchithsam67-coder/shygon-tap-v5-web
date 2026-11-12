@@ -131,6 +131,19 @@ body:has(.storefront) .button:hover svg:last-child:not(:first-child) { transform
 .otp-success { display: grid; justify-items: center; gap: 10px; padding: 12px 0 6px; text-align: center; }
 .otp-success svg { color: var(--ds-color-state-success); animation: otp-pop 0.5s cubic-bezier(0.2, 0, 0, 1.4) both; }
 .otp-success p { color: var(--ds-text-secondary); }
+/* ------------------------------------------------- verify your phone (v0.13) */
+.phone-verify { display: grid; gap: 12px; }
+.phone-verify form { display: grid; gap: 0; }
+.phone-verify-ok { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--ds-text); }
+.phone-verify-ok svg { color: var(--ds-color-state-success); flex: 0 0 auto; }
+.phone-verify-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.phone-verify .otp-field input { max-width: 320px; }
+.phone-verify .field-hint a,
+.phone-verify-back a { color: var(--ds-text); text-decoration: underline; text-underline-offset: 3px; }
+.phone-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.phone-state-ok { color: var(--ds-color-state-success); }
+.phone-state-warn { color: var(--ds-color-state-warning); }
+.phone-state a { color: var(--ds-text); text-decoration: underline; text-underline-offset: 3px; }
 @keyframes otp-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 @keyframes otp-pop { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 

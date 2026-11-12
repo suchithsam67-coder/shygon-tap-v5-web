@@ -8,7 +8,9 @@ import type { CardRow } from '../lib/database.types';
  * Reading is a plain RLS-scoped query: a customer only ever sees their own
  * cards. Changing a card never happens from the browser — it goes through the
  * server function, which checks a one-time password sent to the account's
- * mobile number first.
+ * mobile number first. Since v0.13 that number must be verified, and a number
+ * that replaced a verified one waits 24 hours (409 phone_not_verified /
+ * phone_cooling_down).
  */
 
 // Every column: the limited-edition fields (migration 017) come along once that
@@ -50,7 +52,11 @@ export class CardOtpError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly details: { needsPhone?: boolean; retryAfter?: number; attemptsLeft?: number } = {},
+    /**
+     * `code` (v0.13): 'phone_not_verified', or 'phone_cooling_down' with
+     * `retryAfter` in seconds until the replaced number may confirm card changes.
+     */
+    readonly details: { code?: string; needsPhone?: boolean; retryAfter?: number; attemptsLeft?: number } = {},
   ) {
     super(message);
   }
@@ -76,12 +82,14 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
   }
   const result = (await response.json().catch(() => ({}))) as T & {
     error?: string;
+    code?: string;
     needsPhone?: boolean;
     retryAfter?: number;
     attemptsLeft?: number;
   };
   if (!response.ok) {
     throw new CardOtpError(result.error ?? 'Something went wrong. Please try again.', response.status, {
+      code: typeof result.code === 'string' ? result.code : undefined,
       needsPhone: result.needsPhone,
       retryAfter: result.retryAfter,
       attemptsLeft: result.attemptsLeft,

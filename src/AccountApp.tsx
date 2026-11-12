@@ -52,6 +52,7 @@ const AnalyticsPage = lazy(() => import('./pages/Analytics'));
 const Support = lazy(() => import('./pages/Support'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Cards = lazy(() => import('./pages/Cards'));
+const VerifyPhone = lazy(() => import('./pages/VerifyPhone'));
 const OwnerExperience = lazy(() => import('./pages/OwnerExperience'));
 const EmergencySettings = lazy(() => import('./pages/EmergencySettings'));
 const ReturnToOwner = lazy(() => import('./pages/ReturnToOwner'));
@@ -132,6 +133,7 @@ export default function AccountApp() {
               <Route path="/shygontap/customize" element={<Protected title="Customize your Tap"><Customize /></Protected>} />
               <Route path="/shygontap/qr" element={<Protected title="QR code"><TapQr /></Protected>} />
               <Route path="/shygontap/cards" element={<Protected title="Your cards"><Cards /></Protected>} />
+              <Route path="/shygontap/phone" element={<Protected title="Verify your phone"><VerifyPhone /></Protected>} />
               <Route path="/shygontap/customizations" element={<Protected title="Add-ons"><Customizations /></Protected>} />
               <Route path="/shygontap/checkout" element={<Protected title="Checkout"><Checkout /></Protected>} />
               <Route path="/shygontap/orders" element={<Protected title="Your orders"><Orders /></Protected>} />

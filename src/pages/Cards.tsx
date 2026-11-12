@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Loader2, Nfc, PhoneCall, ShieldCheck, ShieldOff } from 'lucide-react';
+import { CheckCircle2, Clock, Loader2, Nfc, PhoneCall, ShieldCheck, ShieldOff } from 'lucide-react';
 import { AppShell } from '../components/app/AppShell';
 import { EmptyState, ErrorState, SkeletonRows } from '../components/app/States';
 import { useAuth } from '../lib/auth-context';
@@ -21,12 +21,17 @@ import {
   type CardAction,
   type OtpChallenge,
 } from '../services/cards';
+import { stillWaiting } from '../services/account';
+import { usePhoneStatus } from '../hooks/usePhoneStatus';
+import { VERIFY_PHONE_PATH, cardPhoneProblem, whenUsable } from '../lib/phoneVerification';
 
 /**
  * The customer's NFC cards: status, and activation / deactivation confirmed by
  * a one-time password sent to the mobile number on the account. The change
  * itself is made on the server (card-otp function, migration 015), which also
- * alerts the SHYGON admin panel.
+ * alerts the SHYGON admin panel. Since v0.13 the code goes only to a verified
+ * number, so the page says so before a click, and the dialog explains the two
+ * phone refusals (not verified; changed recently) in our words.
  */
 
 const date = (iso?: string | null) =>
@@ -60,6 +65,9 @@ export default function Cards() {
   // While card sales are closed (D-10) a customer without a card has nothing
   // to activate here, so the OTP set-up advice would be a dead end.
   const cardsExpected = CARD_SALES_OPEN || cards.length > 0;
+  // Whether the number can take a card code (v0.13 §4b). A failed read shows
+  // nothing here; the dialog still explains a refusal.
+  const phone = usePhoneStatus(user?.id, profile?.phone, Boolean(profile?.phone) && cardsExpected);
   const [pending, setPending] = useState<{ card: CardRow; action: CardAction } | null>(null);
 
   const done = useCallback(
@@ -83,6 +91,24 @@ export default function Cards() {
           <p>
             Add your mobile number in <Link to="/shygontap/settings">Settings</Link> first. We send the one-time code
             to that number.
+          </p>
+        </section>
+      )}
+      {profile?.phone && cardsExpected && phone && phone.phone && !phone.verified && (
+        <section className="panel card-otp-phone-note" role="note" data-testid="cards-phone-unverified">
+          <PhoneCall size={18} aria-hidden="true" />
+          <p>
+            Verify your mobile number before you change a card: we send the one-time code only to a verified number.{' '}
+            <Link to={VERIFY_PHONE_PATH}>Verify your phone</Link>
+          </p>
+        </section>
+      )}
+      {cardsExpected && phone?.verified && stillWaiting(phone) && phone.usableFrom && (
+        <section className="panel card-otp-phone-note" role="note" data-testid="cards-phone-waiting">
+          <Clock size={18} aria-hidden="true" />
+          <p>
+            Your mobile number changed recently. For your security, it can confirm card changes from{' '}
+            {whenUsable(phone.usableFrom)}.
           </p>
         </section>
       )}
@@ -196,7 +222,7 @@ export default function Cards() {
 
 type Phase = 'sending' | 'entering' | 'verifying' | 'success' | 'blocked';
 
-function OtpDialog({
+export function OtpDialog({
   card,
   action,
   onCancel,
@@ -212,6 +238,7 @@ function OtpDialog({
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
   const [needsPhone, setNeedsPhone] = useState(false);
+  const [needsVerify, setNeedsVerify] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const restoreTo = useRef<HTMLElement | null>(null);
@@ -229,9 +256,13 @@ function OtpDialog({
       requestAnimationFrame(() => inputRef.current?.focus());
     } catch (error) {
       const err = error as CardOtpError;
-      setMessage(err.message);
+      // The phone refusals (v0.13) in our words; their retryAfter is hours away,
+      // not a resend countdown.
+      const phoneProblem = cardPhoneProblem(err.details?.code, err.details?.retryAfter);
+      setMessage(phoneProblem?.message ?? err.message);
       setNeedsPhone(Boolean(err.details?.needsPhone));
-      if (err.details?.retryAfter) setResendIn(err.details.retryAfter);
+      setNeedsVerify(phoneProblem?.link === 'verify');
+      if (err.details?.retryAfter && !phoneProblem) setResendIn(err.details.retryAfter);
       setPhase(challenge ? 'entering' : 'blocked');
     }
   }, [action, card.id, challenge]);
@@ -357,6 +388,7 @@ function OtpDialog({
               <p id="otp-error" className="otp-error" role="alert">
                 {message}{' '}
                 {needsPhone && <Link to="/shygontap/settings">Open Settings</Link>}
+                {needsVerify && <Link to={VERIFY_PHONE_PATH}>Verify your phone</Link>}
               </p>
             )}
 

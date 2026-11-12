@@ -181,6 +181,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/shygontap/phone",
+      "destination": "/index.html"
+    },
+    {
       "source": "/aaroh/experience",
       "destination": "/index.html"
     },

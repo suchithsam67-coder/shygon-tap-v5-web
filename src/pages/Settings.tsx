@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
+  AlertTriangle,
   Bell,
   CheckCircle2,
   Eye,
@@ -30,6 +31,9 @@ import { EXPERIENCE_LABELS } from '../services/tap';
 import { requestAccountDeletion } from '../services/privacy';
 import { DataExport } from '../components/app/DataExport';
 import { TIERS_PATH } from '../lib/commerce';
+import { usePhoneStatus } from '../hooks/usePhoneStatus';
+import { stillWaiting } from '../services/account';
+import { VERIFY_PHONE_PATH, phoneKey, whenUsable } from '../lib/phoneVerification';
 
 /**
  * Account settings.
@@ -48,6 +52,11 @@ export default function Settings() {
 
   const [form, setForm] = useState({ full_name: '', phone: '', company: '', job_title: '' });
   const [savingProfile, setSavingProfile] = useState(false);
+
+  // The account phone's verification (v0.13 §4b). A failed read shows nothing:
+  // the field still works.
+  const phoneStatus = usePhoneStatus(user?.id, profile?.phone);
+  const phoneEdited = Boolean(profile) && phoneKey(form.phone) !== phoneKey(profile?.phone);
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -284,12 +293,34 @@ export default function Settings() {
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 autoComplete="tel"
                 inputMode="tel"
-                aria-describedby="settings-phone-hint"
+                aria-describedby="settings-phone-hint settings-phone-state"
               />
               <small id="settings-phone-hint" style={{ display: 'block', marginTop: 6, fontSize: 12, color: 'var(--ds-text-tertiary)' }}>
-                One-time codes for activating or deactivating your card are sent to this number.
+                One-time codes for activating or deactivating your card are sent to this number, once it is verified.
               </small>
             </label>
+            {/* Outside the label, so its link is not part of the field's name. */}
+            <div id="settings-phone-state" aria-live="polite" style={{ marginTop: -8, marginBottom: 14 }} data-testid="settings-phone-state">
+              {phoneEdited && phoneStatus?.verified ? (
+                <small className="phone-state phone-state-warn">
+                  <AlertTriangle size={13} aria-hidden="true" />
+                  Saving a new number removes the verification from your current one. You then verify the new number,
+                  and for your security it can confirm card changes 24 hours after that.
+                </small>
+              ) : !phoneEdited && phoneStatus?.verified ? (
+                <small className="phone-state phone-state-ok">
+                  <CheckCircle2 size={13} aria-hidden="true" />
+                  {stillWaiting(phoneStatus) && phoneStatus.usableFrom
+                    ? `Verified. It can confirm card changes from ${whenUsable(phoneStatus.usableFrom)}.`
+                    : 'Verified'}
+                </small>
+              ) : !phoneEdited && phoneStatus?.phone ? (
+                <small className="phone-state phone-state-warn">
+                  <AlertTriangle size={13} aria-hidden="true" />
+                  Not verified yet. <Link to={VERIFY_PHONE_PATH}>Verify your phone</Link>
+                </small>
+              ) : null}
+            </div>
             <div className="field-row">
               <label className="field">
                 <span>Company</span>
