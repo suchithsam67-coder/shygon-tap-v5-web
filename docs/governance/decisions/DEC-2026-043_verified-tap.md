@@ -341,6 +341,7 @@ The build uses test-only keys, `VERIFIED_TAP` stays off, and nothing is hosted. 
   - AN10922 §2.2.1's example key (twice);
   - AN12196 §3.4.2.2's example ciphertexts (three lines);
   - an AN12196 session-key example.
+  - Clarified 2026-11-12 (OpenCode review OC-6 #6): line 306 is not a key. It is a 31-hex truncated AN12196 ciphertext, a negative-test input. It is still a published fixture, so E-1 stands unchanged.
 - **Where they appear.** In commit `c466ddee68d1bcb4a25266e44cfba5af856ac75e` (this branch) and `6c7f8db58f3af5af45c1222bc6ff3681be612981` (`opencode/u1-sun-crypto`).
 - **The proposed fix.** The repository's rule (`.gitleaksignore`) needs an APPROVED decision per fingerprint. Proposed: add the 14 fingerprints, `<commit>:netlify/tests/sun.mjs:generic-api-key:<line>` for both commits and all seven lines, under "E-1: published NXP / IETF test vectors".
 - **Done.** The fingerprints were added after the owner's approval. `npm run test:secrets` no longer reports them; only the known V6-014 finding remains.
@@ -476,3 +477,30 @@ The owner answered "Approve D-1 to D-4" to Session A's question, "Approve D-1 to
 - G-1 to G-3.
 
 No order, key, personalisation or hosting is approved. The release stays BLOCKED.
+
+## 13. The OpenCode review (OC-6) and its fixes (2026-11-12)
+
+**The review** [OBSERVED]:
+- OpenCode's independent review is `036906b` on `opencode/review-verified-tap`: `docs/v6/aaroh/reviews/2026-11-02_opencode-review-verified-tap.md`, now also on this branch.
+- The coordinator checked it at this branch's HEAD and handed it over on 2026-11-12.
+- Its verdict:
+  - no P0 and no P1;
+  - no path to a false `genuine`;
+  - nothing leaks in an answer;
+  - the grants are closed.
+- It found four P2s and two nits.
+
+**DESFire (A-1):** the review relies on nothing specific to NTAG 424 DNA (no TagTamper, no LRP). Session A confirmed this. The §12.4 personalisation duties stay with G-1 to G-3.
+
+**Approval** [OBSERVED]: the owner, in session on 2026-11-12, answered "Approve both" (these fixes, and taking over V6-094) to "Approve building both: the review fixes (migration 043) and Codex's admin logs with the two-factor check?".
+
+| # | Finding | Fix | Proof |
+|---|---|---|---|
+| 1 (P2) | The log named the failed check (`bad_picc`, `bad_mac`) | `verify.checked` logs `refused: true` only | The canary check asserts that no log line names a check. Negative control: it fails |
+| 2 (P2) | The rate limits were counted, unlocked, before the events of concurrent checks existed | Migration **043**: `verify_tap_result` counts both limits again under locks (a transaction advisory lock on the visitor, the card's row lock). Over a limit, nothing is decided, consumed or recorded, and `/api/verify` answers 429 | The race is made deterministic by switching off the early checks: the answer is 429, and the counter and the events are unchanged. Negative control: it fails |
+| 3 (P2) | §7 tests 14 and 15 were not run | Test 14 built: a forced failure after the counter update gives 503 with the counter unchanged, and the same tap verifies afterwards. Test 15 still waits for Q2 | Negative control (the failed insert swallowed): it fails |
+| 4 (nit) | The switch-off answer comes faster than an unknown code's | Contract v0.15.2 now says exactly what is equal: the status and the body. With the switch off nothing is read, by design. The switch state is site-wide | Wording |
+| 5 (nit) | Published test vectors could be set as master keys | They are refused by SHA-256 digest, as is any key of one repeated byte. The verdict is `unavailable`, and the log line carries no key | A test. Negative control: it fails |
+| 6 (nit) | E-1's description of line 306 | `.gitleaksignore` and §11 now say that line 306 is a 31-hex truncated AN12196 ciphertext, a negative-test input, not a key | No fingerprint changed |
+
+**Not changed:** `verify_device_lookup` keeps its early, cheap checks. The decision is now authoritative under the locks.

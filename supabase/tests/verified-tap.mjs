@@ -3,12 +3,14 @@
 // netlify/lib/sun.mjs) produces the SUN values; the keys are random per run,
 // TEST KEYS ONLY, and never leave this process.
 //
-// Not executable here, and therefore not claimed: a database failure part-way
-// through a transaction (§7 test 14) and a restore rolling the counter back
-// (§7 test 15; the external acceptance log waits for DEC-2026-043 Q2).
+// §7 test 14 (a database failure part-way through) is forced with a test-only
+// trigger (OpenCode review OC-6 #3). Not built, and therefore not claimed: a
+// restore rolling the counter back (§7 test 15; the external acceptance log
+// waits for DEC-2026-043 Q2).
 //
 //   node --import ./scripts/ci/deny-network.mjs supabase/tests/verified-tap.mjs
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import { startStack } from '../local/stack.mjs';
 import { assert, assertEqual, callFunction, createHarness, signUp } from '../local/testkit.mjs';
 import { diversifyKey, sdmMac, sdmSessionMacKey } from '../../netlify/lib/sun.mjs';
@@ -189,6 +191,27 @@ await t.check('key epochs: no keys for the epoch is unavailable (never genuine);
   return 'fail closed';
 });
 
+await t.check('published test vectors are never masters (OC-6 #5): unavailable, logged without the key, nothing consumed', async () => {
+  // The RFC 4493 key is read from the crypto suite, so no published key is written out here.
+  const rfcKey = fs.readFileSync(new URL('../../netlify/tests/sun.mjs', import.meta.url), 'utf8').match(/const RFC_KEY = '([0-9a-f]{32})'/)[1];
+  const c = await device({ epoch: 3 });
+  const before = logLines.length;
+  const cases = [[rfcKey, hex(16), 'the RFC 4493 key'], [hex(16), '0'.repeat(32), 'the all-zero transport key'], ['ff'.repeat(16), hex(16), 'one repeated byte']];
+  for (const [meta, file, label] of cases) {
+    process.env.VERIFY_META_MASTER_3 = meta;
+    process.env.VERIFY_FILE_MASTER_3 = file;
+    const tap3 = chip(c.card, c.uid, { meta, file });
+    assertEqual((await call({ op: 'tap.verify', code: c.code, ...tap3(1) })).body.verdict, 'unavailable', label);
+  }
+  delete process.env.VERIFY_META_MASTER_3;
+  delete process.env.VERIFY_FILE_MASTER_3;
+  assertEqual(await counterOf(c.code), null, 'nothing consumed');
+  const later = logLines.slice(before);
+  assertEqual(later.filter((l) => l.includes('verify.published-test-vector')).length, cases.length, 'each refusal is logged');
+  assert(!later.some((l) => l.toLowerCase().includes(rfcKey)), 'the key itself is never logged');
+  return 'fail closed';
+});
+
 await t.check('needs_service: the counter at 0xFFFFFF, or a retired card', async () => {
   const d = await device();
   assertEqual((await call({ op: 'tap.verify', code: d.code, ...d.tap(0xffffff) })).body.verdict, 'needs_service', 'counter limit');
@@ -254,6 +277,52 @@ await t.check('rate limits: 20 refused checks per device per hour; 30 checks per
   return 'an 8-byte MAC cannot be guessed at 20 an hour';
 });
 
+await t.check('rate limits are decided again under locks (043, OC-6 #2): checks that passed a stale early count are still refused, and nothing is consumed or recorded', async () => {
+  // The race window, made deterministic: the early checks in verify_device_lookup
+  // are switched off, as if concurrent checks had not yet written their events.
+  const sig = 'public.verify_device_lookup(text, text)';
+  const original = (await stack.query(`SELECT pg_get_functiondef($1::regprocedure) AS d`, [sig])).rows[0].d;
+  const stale = original.replaceAll(') >= 20 THEN', ') >= 1000000 THEN').replaceAll(') >= 30 THEN', ') >= 1000000 THEN');
+  assert(stale !== original, 'the early checks were found');
+  await stack.query(stale);
+  try {
+    const m = await device();
+    for (let i = 0; i < 20; i++) await call({ op: 'tap.verify', code: m.code, e: hex(16), c: hex(8) }, `203.0.113.${i + 1}`);
+    const r = await call({ op: 'tap.verify', code: m.code, ...m.tap(1) }, '203.0.113.199');
+    assertEqual([r.status, codeOf(r), r.body.error?.retryAfter], [429, 'rate_limited', 3600], 'device limit at the decision');
+    assertEqual([await counterOf(m.code), (await events(m.code)).length], [null, 20], 'device: nothing consumed or recorded');
+    const n = await device();
+    const ip = '192.0.2.88';
+    for (let i = 1; i <= 30; i++) await call({ op: 'tap.verify', code: n.code, ...n.tap(i) }, ip);
+    const v = await call({ op: 'tap.verify', code: n.code, ...n.tap(31) }, ip);
+    assertEqual([v.status, codeOf(v)], [429, 'rate_limited'], 'visitor limit at the decision');
+    assertEqual([await counterOf(n.code), (await events(n.code)).length], [30, 30], 'visitor: nothing consumed or recorded');
+  } finally {
+    await stack.query(original);
+  }
+  return 'a burst cannot pass the limits';
+});
+
+await t.check('§7 test 14: a database failure part-way through never gives genuine and never half-advances the counter (OC-6 #3)', async () => {
+  const k = await device();
+  assertEqual((await call({ op: 'tap.verify', code: k.code, ...k.tap(5) })).body.verdict, 'genuine', 'before');
+  // Test-only: the verification log refuses every insert, after the counter update in the same transaction.
+  await stack.query(`CREATE FUNCTION public.test_fail_verify_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test: forced failure'; END $$`);
+  await stack.query(`CREATE TRIGGER test_fail_verify_event BEFORE INSERT ON public.tap_verify_events FOR EACH ROW EXECUTE FUNCTION public.test_fail_verify_event()`);
+  const tap = k.tap(6);
+  let r;
+  try {
+    r = await call({ op: 'tap.verify', code: k.code, ...tap });
+  } finally {
+    await stack.query(`DROP TRIGGER test_fail_verify_event ON public.tap_verify_events`);
+    await stack.query(`DROP FUNCTION public.test_fail_verify_event()`);
+  }
+  assertEqual([r.status, codeOf(r)], [503, 'temporarily_unavailable'], 'fail closed');
+  assertEqual([await counterOf(k.code), (await events(k.code)).length], [5, 1], 'the counter update rolled back with the failed insert');
+  assertEqual((await call({ op: 'tap.verify', code: k.code, ...tap })).body.verdict, 'genuine', 'the same tap, once the database is back: never consumed');
+  return 'atomic under failure';
+});
+
 // ---------------------------------------------------------------------------
 t.section('D. Privacy and closure');
 
@@ -264,6 +333,9 @@ await t.check('canaries: no UID, UID HMAC, key, pepper, e or c in any answer or 
     for (const s of secrets) if (text.toLowerCase().includes(s.toLowerCase())) leaks.push(`#${i}`);
   }
   assertEqual(leaks, [], 'leaks');
+  // OC-6 #1: a log line never says which check failed, only that the chip's values were refused.
+  assertEqual(logLines.filter((l) => /bad_(mac|picc|format)/.test(l)), [], 'no log line names the failed check');
+  assert(logLines.some((l) => l.includes('"verify.checked"') && l.includes('"refused":true')), 'refusals are logged as refused');
   const shapes = new Set(answers.map((text) => Object.keys(JSON.parse(text) ?? {}).sort().join()));
   for (const shape of shapes) assert(['slug,verdict', 'edition,slug,verdict', 'error'].includes(shape), `answer keys: ${shape}`);
   const cols = (await stack.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'tap_verify_events' ORDER BY 1`)).rows.map((r) => r.column_name);

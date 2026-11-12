@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { requestLog } from '../lib/log.mjs';
 import { env } from '../lib/sms.mjs';
 import { clientAddress, trustedClientIpHeader } from '../lib/client-address.mjs';
@@ -73,11 +74,37 @@ function visitorOf(secret, request) {
   return ip ? hmac(secret, `verify-visitor|${new Date().toISOString().slice(0, 10)}|${ip}`) : null;
 }
 
-/** The epoch's two master keys. Custody in production is DEC-2026-043 Q2; locally, test keys. */
-function mastersFor(epoch) {
+/**
+ * Published test vectors never serve as masters (OpenCode review OC-6 #5):
+ * anyone can compute with them. Listed as SHA-256 digests of the lowercase hex,
+ * so the values are not in this file: the RFC 4493 §4 key, the AN10922 §2.2.1
+ * key and the AN12196 §3.3 SDMFileReadKey (the vectors in netlify/tests/sun.mjs).
+ * A key of one repeated byte (all zeros, the transport value, or all FF) is
+ * refused too.
+ */
+const PUBLISHED_VECTOR_DIGESTS = new Set([
+  '2ef2503d964e9668092e6878d3c390ca7909bbbffabd781857115e3be4bb3e5a',
+  '5947d7c33d783f94b3b4c1a96ebc8991ed28f1b069b71e03376cba8caa98a720',
+  '7255d3a1d3a71b97f6a1ddf3f4465501ef29bb62763ee448fdf33af3f3341bbd',
+]);
+const isPublishedVector = (hex) => {
+  const lower = hex.toLowerCase();
+  return /^([0-9a-f]{2})\1{15}$/.test(lower) || PUBLISHED_VECTOR_DIGESTS.has(crypto.createHash('sha256').update(lower).digest('hex'));
+};
+
+/**
+ * The epoch's two master keys. Custody in production is DEC-2026-043 Q2; locally, test keys.
+ * Missing, malformed or published keys give null, so the verdict is 'unavailable', never 'genuine'.
+ */
+function mastersFor(epoch, log) {
   const meta = env(`VERIFY_META_MASTER_${epoch}`);
   const file = env(`VERIFY_FILE_MASTER_${epoch}`);
-  return KEY_HEX.test(meta ?? '') && KEY_HEX.test(file ?? '') ? { meta, file } : null;
+  if (!KEY_HEX.test(meta ?? '') || !KEY_HEX.test(file ?? '')) return null;
+  if (isPublishedVector(meta) || isPublishedVector(file)) {
+    log.error('verify.published-test-vector', { keyEpoch: epoch });
+    return null;
+  }
+  return { meta, file };
 }
 
 /** D-a (DEC-2026-043 Q8): both keys are diversified by the device id, the 16 bytes of cards.id. */
@@ -110,7 +137,7 @@ async function tapVerify(cfg, request, body, log) {
   const slug = pairing ? null : device.slug;
   if (!hasE) return json({ slug, verdict: 'not_verified' });
 
-  const keys = mastersFor(device.keyEpoch);
+  const keys = mastersFor(device.keyEpoch, log);
   const pepper = env('VERIFY_UID_PEPPER');
   if (!keys || !pepper || pepper.length < 32) {
     log.warn('verify.keys-unavailable', { keyEpoch: device.keyEpoch, pepperSet: Boolean(pepper) });
@@ -130,7 +157,10 @@ async function tapVerify(cfg, request, body, log) {
     p_counter: tap.ok ? tap.readCounter : null,
     p_visitor: visitor,
   });
-  log.info('verify.checked', { verdict: result?.verdict ?? 'unavailable', refusal: tap.ok ? null : tap.reason, pairing });
+  // Never which check failed (OC-6 #1): only that the chip's values were refused.
+  log.info('verify.checked', { verdict: result?.verdict ?? 'unavailable', refused: !tap.ok, pairing });
+  // 043: the rate limits are decided again under locks, where the verdict is made.
+  if (result?.verdict === 'rate_limited') return fail('rate_limited', { retryAfter: result.retryAfter });
   const answer = { slug, verdict: result?.verdict ?? 'unavailable', ...(result?.edition ? { edition: result.edition } : {}) };
   if (pairing && answer.verdict === 'genuine') answer.possession = possessionProof(cfg.secret, code, tap.readCounter);
   return json(answer);

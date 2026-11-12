@@ -1004,3 +1004,50 @@ The two admin edge functions check access on their own.
 - Q2, Q3 and Q7.
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 29. 2026-11-12: the OpenCode Verified Tap review (OC-6) fixed (migration 043, contract v0.15.2)
+
+**Approval:** the owner, in session on 2026-11-12: "Approve both".
+
+**The review:** OpenCode's `036906b`, handed over by the coordinator. It found no P0 and no P1, plus four P2s and two nits. All are fixed except §7 test 15, which waits for Q2.
+
+**The fixes (DEC-2026-043 §13):**
+- the log no longer names the failed check;
+- migration 043 decides both rate limits under locks;
+- §7 test 14 is built;
+- the 404 equivalence is stated precisely in the contract;
+- published test keys are refused as masters;
+- the E-1 note is clarified.
+
+**DESFire:** the review relies on nothing specific to NTAG 424 DNA.
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]:
+
+| Check | Result |
+|---|---|
+| `test:verified-tap` | **20 passed**, 0 failed (3 new: the locked rate limits, §7 test 14, published keys refused; the canary check now also asserts that no log line names the failed check) |
+| `test:sun` | 27 passed |
+| `test:card-lifecycle` | 9 passed (pairing taps go through the new `verify_tap_result`) |
+| `test:suspension` | 46 passed (no reachable function changes a session setting; the advisory lock is not one) |
+| `test:security` | 12 passed |
+| `test:db` | verify 21; adversarial 64; RLS matrix 1729 (61 tables, 7 callers); identity 69; admin-notes 12; golden **24** (a stage for 043, byte-identical); admin-contract 21; rollbacks **23** (043 restores 037's `verify_tap_result` exactly); account-deletion 9; history 2 |
+| `db:bundle`, `db:bundle:check`, `lint` | exit 0 |
+
+**Negative controls** [OBSERVED]:
+- **The mutations,** applied together:
+  - the log names the check again;
+  - `verify_tap_result` goes back to 037's, with its event insert swallowing errors;
+  - published keys are accepted.
+- **The result:** exactly the four matching checks failed, each for its own reason:
+  - the RFC key gave `genuine`;
+  - the device limit answered 200;
+  - the forced failure answered 200;
+  - a log line named the check.
+- The good files were restored and compared byte for byte.
+
+**Not run or not built:**
+- §7 test 15 (the external acceptance log, Q2);
+- real concurrency on PostgreSQL 17 (PGlite has one connection; the race was made deterministic instead);
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).
