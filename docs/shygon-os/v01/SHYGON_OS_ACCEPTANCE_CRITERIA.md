@@ -69,7 +69,7 @@
 | G9 | Live payments smoke (one real purchase + admin refund) | Dashboard + app evidence |
 | G10 | DLT templates registered; supervised emergency smoke test | Template ids by name; the smoke evidence |
 | G11 | Dependency audit 0 high | `npm audit` output |
-| G12 | First NTAG batch personalised and batch-verified (if Verified Tap is in the launch) | Batch QA report |
+| G12 | First DESFire EV3 batch personalised and batch-verified (if Verified Tap is in the launch) | Batch QA report |
 | G13 | The role roster complete with adults for the legal and incident roles | ROLE_ROSTER |
 | G14 | Owner-approved wording for every visible V01 string | Approval record |
 | G15 | Release decision by the founder + adult signatory | Signed release record |

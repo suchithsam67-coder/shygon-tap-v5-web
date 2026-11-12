@@ -8,7 +8,7 @@
 ## 1. System overview
 
 ```
-NFC card (NTAG 424 DNA: /d/<code>?e&c; older cards /t/<slug>)
+NFC card (MIFARE DESFire EV3: /d/<code>?e&c; older cards /t/<slug>)
    │ tap → phone browser
    v
 CDN + static SPA (React/Vite, dist/)  ── one host (F-4)

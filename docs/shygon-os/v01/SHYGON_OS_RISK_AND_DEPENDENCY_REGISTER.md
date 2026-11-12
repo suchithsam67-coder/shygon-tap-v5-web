@@ -24,7 +24,7 @@
 | R-13 | The landing page misses its performance budget (5.7 s vs 4 s) | H | M | T-14 (chunking, rendering the hero earlier) | B | OPEN |
 | R-14 | No monitoring or backups at launch | M | H | T-22, T-23 before release | A | OPEN |
 | R-15 | Pricing/subscription claims conflict with the Terms (C-6) | M | M | F-9 | Owner + Counsel | OPEN |
-| R-16 | Supplier can't build NTAG 424 DNA into metal/transparent cards at small MOQ | M | H | RFQ to 3–5 suppliers (GPT-7 pack); sample first | Adult | OPEN |
+| R-16 | Supplier can't build MIFARE DESFire EV3 into metal/transparent cards at small MOQ | M | H | RFQ to 3–5 suppliers (GPT-7 pack); sample first | Adult | OPEN |
 | R-17 | Scope creep: "build everything" delays any release indefinitely | H | H | The V01 scope (F-1) is the finish line; P8 items need new DECs | Owner + Coord | OPEN |
 | R-18 | Tests are green locally but behave differently on the real host (headers, IP, concurrency) | M | H | Hosted P1/P2; preview soak on real Postgres | A | OPEN |
 
@@ -35,11 +35,11 @@
 | Adult authorised signatory (F-2) | Razorpay, DLT, suppliers, counsel, host billing | Human/legal | OPEN |
 | Counsel (F-23, DEC-017) | Terms, privacy notice, emergency/Connect/Return to Owner release, 18+ | Human | OPEN |
 | Host choice (F-4) | Previews, cron, monitoring, deploy | Founder | OPEN (GPT-8 brief) |
-| Production domain (F-5) | Razorpay review, DLT URL, NTAG URL template | Founder | OPEN |
+| Production domain (F-5) | Razorpay review, DLT URL, DESFire EV3 URL template | Founder | OPEN |
 | Non-production Supabase project (F-8) | P1/P2, preview verification | Founder + billing | OPEN |
 | Production capture (F-7) | Rebaseline, apply | Founder | OPEN |
 | MSG91 + DLT (F-10) | Emergency alerts, order SMS, phone verification | Provider | OPEN |
 | Razorpay live (F-11) | Payments | Provider | OPEN |
-| NTAG card supplier (F-16) | Verified Tap release, card sales | Supplier | OPEN (RFQ drafted) |
+| DESFire EV3 card supplier (F-16) | Verified Tap release, card sales | Supplier | OPEN (RFQ drafted) |
 | Email provider (DEC-031) | Notifications beyond SMS | Founder | OPEN (not V01-blocking) |
 | GitHub Actions minutes | CI | Platform | Available (private repo quota: verify) |
