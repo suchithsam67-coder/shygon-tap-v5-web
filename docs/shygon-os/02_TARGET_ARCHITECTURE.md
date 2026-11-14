@@ -92,7 +92,7 @@ ASCII fallback of the tap path (for tools that don't render Mermaid):
 
 | Step | What happens | Where | Notes |
 |---|---|---|---|
-| 1 Tap | Chip/QR opens `https://shygontech.com/d/{code}` (new) or `/t/{slug}` (legacy printed cards). | Physical | Static URL for MVP; optional signed URL (NTAG 424 DNA SDM) later. |
+| 1 Tap | Chip/QR opens `https://shygontech.com/d/{code}` (new) or `/t/{slug}` (legacy printed cards). | Physical | Static URL for MVP; optional signed URL (MIFARE DESFire EV3 SDM, owner 2026-11-10; DEC-2026-043 A-1) later. |
 | 2 Identify | Resolver maps code → `tap_devices` row (or slug → persona). Computes **trust level**: `T0 static-or-QR`, `T1 authenticated-tap` (SDM CMAC valid, counter fresh). | Edge | Never an identity claim. |
 | 3 Lifecycle gate | Device state must be `active` (or `lost` → rescue route). `suspended/deactivated/retired` → neutral "unavailable" page. | DB | Fixes F3. |
 | 4 Context | `tap_routes` picks target by rule (default persona; event mode active window; org override; lost mode). | DB | Deterministic, priority-ordered, all server-side. |

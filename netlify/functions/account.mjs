@@ -22,6 +22,15 @@ import { buildVcard } from '../lib/vcard.mjs';
  *   phone.verify.start   texts a 6-digit code to the phone now on the account
  *   phone.verify.confirm { code }: verifies it. A number that replaces a
  *                        verified one may confirm card actions after 24 hours.
+ *   age.status           whether the account holder confirmed they are 18 or
+ *                        older (V01 task T-13; migration 044; DEC-2026-048)
+ *   age.confirm          { adult: true, policiesVersion? }: records that
+ *                        confirmation, once, with the server's time, for an
+ *                        account that has none (accounts from before the gate)
+ *
+ * The sign-up confirmation itself is recorded by the database when the account
+ * is created (044's trigger reads the sign-up data once); later edits of the
+ * sign-up data change nothing.
  *
  * The account phone counts as verified only while profiles.phone, in E.164,
  * equals the verified number: editing it in Settings unverifies it. card-otp
@@ -55,6 +64,7 @@ const ERRORS = {
   wrong_code: [400, 'That code is not right.'],
   too_many_attempts: [429, 'Too many wrong attempts. Request a new code.'],
   phone_changed: [409, 'Your number changed after the code was sent. Request a new code.'],
+  already_confirmed: [409, 'You have already confirmed that you are 18 or older.'],
   server_misconfigured: [500, 'The server is not configured.'],
   internal: [500, 'Something went wrong. Please try again.'],
 };
@@ -172,6 +182,23 @@ const OPS = {
     }
     log.info('account.phone-verified', { replaced: r.replaced === true });
     return json({ verified: true, verifiedAt: r.verifiedAt, usableFrom: r.usableFrom });
+  },
+  'age.status': async (cfg, user) => {
+    const s = await rpc(cfg, 'account_age_status', { p_user: user.id });
+    return json({ confirmed: s?.confirmed === true, confirmedAt: s?.confirmedAt ?? null, source: s?.source ?? null });
+  },
+  'age.confirm': async (cfg, user, body, log) => {
+    // An explicit statement only: the body must say so, as the sign-up box does.
+    if (body.adult !== true) return fail('invalid_request');
+    const version = body.policiesVersion;
+    if (version !== undefined && (typeof version !== 'string' || version.length > 40)) return fail('invalid_request');
+    const r = await rpc(cfg, 'account_age_confirm', { p_user: user.id, p_policies_version: version ?? null });
+    if (r?.ok !== true) {
+      log.warn('account.age-confirm-refused', { code: r?.code ?? null });
+      return fail(r?.code === 'already_confirmed' ? 'already_confirmed' : 'internal');
+    }
+    log.info('account.age-confirmed', { source: 'reconfirm' });
+    return json({ confirmed: true, confirmedAt: r.confirmedAt });
   },
 };
 

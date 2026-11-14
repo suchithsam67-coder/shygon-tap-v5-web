@@ -15,15 +15,18 @@ Supported forms, one model: **card** (PVC/metal/transparent, existing), **tag/st
 | **Device key** (SDM, optional) | In chip secure memory + derived server-side from KMS master + `device_id` | **Yes** | Proves chip authenticity per tap (CMAC + counter) |
 | Vanity slug `/t/<slug>` | Persona | No | Human-friendly persona URL; legacy printed cards |
 
-## 3. Chip strategy (decision needed — OQ-2)
+## 3. Chip strategy (OQ-2 answered 2026-11-10: MIFARE DESFire only)
+
+**Owner, 2026-11-10:** "use desfare only, update it everywhere". New AAROH cards carry **MIFARE DESFire EV3**, the only DESFire generation NXP documents with Secure Dynamic Messaging (SUN). EV1 and EV2 cannot do a Verified Tap. Details, gates and open questions: DEC-2026-043 §12 (A-1).
 
 | Tier | Chip | Auth | Cloneable? | Use |
 |---|---|---|---|---|
 | Baseline | NTAG213/215/216 (static NDEF, locked) | none (T0) | Yes, trivially | Business/personal cards, location tags where a clone is harmless |
-| Recommended for new batches | **NTAG 424 DNA** (SDM: encrypted UID+counter+CMAC in URL) | T1 authenticated tap | Clone yields stale/replayed URL → rejected | Rescue tags, badges, anything with ownership meaning; **required for any future Access** |
-| Access-grade (Phase 5) | DESFire EV3 / secure element via reader, **not** phone-URL | Mutual auth | No | Physical access (doors) — out of scope of tap-URL model; integrates via controller |
+| New AAROH cards (owner 2026-11-10) | **MIFARE DESFire EV3** (SDM: encrypted UID+counter+CMAC in the NDEF URL; NXP: "compatible with NTAG DNA") | T1 authenticated tap | Clone yields stale/replayed URL → rejected | Rescue tags, badges, anything with ownership meaning; **required for any future Access** |
+| Access-grade (Phase 5) | A separate application on the same DESFire EV3 chip (or a secure element), read by a door reader, **not** the phone URL | Mutual auth | No | Physical access (doors): out of scope of the tap-URL model; integrates via a controller. V01 chips are 2 kB (DEC-2026-043 D-2, approved 2026-11-12), so a second application needs a new decision, more memory and its own keys |
+| Not usable for Verified Tap | NTAG 424 DNA (the earlier recommendation, replaced 2026-11-10); DESFire EV1 and EV2 (no SDM) | — | — | Static `/d/<code>` only, no authenticity claim |
 
-Cost note (for the owner to price): NTAG 424 DNA inlays cost more than NTAG21x, and metal-card encoding needs an ISO-compliant, RF-tested layout — confirm with the card manufacturer whether the current metal/transparent designs can carry a 424-class inlay.
+Cost note (for the owner to price): DESFire EV3 inlays cost more than NTAG21x, and metal-card encoding needs an ISO-compliant, RF-tested layout. The adult signatory confirms with the inlay maker the memory size (2 kB approved, DEC-2026-043 D-2), the input capacitance (17 pF or 70 pF) and whether the current metal/transparent designs can carry an EV3 inlay (DEC-2026-043 D-2, Q7).
 
 ## 4. Lifecycle state machine
 

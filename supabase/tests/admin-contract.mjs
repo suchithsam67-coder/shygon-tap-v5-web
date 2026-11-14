@@ -84,6 +84,15 @@ const V6_071 = [
 // BQ-1 (migration 035, DEC-2026-041): the public profile reader answers NULL
 // while the Tap shows another mode (Info). One guard after the Tap lookup.
 const BQ_1 = [["IF NOT FOUND THEN RETURN NULL; END IF;", "IF NOT FOUND THEN RETURN NULL; END IF;\n  -- BQ-1 (migration 035, DEC-2026-041): while the Tap shows another mode\n  -- (Info), its Business profile is not public through this reader either.\n  IF EXISTS (SELECT 1 FROM public.tap_mode_state s\n             WHERE s.tap_profile_id = v_tap.id AND s.active_mode <> 'business') THEN\n    RETURN NULL;\n  END IF;"]];
+// DEC-2026-046 step 2 (migration 040): the opt-in second-factor rule. is_admin and
+// admin_has also require admin_mfa_satisfied(); require_admin and admin_me refuse an
+// administrator whose session lacks a required factor with 'admin:mfa_required'
+// (P0001, not 42501, so the admin app does not sign them out). Bodies compare
+// CR-normalised, as the harness loads the baseline.
+const T12_IS_ADMIN = [["    WHERE a.user_id = auth.uid() AND a.is_active\n  );","    WHERE a.user_id = auth.uid() AND a.is_active\n  )\n  -- DEC-2026-046 (migration 040): and, where a second factor is required, the\n  -- session has it (aal2).\n  AND public.admin_mfa_satisfied();"]];
+const T12_ADMIN_HAS = [["        OR p_permission = ANY (a.permissions)\n      )\n  );","        OR p_permission = ANY (a.permissions)\n      )\n  )\n  -- DEC-2026-046 (migration 040): and, where a second factor is required, the\n  -- session has it (aal2).\n  AND public.admin_mfa_satisfied();"]];
+const T12_REQUIRE_ADMIN = [["    RAISE EXCEPTION 'Not authenticated.' USING ERRCODE = '42501';\n  END IF;\n","    RAISE EXCEPTION 'Not authenticated.' USING ERRCODE = '42501';\n  END IF;\n\n  -- DEC-2026-046 (migration 040): an active administrator whose session lacks a\n  -- required second factor gets its own refusal, not 42501, so the admin app can\n  -- ask for the code instead of signing them out.\n  IF public.admin_mfa_pending() THEN\n    RAISE EXCEPTION 'admin:mfa_required' USING ERRCODE = 'P0001',\n      HINT = 'Complete multi-factor authentication (aal2), then try again.';\n  END IF;\n"]];
+const T12_ADMIN_ME = [["    RAISE EXCEPTION 'Not authenticated.' USING ERRCODE = '42501';\n  END IF;\n","    RAISE EXCEPTION 'Not authenticated.' USING ERRCODE = '42501';\n  END IF;\n\n  -- DEC-2026-046 (migration 040): an active administrator whose session lacks a\n  -- required second factor gets its own refusal, not 42501, so the admin app can\n  -- ask for the code instead of signing them out.\n  IF public.admin_mfa_pending() THEN\n    RAISE EXCEPTION 'admin:mfa_required' USING ERRCODE = 'P0001',\n      HINT = 'Complete multi-factor authentication (aal2), then try again.';\n  END IF;\n"]];
 const APPROVED_BODY_CHANGES = {
   'provision_tap_on_payment()': {
     decision: 'DEC-2026-024 D-U4 (migration 021)', replacements: D_U4,
@@ -108,6 +117,22 @@ const APPROVED_BODY_CHANGES = {
   'get_public_profile(text)': {
     decision: 'DEC-2026-041 BQ-1, approved 2026-10-24 (migration 035)', replacements: BQ_1,
     summary: 'NULL while the Tap shows another mode; nothing else',
+  },
+  'is_admin()': {
+    decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)', replacements: T12_IS_ADMIN,
+    summary: 'AND admin_mfa_satisfied(); nothing else',
+  },
+  'admin_has(text)': {
+    decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)', replacements: T12_ADMIN_HAS,
+    summary: 'AND admin_mfa_satisfied(); nothing else',
+  },
+  'require_admin(text)': {
+    decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)', replacements: T12_REQUIRE_ADMIN,
+    summary: 'the admin:mfa_required refusal after the sign-in check; nothing else',
+  },
+  'admin_me()': {
+    decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)', replacements: T12_ADMIN_ME,
+    summary: 'the admin:mfa_required refusal after the sign-in check; nothing else',
   },
 };
 
@@ -146,6 +171,9 @@ const APPROVED_NEW_RELATIONS = {
     .map((t) => [t, 'DEC-2026-041 implementation scope, approved 2026-10-24 (migration 034)'])),
   ...Object.fromEntries(['tap_device_auth', 'tap_verify_events']
     .map((t) => [t, 'DEC-2026-043, approved for the local build 2026-10-31 (migration 037)'])),
+  admin_security_settings: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)',
+  card_events: 'DEC-2026-047, approved for the local build 2026-11-10 (migration 041)',
+  account_age_confirmations: 'DEC-2026-048, approved for the local build 2026-11-14 (migration 044)',
   ...Object.fromEntries(['account_phone_verifications', 'account_phone_challenges']
     .map((t) => [t, 'DEC-2026-045, approved for the local build 2026-11-05 (migration 039)'])),
 };
@@ -155,6 +183,11 @@ const APPROVED_NEW_RELATIONS = {
 const NEW_ADMIN_FUNCTIONS = {
   'admin_list_emergency_events(text,integer,integer)': { decision: 'DEC-2026-038 Q1, approved 2026-10-19 (migration 029)', state: 'APPROVED' },
   'admin_list_rescue_reports(integer,integer)': { decision: 'DEC-2026-038 Q12, approved 2026-10-19 (migration 031)', state: 'APPROVED' },
+  'admin_mfa_status()': { decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)', state: 'APPROVED' },
+  'admin_mfa_set_required(boolean,boolean,text)': { decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)', state: 'APPROVED' },
+  'admin_mfa_pending()': { decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)', state: 'APPROVED' },
+  'admin_mfa_satisfied()': { decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)', state: 'APPROVED' },
+  'admin_mfa_required()': { decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)', state: 'APPROVED' },
 };
 
 // Functions an approved decision lets a client role EXECUTE beyond live, with
@@ -162,6 +195,9 @@ const NEW_ADMIN_FUNCTIONS = {
 // executable by the same roles on live: a new function granted to anon fails
 // here whatever its name (OpenCode review 2026-10-25 #2).
 const APPROVED_CLIENT_EXECUTE = {
+  'admin_mfa_status()': {
+    roles: ['authenticated'], decision: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040); administrators only, checked inside, never requiring the factor itself',
+  },
   'admin_list_emergency_events(text,integer,integer)': {
     roles: ['authenticated'], decision: 'DEC-2026-038 Q1, approved 2026-10-19 (migration 029; administrators only, checked inside)',
   },

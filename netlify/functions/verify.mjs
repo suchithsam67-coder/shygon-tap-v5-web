@@ -1,8 +1,10 @@
+import crypto from 'node:crypto';
 import { requestLog } from '../lib/log.mjs';
 import { env } from '../lib/sms.mjs';
 import { clientAddress, trustedClientIpHeader } from '../lib/client-address.mjs';
 import { config, hmac, rpc } from '../lib/emergency.mjs';
 import { diversifyKey, verifySun } from '../lib/sun.mjs';
+import { possessionProof } from '../lib/possession.mjs';
 
 /**
  * POST /api/verify: Verified Tap (U1; migration 037; DEC-2026-043, approved for
@@ -11,7 +13,7 @@ import { diversifyKey, verifySun } from '../lib/sun.mjs';
  * Body: { op: 'tap.verify', code, e?, c? }. No sign-in. The /d/<code> page's
  * script calls it after the page has loaded, never on a plain GET, so link
  * previews and prefetch consume no counter. `e` (32 hex) and `c` (16 hex) are
- * the NTAG 424 DNA SUN values the chip appends; without them the answer is
+ * the SUN values the MIFARE DESFire EV3 chip appends (SDM); without them the answer is
  * `not_verified` and nothing is consumed.
  *
  * Answers { slug, verdict, edition? }:
@@ -22,6 +24,9 @@ import { diversifyKey, verifySun } from '../lib/sun.mjs';
  *   unavailable      the server cannot decide now (no keys for the epoch)
  *   not_verified     no SUN values: a QR, a typed or a shared link
  *   null             the Tap is in Lost mode: the lifecycle answer instead
+ * A card issued to an owner but not yet active (DEC-2026-047) answers with
+ * slug null, and a genuine tap adds `possession`: an opaque, 10-minute,
+ * single-use proof for /api/cards owner.card.activate.
  * A failure never says which check failed. The UID, the keys, `e` and `c` never
  * appear in an answer or a log line.
  *
@@ -69,11 +74,37 @@ function visitorOf(secret, request) {
   return ip ? hmac(secret, `verify-visitor|${new Date().toISOString().slice(0, 10)}|${ip}`) : null;
 }
 
-/** The epoch's two master keys. Custody in production is DEC-2026-043 Q2; locally, test keys. */
-function mastersFor(epoch) {
+/**
+ * Published test vectors never serve as masters (OpenCode review OC-6 #5):
+ * anyone can compute with them. Listed as SHA-256 digests of the lowercase hex,
+ * so the values are not in this file: the RFC 4493 §4 key, the AN10922 §2.2.1
+ * key and the AN12196 §3.3 SDMFileReadKey (the vectors in netlify/tests/sun.mjs).
+ * A key of one repeated byte (all zeros, the transport value, or all FF) is
+ * refused too.
+ */
+const PUBLISHED_VECTOR_DIGESTS = new Set([
+  '2ef2503d964e9668092e6878d3c390ca7909bbbffabd781857115e3be4bb3e5a',
+  '5947d7c33d783f94b3b4c1a96ebc8991ed28f1b069b71e03376cba8caa98a720',
+  '7255d3a1d3a71b97f6a1ddf3f4465501ef29bb62763ee448fdf33af3f3341bbd',
+]);
+const isPublishedVector = (hex) => {
+  const lower = hex.toLowerCase();
+  return /^([0-9a-f]{2})\1{15}$/.test(lower) || PUBLISHED_VECTOR_DIGESTS.has(crypto.createHash('sha256').update(lower).digest('hex'));
+};
+
+/**
+ * The epoch's two master keys. Custody in production is DEC-2026-043 Q2; locally, test keys.
+ * Missing, malformed or published keys give null, so the verdict is 'unavailable', never 'genuine'.
+ */
+function mastersFor(epoch, log) {
   const meta = env(`VERIFY_META_MASTER_${epoch}`);
   const file = env(`VERIFY_FILE_MASTER_${epoch}`);
-  return KEY_HEX.test(meta ?? '') && KEY_HEX.test(file ?? '') ? { meta, file } : null;
+  if (!KEY_HEX.test(meta ?? '') || !KEY_HEX.test(file ?? '')) return null;
+  if (isPublishedVector(meta) || isPublishedVector(file)) {
+    log.error('verify.published-test-vector', { keyEpoch: epoch });
+    return null;
+  }
+  return { meta, file };
 }
 
 /** D-a (DEC-2026-043 Q8): both keys are diversified by the device id, the 16 bytes of cards.id. */
@@ -98,14 +129,19 @@ async function tapVerify(cfg, request, body, log) {
   const device = await rpc(cfg, 'verify_device_lookup', { p_code: code, p_visitor: visitor });
   if (device?.state === 'rate_limited') return fail('rate_limited', { retryAfter: device.retryAfter });
   if (device?.state === 'lost') return json({ slug: device.slug, verdict: null });
-  if (device?.state !== 'ready' && device?.state !== 'retired') return fail('unavailable');
-  if (!hasE) return json({ slug: device.slug, verdict: 'not_verified' });
+  // DEC-2026-047: a card issued to an owner but not yet active ('pairing') is
+  // checked like any other, opens no Tap, and a genuine tap carries a possession
+  // proof for "tap to activate".
+  const pairing = device?.state === 'pairing';
+  if (!pairing && device?.state !== 'ready' && device?.state !== 'retired') return fail('unavailable');
+  const slug = pairing ? null : device.slug;
+  if (!hasE) return json({ slug, verdict: 'not_verified' });
 
-  const keys = mastersFor(device.keyEpoch);
+  const keys = mastersFor(device.keyEpoch, log);
   const pepper = env('VERIFY_UID_PEPPER');
   if (!keys || !pepper || pepper.length < 32) {
     log.warn('verify.keys-unavailable', { keyEpoch: device.keyEpoch, pepperSet: Boolean(pepper) });
-    return json({ slug: device.slug, verdict: 'unavailable' });
+    return json({ slug, verdict: 'unavailable' });
   }
   const input = deviceInput(device.cardId);
   const tap = verifySun({
@@ -121,8 +157,13 @@ async function tapVerify(cfg, request, body, log) {
     p_counter: tap.ok ? tap.readCounter : null,
     p_visitor: visitor,
   });
-  log.info('verify.checked', { verdict: result?.verdict ?? 'unavailable', refusal: tap.ok ? null : tap.reason });
-  return json({ slug: device.slug, verdict: result?.verdict ?? 'unavailable', ...(result?.edition ? { edition: result.edition } : {}) });
+  // Never which check failed (OC-6 #1): only that the chip's values were refused.
+  log.info('verify.checked', { verdict: result?.verdict ?? 'unavailable', refused: !tap.ok, pairing });
+  // 043: the rate limits are decided again under locks, where the verdict is made.
+  if (result?.verdict === 'rate_limited') return fail('rate_limited', { retryAfter: result.retryAfter });
+  const answer = { slug, verdict: result?.verdict ?? 'unavailable', ...(result?.edition ? { edition: result.edition } : {}) };
+  if (pairing && answer.verdict === 'genuine') answer.possession = possessionProof(cfg.secret, code, tap.readCounter);
+  return json(answer);
 }
 
 async function handle(request, log) {

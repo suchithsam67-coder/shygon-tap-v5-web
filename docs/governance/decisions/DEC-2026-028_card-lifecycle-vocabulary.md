@@ -7,7 +7,7 @@
 | Consulted | Security Owner, Principal Architect, Data Owner |
 | State | **PROPOSED — HUMAN DECISION REQUIRED** |
 | Priority | I2 U1 Irr3 R2 = 8 → P1 · matrix P1 · **P1** · before M1.3 |
-| Related | DEC-2026-002 (14-day expiry), OQ-2/2b, DEC-2026-022 (F3), DEC-2026-024 (I-4) |
+| Related | DEC-2026-002 (14-day expiry), OQ-2/2b, DEC-2026-022 (F3), DEC-2026-024 (I-4). **V01 subset proposed in DEC-2026-047** (T-08/T-09, 2026-11-10) |
 
 **Question:** What is the card state vocabulary, which column is canonical, and what do the brief's terms mean?
 

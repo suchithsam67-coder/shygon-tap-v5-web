@@ -58,7 +58,7 @@ Legend: **KEEP** unchanged · **EXTEND** additive change, existing contracts pre
 | 20 | Auth (email, `localStorage` session) | **EXTEND** | Add verified phone, step-up (recent-OTP/AAL2), TOTP MFA for admins & org admins. "Keep me signed in" decision noted in PRODUCTION §8 is still open. |
 | 21 | Supabase Storage (avatar upload to `<user.id>/avatar-*`, public URL) | **UNKNOWN** | Bucket + policies not in the repo. Need: bucket public?, size/type limits, per-user path enforcement, EXIF stripping. |
 | 22 | Admin APK | **UNKNOWN** | Not provided; only its contract (RPC names) is visible. |
-| 23 | NFC chip & encoding | **UNKNOWN** | Nothing in the repo writes to a chip; `cards.card_uid` is populated by hand/admin. Chip family (NTAG213/215/216 vs NTAG 424 DNA) is undocumented — decides cloning resistance. |
+| 23 | NFC chip & encoding | **UNKNOWN** | Nothing in the repo writes to a chip; `cards.card_uid` is populated by hand/admin. Chip family (NTAG213/215/216 vs NTAG 424 DNA) is undocumented — decides cloning resistance. (Later: the owner chose MIFARE DESFire for new AAROH cards, 2026-11-10; DEC-2026-043 A-1. This audit row describes V5 as found.) |
 | 24 | Shiprocket / `check-delivery` | **KEEP** | Out of OS scope. |
 | 25 | Email delivery | **UNKNOWN / MISSING** | No transactional email sender in the repo (only Supabase Auth mails and SMS via MSG91/Twilio). |
 | 26 | Data export / deletion (DSR) | **MISSING** | `ON DELETE CASCADE` from `auth.users` exists but there is no customer-facing export/erase flow, retention policy, or soft-delete. |

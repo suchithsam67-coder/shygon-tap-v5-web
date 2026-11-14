@@ -26,7 +26,7 @@
 F-1 scope ─┬─> F-2 adult signatory ─> F-10 DLT, F-11 Razorpay, F-23 counsel ──────────┐
            ├─> F-4 host + F-5 domain ─> F-8 non-prod + previews ─> P1/P2 hosted checks ┤
            ├─> F-7 production capture + F-18 rotation ─> rebaseline ─> apply 020–037 ──┤
-           └─> F-16 key custody + suppliers ─> first NTAG batch ───────────────────────┤
+           └─> F-16 key custody + suppliers ─> first DESFire EV3 batch ───────────────────────┤
 Build in parallel: badge, pairing, export, phone verify, MFA, 18+ gate, monitoring ───┤
                                                                                        v
                           Release checklist (acceptance §7) ─> founder + adult release decision
@@ -64,17 +64,17 @@ Status: TODO / DOING / REVIEW / DONE / BLOCKED. "Dep" lists blocking decisions o
 |---|---|---|---|---|---|
 | T-01 | Founder answers F-1..F-27 | P0 | Owner/Adult | — | DOING (F-1 APPROVED 2026-11-02) |
 | T-02 | Resolve contradictions C-1..C-11 in the docs | P0 | Coord + A | T-01 | TODO |
-| T-03 | Verified Tap independent review (OC-6) → fixes | P1 | OC → A | — | DOING |
-| T-04 | Lost frontend review (OC-7) → fixes | P3 | OC → B | — | DOING |
-| T-05 | Admin edge logging V6-094 (CODEX-1) → review → A | P4 | CX → A | — | DOING |
-| T-06 | Merge backend v0.11.1 into the frontend | P2 | B | — | TODO |
-| T-07 | Verified Tap badge + `/d/<code>` page (contract v0.11) | P3 | B | T-06 | TODO |
-| T-08 | Card pairing (minimal): bind code+epoch to the owner at activation; lifecycle states | P2 | A → B | DEC-028, F-14 | TODO |
-| T-09 | Report stolen / disable card | P2 | A → B | T-08 | TODO |
-| T-10 | Data export (JSON + vCard) + export page | P4 | A → B | F-20 | TODO |
-| T-11 | Phone verification of the account phone | P4 | A → B | — | TODO |
-| T-12 | Admin MFA | P4 | A | — | TODO |
-| T-13 | 18+ eligibility at sign-up + Terms wording | P1 | B + Counsel | F-26 | TODO |
+| T-03 | Verified Tap independent review (OC-6) → fixes | P1 | OC → A | — | REVIEW (report 036906b, awaiting Coordinator check; written for NTAG 424 DNA, logic applies to DESFire EV3 SDM per DEC-043 A-1) |
+| T-04 | Lost frontend review (OC-7) → fixes | P3 | OC → B | — | REVIEW (report 047ceff, awaiting Coordinator check) |
+| T-05 | Admin edge logging V6-094 (CODEX-1) → review → A | P4 | CX → A | — | REVIEW (17c4a56; must add the §12a aal rule) |
+| T-06 | Merge backend v0.11.1 into the frontend | P2 | B | — | DONE locally (956442d) |
+| T-07 | Verified Tap badge + `/d/<code>` page (contract v0.11) | P3 | B | T-06 | DONE locally (6dc5fc9) |
+| T-08 | Card pairing (minimal): bind code+epoch to the owner at activation; lifecycle states | P2 | A → B | DEC-028, F-14 | Backend DONE locally (d33b622, DEC-2026-047, v0.15); frontend TODO |
+| T-09 | Report stolen / disable card | P2 | A → B | T-08 | Backend DONE locally (d33b622); frontend TODO |
+| T-10 | Data export (JSON + vCard) + export page | P4 | A → B | F-20 | DONE locally (backend d258382, frontend 362a10e) |
+| T-11 | Phone verification of the account phone | P4 | A → B | — | Backend DONE locally (b2b5f91, v0.13); frontend TODO |
+| T-12 | Admin MFA | P4 | A + Admin APK session | — | Step 2 DONE locally (a11a3d7, opt-in, switch OFF); admin-app screens with the Admin APK session; edge functions after V6-094 |
+| T-13 | 18+ eligibility at sign-up + Terms wording | P1 | B + Counsel | F-26 | ON HOLD: the founder is choosing 18+ vs under-18 with parent consent (students) |
 | T-14 | Landing hero < 4 s (from the OC-4 diagnosis) | P2 | B | — | TODO |
 | T-15 | Lost / Info / Verified Tap wording approval | P3 | Owner | F-19 | TODO |
 | T-16 | V6-128 refund webhook sync | P6 | A | F-22 | TODO |
@@ -87,7 +87,7 @@ Status: TODO / DOING / REVIEW / DONE / BLOCKED. "Dep" lists blocking decisions o
 | T-23 | Backups + restore drill + replay-state reconciliation runbook | P7 | A | F-4 | TODO |
 | T-24 | Emergency sweep cron | P7 | A | F-4 | BLOCKED |
 | T-25 | DLT templates + variable normalisation | P3 | Adult → A | F-10 | BLOCKED |
-| T-26 | Supplier RFQ → first NTAG batch → personalisation + batch verification | P3 | Adult + A | F-16 | BLOCKED |
+| T-26 | Supplier RFQ → first DESFire EV3 batch → personalisation + batch verification | P3 | Adult + A | F-16 | BLOCKED |
 | T-27 | Counsel review: Terms, privacy notice (GPT-2 pack), safety features | P4 | Adult/Counsel | F-23 | BLOCKED |
 | T-28 | AI governance + architecture doc (no features) | P5 | Coord | F-25 | TODO |
 | T-29 | Independent full security review before release | P7 | OC + Coord | T-03..T-12 | TODO |

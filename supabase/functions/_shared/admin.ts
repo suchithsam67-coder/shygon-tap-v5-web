@@ -11,6 +11,7 @@
  */
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+import { requestLog } from './log.ts';
 
 export class MissingSecretError extends Error {
   constructor(readonly secretName: string) {
@@ -37,7 +38,7 @@ export const json = (body: unknown, status = 200): Response =>
  */
 export const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-request-id',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -62,8 +63,39 @@ export interface ActingAdmin {
   displayName: string | null;
 }
 
+/** resolveAdmin's answer for an administrator whose session lacks a required second factor. */
+export const MFA_REQUIRED = 'mfa-required' as const;
+
 /**
- * Resolves the caller to an active administrator, or returns null.
+ * What both functions answer then (contract §12a, v0.16). The code is the one the
+ * admin RPCs raise; the message does not match the admin app's sign-out rule, so
+ * the app asks for the authenticator code instead of signing the person out.
+ */
+export const mfaRequiredBody = { error: 'Enter your authenticator code to continue.', code: 'admin:mfa_required' };
+
+/**
+ * DEC-2026-046 (migration 040): an administrator with a verified second factor,
+ * or every administrator once SHYGON switches it on, must hold an aal2 session.
+ * The service-role lookup cannot see the token's assurance level, so the
+ * database is asked in the caller's own session (admin_mfa_status, the same rule
+ * as is_admin() and require_admin()). Anything but a clear answer is 'unknown',
+ * which the caller treats as a refusal. A missing SUPABASE_ANON_KEY throws
+ * MissingSecretError, which both functions turn into 503: still never allowed.
+ */
+async function mfaState(token: string): Promise<'satisfied' | 'required' | 'unknown'> {
+  const caller = createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_ANON_KEY'), {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data, error } = await caller.rpc('admin_mfa_status');
+  if (error || !data || typeof data !== 'object') return 'unknown';
+  const satisfied = (data as { satisfied?: unknown }).satisfied;
+  return satisfied === true ? 'satisfied' : satisfied === false ? 'required' : 'unknown';
+}
+
+/**
+ * Resolves the caller to an active administrator, or returns null, or
+ * MFA_REQUIRED when the administrator's session lacks a required second factor.
  *
  * The permission set is re-derived from the database rather than read from the
  * request: a token proves who you are, never what you may do.
@@ -72,15 +104,25 @@ export async function resolveAdmin(
   service: SupabaseClient,
   request: Request,
   permission: string,
-): Promise<ActingAdmin | null> {
+  log = requestLog('admin', request),
+): Promise<ActingAdmin | typeof MFA_REQUIRED | null> {
   const header = request.headers.get('authorization') ?? '';
-  if (!header.toLowerCase().startsWith('bearer ')) return null;
+  if (!header.toLowerCase().startsWith('bearer ')) {
+    log.warn('security.admin-refused', { reason: 'no-session' });
+    return null;
+  }
 
   const token = header.slice(7).trim();
-  if (!token) return null;
+  if (!token) {
+    log.warn('security.admin-refused', { reason: 'no-session' });
+    return null;
+  }
 
   const { data, error } = await service.auth.getUser(token);
-  if (error || !data?.user) return null;
+  if (error || !data?.user) {
+    log.warn('security.admin-refused', { reason: 'no-session' });
+    return null;
+  }
 
   const { data: row, error: adminError } = await service
     .from('admin_users')
@@ -89,16 +131,34 @@ export async function resolveAdmin(
     .maybeSingle();
 
   if (adminError) {
-    console.error('admin lookup failed', adminError.message);
+    log.error('admin.lookup-failed', { code: 'admin-lookup-failed' });
+    log.warn('security.admin-refused', { reason: 'not-admin' });
     return null;
   }
-  if (!row || row.is_active !== true) return null;
+  if (!row || row.is_active !== true) {
+    log.warn('security.admin-refused', { reason: 'not-admin' });
+    return null;
+  }
 
   const effective = new Set<string>([
     ...rolePermissions(row.role as string),
     ...((row.permissions as string[] | null) ?? []),
   ]);
-  if (!effective.has(permission)) return null;
+  if (!effective.has(permission)) {
+    log.warn('security.admin-refused', { reason: 'missing-permission' });
+    return null;
+  }
+
+  const mfa = await mfaState(token);
+  if (mfa === 'unknown') {
+    log.error('admin.mfa-check-failed', { code: 'mfa-check-failed' });
+    log.warn('security.admin-refused', { reason: 'mfa-check-failed' });
+    return null;
+  }
+  if (mfa === 'required') {
+    log.warn('security.admin-refused', { reason: 'mfa-required' });
+    return MFA_REQUIRED;
+  }
 
   return {
     userId: row.user_id as string,
@@ -159,6 +219,7 @@ export async function audit(
   entityType: string,
   entityId: string,
   metadata: Record<string, unknown>,
+  log: ReturnType<typeof requestLog>,
 ): Promise<void> {
   const { error } = await service.from('admin_audit_log').insert({
     admin_id: adminId,
@@ -169,5 +230,5 @@ export async function audit(
   });
   // An unrecorded privileged action is a real problem, but it must not undo a
   // refund that already left the gateway. Log loudly instead.
-  if (error) console.error('AUDIT WRITE FAILED', action, entityId, error.message);
+  if (error) log.error('admin.audit-write-failed', { code: 'unexpected-error', entityId });
 }

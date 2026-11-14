@@ -10,6 +10,8 @@
 # standard TEST VECTORS, not secrets, in netlify/tests/sun.mjs: the RFC 4493 §4
 # example key, the AN10922 §2.2.1 example key, AN12196 §3.3 / §3.4.2.2 example
 # session key and ciphertexts. Both commits that carry the file are listed.
+# Line 306 is not a key: a 31-hex truncated AN12196 ciphertext used as a
+# negative-test input (clarified 2026-11-12, OpenCode review OC-6 #6).
 c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:54
 c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:72
 c466ddee68d1bcb4a25266e44cfba5af856ac75e:netlify/tests/sun.mjs:generic-api-key:130

@@ -859,3 +859,253 @@ The new files were restored and compared byte for byte.
 - any hosted check.
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 25. 2026-11-10: administrator MFA, step 2 (V01 T-12) built locally (migration 040, contract v0.14)
+
+**Assessment first, as the coordinator asked** (DEC-2026-046, `a1863b8`). Requiring a second factor at once would lock every administrator out:
+- the Expo admin app has no MFA screens;
+- it re-runs `admin_me()` on every token refresh;
+- it signs the operator out on 42501.
+
+The two admin edge functions check access on their own.
+
+**Approval:** the owner, in this session on 2026-11-10: "Approve T-12 option A", answering "Approve building step 2 of T-12 (the opt-in database rule) locally?". Q1–Q5 are as recommended.
+
+**Built:**
+- **Migration 040:**
+  - `is_admin` and `admin_has` also need `admin_mfa_satisfied()`;
+  - `require_admin` and `admin_me` refuse with `admin:mfa_required` (P0001, never 42501);
+  - `admin_mfa_status()` for the app; `admin_mfa_set_required()` service-only; the switch row OFF.
+- **The local stack:** `auth.jwt()` and `auth.mfa_factors` in the platform shim. The auth stand-in gains GoTrue's MFA endpoints with RFC 6238 codes and `aal2` sessions.
+- **Contract AAROH-API v0.14 (§12a)**, and the admin-contract approvals for the four frozen edits.
+
+**The rule:** an administrator who has a verified factor must use an `aal2` session for every admin function, the admin read policies and `admin_me`. An administrator without a factor is unaffected until the switch is turned on (step 3).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites].
+
+| Group | Results |
+|---|---|
+| `test:db` | verify 21; adversarial 64; RLS matrix **1704** (60 tables, the switch closed to all 7 callers); identity 69; admin-notes 12 (administrators without a factor, unchanged); golden **22** (a new stage for 040, byte-identical); admin-contract **21** (the four frozen body edits approved exactly; `admin_mfa_status()` the only new client-executable function); rollbacks **21** (040 restores exactly); account-deletion 9; history 2; bundle as one batch and twice |
+| New | `test:admin-mfa` **9** (through supabase-js's MFA API) |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 17; account-export 12; phone-verify 12; local-host 9; admin-edge 11; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 (7 moderate) |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`), before and after this commit |
+
+**Negative control** [OBSERVED]: 040 without its four frozen-function edits failed 2 of the 9 checks. An enrolled administrator's password-only session was accepted, and the switch had no effect. The real 040 was restored and compared byte for byte.
+
+**Open, with their own approvals:**
+- the admin app's MFA screens (DEC-2026-046 Q2: no session owns `../shygon-tap-v5-admin`, and it is not under version control);
+- `admin-refund` and `admin-push`, which still accept a password-only administrator session (Codex, after V6-094);
+- step 3, switching ON (Q4);
+- the break-glass runbook (Q5, the adult incident lead).
+
+**Verdict unchanged:** release BLOCKED (§18).
+
+## 26. 2026-11-10: card pairing and report stolen (V01 T-08, T-09) built locally (migration 041, contract v0.15)
+
+**Approval:** the owner, in this session on 2026-11-10: "Approve T-08/T-09 build". That answered "Approve building T-08/T-09 locally on DEC-2026-047's recommended answers?", so Q1–Q7 are as recommended, including F-14: the Verified Tap code stays in `tap_device_auth`.
+
+**Built:**
+- **Migration 041,** generated from 037's and 039's text:
+  - the append-only `card_events`, `card_transition()` and a guard trigger for AAROH cards;
+  - `verify_device_lookup` answers `pairing` for a `pending` or `shipped` card;
+  - the owner card functions, and each card's history in the export.
+- **The possession proof** (`netlify/lib/possession.mjs`) on a genuine pairing tap.
+- **`/api/cards`:** list, tap to activate, report stolen.
+- **Contract AAROH-API v0.15** (§7 C-6 to C-8, §10d).
+
+**The rules:**
+- An AAROH card becomes active only with a genuine tap of that card plus its owner's own session, and it never expires.
+- Every other writer is refused and logged.
+- A suspended card is not pairable (O-7 stays closed).
+- Report stolen is terminal, and the card then opens nothing.
+- V5 cards keep every live path. `/t/` still opens for them (F3), and the contract says so.
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites; a simulated chip with random test keys].
+
+| Group | Results |
+|---|---|
+| `test:db` | verify 21; adversarial 64; RLS matrix **1729** (61 tables, `card_events` closed to all 7 callers); identity 69; admin-notes 12; golden **23** (a new stage for 041, byte-identical); admin-contract 21 (`card_events` an approved new, closed relation; no new client-executable function); rollbacks **22** (041 restores exactly, 037's lookup and 039's export builder included); account-deletion 9; history 2; the bundle current and applied as one batch and twice |
+| New and changed | `test:card-lifecycle` **9**; `test:account-export` 12 (`card_events` exported with its card); `test:security` 12 (6 functions); `test:verified-tap` 17 (active cards unchanged) |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension **46**; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; account-export 12; phone-verify 12; admin-mfa 9; local-host 9; admin-edge 11; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 (7 moderate) |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`), before and after this commit |
+
+**Negative control** [OBSERVED]: 041 without its guard trigger failed 3 of the 9 checks. A direct write activated a shipped AAROH card and revived a retired one. The real 041 was restored and compared byte for byte.
+
+**Corrected before commit:** the guard first recognised `card_transition` by a transaction-local session setting. `test:suspension` refused it (no reachable function may change a session setting). It now recognises the transition's own `card_events` row, written first in the same transaction, which no client can write. The negative control was re-run on the final design.
+
+**Not run or not built:**
+- two activations racing (PGlite has one connection; the rows are locked `FOR UPDATE`);
+- support's undo (a new personalisation);
+- Session B's pages;
+- real chips and keys (DEC-2026-043 Q2, Q3, Q7);
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).
+
+## 27. 2026-11-11: the chip is MIFARE DESFire EV3 (DEC-2026-043 amendment A-1; contract v0.15.1)
+
+**The decision:**
+- **The owner, 2026-11-10:** "use desfare only, update it everywhere". The store session recorded it in `ea13379` and relayed it.
+- **In this session:** the owner answered "Start DESFire change".
+
+**The crypto review** (DEC-2026-043 §12.1, §12.2):
+- **What NXP's public documents show** [OBSERVED]:
+  - only DESFire EV3 has Secure Dynamic Messaging; NXP's documents say EV1 and EV2 have none;
+  - NXP calls EV3's SUN "compatible with NTAG DNA";
+  - the byte layouts are only in the restricted EV3 data sheet.
+- **So no logic changed.** The built core (`sun.mjs`, 037, `/api/verify`, 041's possession proof) stands, and is **INFERRED** to match EV3 until gates G-1 (the data sheet) and G-2 (a real EV3 known answer) pass.
+- **New personalisation duties on DESFire** (§12.4): change the PICC master key, forbid unauthenticated format and application changes, and write-lock the NDEF file.
+
+**Changed:**
+- labels and comments in code, tests and the 037 and 041 headers (`APPLY_ALL.sql` rebuilt);
+- the contract (v0.15.1, wording only);
+- DEC-2026-043 §12, `DECISIONS.md` (DEC-2026-015 answered), backlog V6-133;
+- the capability matrix, the differentiation plan, the U1 notes;
+- SHYGON OS docs 00, 01, 02, 04, 07, 08 and 11.
+
+**Evidence** [OBSERVED, Node 20.18.0]:
+
+| Check | Result |
+|---|---|
+| `db:bundle` | rebuilt (3 lines: the 037 and 041 header comments); no 001–019 history; applies as one batch and twice |
+| `db:bundle:check` | exit 0 |
+| `lint` | exit 0 |
+| `test:sun` | 27 passed, 0 failed (AN12196 vectors; the suite now names them as NTAG 424 DNA's) |
+| `test:verified-tap` | 17 passed, 0 failed |
+| `test:card-lifecycle` | 9 passed, 0 failed |
+| `test:security` | 12 passed, 0 failed |
+| `test:db` | verify 21; adversarial 64; RLS matrix 1729 (61 tables, 7 callers); identity 69; admin-notes 12; golden 23; admin-contract 21; rollbacks 22; account-deletion 9; history 2; all 0 failed |
+| `test:secrets` | run after the commit; result recorded in the commit report |
+
+**Not done:**
+- G-1 to G-3;
+- the owner's D-1 to D-4;
+- Session B's and the coordinator's copies, which are relayed to them.
+
+**Verdict unchanged:** release BLOCKED (§18).
+
+## 28. 2026-11-12: the DESFire questions D-1 to D-4 approved (DEC-2026-043 §12.7)
+
+**Approval:** the owner, in session on 2026-11-12, answered "Approve D-1 to D-4" to "Approve D-1 to D-4 (EV3, 2 kB, Random ID off, adopt the gates)?".
+
+**Approved:**
+- D-1: the chip is MIFARE DESFire EV3;
+- D-2: 2 kB;
+- D-3: Random ID off;
+- D-4: G-1 to G-3 and the §12.4 personalisation duties are conditions before any real key or chip.
+
+**Changed:** records only, with no code, schema or contract change:
+- DEC-2026-043 §12.7;
+- `DECISIONS.md`, backlog V6-133;
+- the capability matrix and doc 08.
+
+**Not done:**
+- G-1 (the EV3 data sheet), G-2 (a real EV3 known answer), G-3 (real phones);
+- Q2, Q3 and Q7.
+
+**Verdict unchanged:** release BLOCKED (§18).
+
+## 29. 2026-11-12: the OpenCode Verified Tap review (OC-6) fixed (migration 043, contract v0.15.2)
+
+**Approval:** the owner, in session on 2026-11-12: "Approve both".
+
+**The review:** OpenCode's `036906b`, handed over by the coordinator. It found no P0 and no P1, plus four P2s and two nits. All are fixed except §7 test 15, which waits for Q2.
+
+**The fixes (DEC-2026-043 §13):**
+- the log no longer names the failed check;
+- migration 043 decides both rate limits under locks;
+- §7 test 14 is built;
+- the 404 equivalence is stated precisely in the contract;
+- published test keys are refused as masters;
+- the E-1 note is clarified.
+
+**DESFire:** the review relies on nothing specific to NTAG 424 DNA.
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]:
+
+| Check | Result |
+|---|---|
+| `test:verified-tap` | **20 passed**, 0 failed (3 new: the locked rate limits, §7 test 14, published keys refused; the canary check now also asserts that no log line names the failed check) |
+| `test:sun` | 27 passed |
+| `test:card-lifecycle` | 9 passed (pairing taps go through the new `verify_tap_result`) |
+| `test:suspension` | 46 passed (no reachable function changes a session setting; the advisory lock is not one) |
+| `test:security` | 12 passed |
+| `test:db` | verify 21; adversarial 64; RLS matrix 1729 (61 tables, 7 callers); identity 69; admin-notes 12; golden **24** (a stage for 043, byte-identical); admin-contract 21; rollbacks **23** (043 restores 037's `verify_tap_result` exactly); account-deletion 9; history 2 |
+| `db:bundle`, `db:bundle:check`, `lint` | exit 0 |
+
+**Negative controls** [OBSERVED]:
+- **The mutations,** applied together:
+  - the log names the check again;
+  - `verify_tap_result` goes back to 037's, with its event insert swallowing errors;
+  - published keys are accepted.
+- **The result:** exactly the four matching checks failed, each for its own reason:
+  - the RFC key gave `genuine`;
+  - the device limit answered 200;
+  - the forced failure answered 200;
+  - a log line named the check.
+- The good files were restored and compared byte for byte.
+
+**Not run or not built:**
+- §7 test 15 (the external acceptance log, Q2);
+- real concurrency on PostgreSQL 17 (PGlite has one connection; the race was made deterministic instead);
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).
+
+## 30. 2026-11-12: the admin edge functions take V6-094's logs and the second-factor rule (contract v0.16)
+
+**Approval:** the owner, in session on 2026-11-12: "Approve both".
+
+**What changed:**
+- **Codex's V6-094** (`17c4a56`; structured, privacy-safe admin edge logs) is merged unchanged. The coordinator checked it and handed it over.
+- **The second-factor rule at the edge.** Session A added DEC-2026-046's rule to `resolveAdmin`:
+  - it asks the database in the caller's own session (`admin_mfa_status`);
+  - when the factor is required and missing, both functions answer `403` with `code: 'admin:mfa_required'`;
+  - if the check cannot run, the ordinary 403 refusal (fail closed).
+- Records: contract v0.16 and DEC-2026-046 §9.
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]:
+
+| Group | Results |
+|---|---|
+| `test:admin-edge` | **16 passed** (13 from Codex; 3 new: opt-in at aal1/aal2 on both functions with the database agreeing, the mandatory switch, fail-closed) |
+| Negative control | `resolveAdmin` without the check: exactly the 3 new checks failed (an aal1 session, and the switch-on case, were accepted as administrator; the fail-closed case allowed). The good file was restored and compared byte for byte |
+| `test:db` | verify 21; adversarial 64; RLS matrix 1729 (61 tables, 7 callers); identity 69; admin-notes 12; golden 24; admin-contract 21; rollbacks 23; account-deletion 9; history 2 |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 20; account-export 12; phone-verify 12; admin-mfa 9; card-lifecycle 9; local-host 9; admin-edge 16; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 (7 moderate) |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`) |
+
+**Not built:**
+- the admin app's screens (the Admin APK session);
+- the switch turned on for everyone (Q4);
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).
+
+## 31. 2026-11-14: the server-side 18+ record (V01 T-13) built locally (migration 044, contract v0.17)
+
+**Approval:** the owner, in session on 2026-11-14: "Approve the build" (DEC-2026-048, Q1–Q5 as recommended, option A). The founder's decision F-26 ("Option A: 18+ now") came through the coordinator.
+
+**Built:**
+- the closed, append-only `account_age_confirmations`, written once at sign-up by a second trigger on `auth.users`. The time of record is the server's; only the JSON value true confirms; a sign-up never fails because of it;
+- `age.status` and `age.confirm` on `/api/account`, for the accounts without a confirmation;
+- `ageConfirmation` in the owner export;
+- contract v0.17 (§4c).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]:
+
+| Group | Results |
+|---|---|
+| `test:age-gate` | **11 passed**, 0 failed (closure; sign-up recording with the server's time; only the JSON value true confirms; bad data never fails a sign-up; later edits change nothing; the triggers are independent; `age.status`; `age.confirm` once, explicit only; two confirmations write one row; the export; deletion) |
+| Negative control | 044 without its sign-up trigger: **all 11 checks failed** (no record at sign-up, the export showed nothing, the trigger list lacked it). The good file was restored and compared byte for byte |
+| `test:db` | verify 21; adversarial 64; RLS matrix **1754** (62 tables, 7 callers; `account_age_confirmations` closed to all 7); identity 69 (`handle_new_user` unchanged); admin-notes 12; golden **25** (a stage for 044, byte-identical); admin-contract 21 (an approved new, closed relation); rollbacks **24** (044 restores 041's export builder exactly); account-deletion 9; history 2 |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 20; account-export 12 (the new table exported and covered by the deletion procedure); phone-verify 12; admin-mfa 9; card-lifecycle 9; age-gate 11; local-host 9; admin-edge 16; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 (7 moderate) |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`) |
+
+**Not run or not built:**
+- the hosted auth service's own sign-up (the trigger ran on the local stand-in's `auth.users`);
+- two real connections racing (PGlite has one; `age.confirm` takes an advisory lock per account);
+- Session B's pages;
+- counsel's view;
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).

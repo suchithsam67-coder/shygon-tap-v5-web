@@ -44,7 +44,7 @@
 | **DEC-2026-001** | Rotate the possibly exposed service-role and Razorpay secrets now | Security Owner (you, until named) | **P1 → P0 on trigger** |
 | **OQ-16** | Name the role holders (Product, Architect, Security, Data, Engineering, QA, Release, two Incident Leads) | Founder | P1 (launch gate) |
 | **DEC-2026-002 / OQ-1** | Should a card stop working 14 days after activation? | Product Owner | P1 |
-| OQ-2 | NFC chip family; NTAG 424 DNA for new batches? | Security Owner | P1 (before any hardware order) |
+| OQ-2 | NFC chip family; NTAG 424 DNA for new batches? **Answered 2026-11-10: MIFARE DESFire only (EV3 for Verified Tap; DEC-2026-043 A-1)** | Security Owner | P1 (before any hardware order) |
 | OQ-3 | Provide the live schema dump + Admin APK contract | Data Owner | P1 |
 | OQ-17 | Paging service + status page + out-of-band channel | Release Owner | before Phase 1 launch |
 | OQ-18 | Counsel: CERT-In/DPDP incident rules, log retention | Data Owner | before Phase 1 launch |

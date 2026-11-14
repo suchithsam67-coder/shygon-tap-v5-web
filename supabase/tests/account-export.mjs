@@ -43,7 +43,7 @@ const EXPORTED = [
   'rescue_settings', 'rescue_threads', 'rescue_messages', 'rescue_blocks', 'rescue_audit',
   'connect_settings', 'connections', 'consent_grants', 'connect_audit',
   'prive_demo_requests', 'prive_demo_request_events', 'notifications', 'support_tickets', 'support_messages', 'account_events',
-  'account_phone_verifications',
+  'account_phone_verifications', 'card_events', 'account_age_confirmations',
 ];
 const EXCLUDED = {
   card_otp_challenges: 'security: one-time code hashes',
@@ -152,6 +152,7 @@ async function seedOwner(u, n, slug) {
     RETURNING id`, [u.userId, tap, `SHY-EXP-${n}`, C.activationCode, C.cardUid, 70 + n]))[0].id;
   await q(`SELECT public.verify_register_device($1, $2, 1, $3)`, [card, code, C.uidHmac]);
   await q(`UPDATE public.tap_device_auth SET last_counter = 4242, last_verified_at = now() WHERE public_code = $1`, [code]);
+  await q(`INSERT INTO public.card_events (card_id, from_status, to_status, actor, reason) VALUES ($1, 'shipped', 'active', 'owner', 'tap to activate')`, [card]);
   await q(`INSERT INTO public.tap_verify_events (public_code, verdict, visitor_digest) VALUES ($1, 'genuine', $2)`, [code, C.verifyDigest]);
   const order = (await q(`INSERT INTO public.orders (order_id, user_id, customer_id, product_name, amount, amount_in_paise, payment_status,
       order_status, fulfillment_status, order_type, admin_note, email_provider_id, shipping_name, shipping_address, razorpay_payment_id)
@@ -270,7 +271,11 @@ await t.check('the deletion procedure clears every exported table, except the or
   // Rows that go with their parent (ON DELETE CASCADE) are named in the procedure's comments, not its statements.
   const cascade = { tap_mode_audit: true, customer_customizations: 'customisations', tap_device_auth: 'cards', order_items: true,
     emergency_event_recipients: 'recipients', rescue_messages: 'messages', consent_grants: 'consent grants',
-    prive_demo_request_events: 'steps', support_messages: 'messages' };
+    prive_demo_request_events: 'steps', support_messages: 'messages',
+    // A card's history stays with the card, which the procedure unlinks and keeps as a hardware record.
+    card_events: 'cards',
+    // The 18+ record (044) goes with its account (ON DELETE CASCADE from auth.users).
+    account_age_confirmations: 'the account' };
   const unexplained = missing.filter((x) => !cascade[x]);
   assertEqual(unexplained, [], 'exported tables the procedure does not mention');
   return 'checked against the data again in section C';
@@ -342,6 +347,8 @@ await t.check('the owner gets their own data in every exported section', async (
     support_messages: x.support[0]?.messages.map((m) => [m.from, m.body]).join('|') === 'customer,My card is not scanning|admin,We have received your request',
     account_events: x.accountEvents.some((e) => e.eventType === 'tap_published'),
     account_phone_verifications: x.phoneVerification?.last4 === '5678' && typeof x.phoneVerification.verifiedAt === 'string',
+    card_events: x.cards[0]?.history?.[0]?.reason === 'tap to activate' && x.cards[0].history[0].to === 'active',
+    account_age_confirmations: typeof x.ageConfirmation?.confirmed === 'boolean' && x.ageConfirmation.source === 'signup',
   };
   assertEqual(Object.keys(PRESENT).sort(), [...EXPORTED].sort(), 'every exported table has a round-trip check');
   const missing = Object.entries(PRESENT).filter(([, ok]) => !ok).map(([k]) => k);

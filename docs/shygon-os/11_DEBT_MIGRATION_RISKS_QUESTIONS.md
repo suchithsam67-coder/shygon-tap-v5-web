@@ -85,7 +85,7 @@
 |---|---|---|---|
 | **OQ-1** | What is the **14-day card activation** meant to do? Is a card *supposed* to stop working 14 days after activation unless renewed (live `expire_tap_cards`), or is that a mix-up with the 14-day *edit* interval? | Determines lifecycle rules & resolver gating; may be silently disabling cards | Treat as **bug**: activation does not expire; cards stay active until suspended; sweeper disabled after audit |
 | **OQ-1b** | Confirm live `get_public_profile` — does it check card status on live? (repo version doesn't) | F3 severity | Assume repo version |
-| **OQ-2** | Which NFC chip is in shipped cards (NTAG213/215/216/424 DNA?), and can the metal/transparent designs carry a 424-class inlay? | Cloning resistance, Rescue hardware plan | Assume NTAG21x static; SDM optional for new batches |
+| **OQ-2** | Which NFC chip is in shipped cards (NTAG213/215/216/424 DNA?), and can the metal/transparent designs carry a 424-class inlay? **Answered for new AAROH cards 2026-11-10: MIFARE DESFire only, EV3 for Verified Tap (DEC-2026-043 A-1); the inlay question stays open (Q7, D-2)** | Cloning resistance, Rescue hardware plan | Shipped V5 cards: assume NTAG21x static. New AAROH cards: DESFire EV3 with SDM |
 | **OQ-2b** | Users with several legacy cards: does suspending one card gate the persona? | Legacy behavior | Persona reachable while ≥ 1 legacy device active |
 | **OQ-3** | Grant read access to **live Supabase schema** (or a `pg_dump --schema-only`) and the **Admin APK** repo contract | Baseline & contract tests | Work from repo only (risky) |
 | **OQ-4** | How many personas per plan (Essential/Business/Premium/GOAT/Pass)? | Gating in trigger | Essential 1; multi-persona unlocked by Pass or paid tier — *decide at Phase 2* |

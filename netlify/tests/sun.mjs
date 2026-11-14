@@ -1,4 +1,4 @@
-// The SUN crypto core for NTAG 424 DNA taps — U1 "Verified Tap": published
+// The SUN crypto core for DESFire EV3 taps (AN12196 scheme) — U1 "Verified Tap": published
 // known answers first, then every refusal this server must make.
 //
 //   node --import ./scripts/ci/deny-network.mjs netlify/tests/sun.mjs
@@ -27,7 +27,7 @@ import {
   verifySun,
 } from '../lib/sun.mjs';
 
-const t = createHarness('SUN crypto core: NTAG 424 DNA known answers and refusals');
+const t = createHarness('SUN crypto core: AN12196 (NTAG 424 DNA) known answers and refusals');
 const bytes = (value) => Buffer.from(value, 'hex');
 const ZERO_KEY = '00000000000000000000000000000000'; // the transport value of every NTAG 424 DNA AppKey
 

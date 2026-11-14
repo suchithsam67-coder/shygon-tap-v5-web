@@ -1,5 +1,6 @@
 -- 037: Verified Tap (U1). Device codes for /d/<code>, the per-device SUN state
--- (NTAG 424 DNA) and an append-only verification log, read and written only by
+-- (MIFARE DESFire EV3 SDM; DEC-2026-043 A-1, was NTAG 424 DNA) and an append-only
+-- verification log, read and written only by
 -- the server (/api/verify). Nothing here is reachable by a client role.
 --
 -- Decision:  DEC-2026-043, approved for the LOCAL BUILD by the owner in session

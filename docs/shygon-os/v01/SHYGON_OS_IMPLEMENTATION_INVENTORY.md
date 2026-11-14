@@ -5,6 +5,7 @@
 | Date | 2026-11-02 |
 | Author | The Coordinator (Claude Code). Read-only audit: no product file changed |
 | Repository | `shygon-tap-v5-web` (private remote `github.com/suchithsam67-coder/shygon-tap-v5-web`; GitHub holds the 2026-10-26 state, everything newer is local) |
+| Update 2026-11-12 | Chip changed to **MIFARE DESFire EV3** (DEC-2026-043 A-1). Built since: export (038), phone verification (039), admin MFA opt-in (040), card pairing + report stolen (041); frontend: Verified Tap page, export page |
 | Code inspected | Backend `v6/aaroh-backend` @ **2e1acab** (AAROH-API v0.11.1, migrations 001–037); frontend `claude/shygon-aaroh-v6-frontend-c7fab7` @ **249c8d9** (merged backend up to 39d87ca) |
 | Supersedes | `coordination/2026-10-26_shygon-os-implementation-audit.md` (same method; updated for U1, Lost frontend and the review fixes) |
 
@@ -57,7 +58,7 @@ The directive's eight statuses are used exactly as below. Five separate facts ar
 | Visitor-initiated emergency alerts | BUILT AND VERIFIED | No | Same | **OFF** by decision (DEC-038 Q2) |
 | Emergency Profile (a view) | PARTIALLY IMPLEMENTED | No | DEC-038 Q11 = B (relay view only) | Hidden |
 | SHYGON Connect + consent ledger | BUILT AND VERIFIED | No | 032, `/api/connect`; `test:connect` 17 | **OFF** (`CONNECT_PUBLIC`); hosted P2 required |
-| Verified Tap (NTAG 424 DNA SUN, `/d/<code>`) | BUILT AND VERIFIED (backend) | No | 037, `/api/verify`, `netlify/lib/sun.mjs`; `test:verified-tap` 17, `test:sun` 27 (RAN + an independent vector check) | **OFF** (`VERIFIED_TAP`), test keys only; **frontend badge NOT STARTED**; key custody (Q2) open |
+| Verified Tap (DESFire EV3 SDM/SUN, `/d/<code>`) | BUILT AND VERIFIED (backend) | No | 037, `/api/verify`, `netlify/lib/sun.mjs`; `test:verified-tap` 17, `test:sun` 27 (RAN + an independent vector check) | **OFF** (`VERIFIED_TAP`), test keys only; **frontend badge NOT STARTED**; key custody (Q2) open |
 | Privé (hospitality) | PROTOTYPE | No | 033 demo provider (DEC-040); `test:prive` 12 | Demo showroom only |
 | Guardian | DOCUMENTED ONLY | — | Deferred by the owner 2026-10-25 | — |
 | Student | DOCUMENTED ONLY | — | Showroom "Coming soon"; DEC-017 legal gate (minors) | — |
@@ -116,7 +117,7 @@ The directive's eight statuses are used exactly as below. Five separate facts ar
 
 | Product | Where | Status |
 |---|---|---|
-| Admin app (Expo, Android APK) | `../shygon-tap-v5-admin` | Exists; NOT AUDITED |
+| Admin app (Expo, Android APK) | `../shygon-tap-v5-admin` (git since 2026-11-10; owner: the "SHYGON Tap V5 Admin APK" session) | Exists; NOT AUDITED by the Coordinator; no remote yet |
 | SHYGON Member OS | `Documents\SUCHITH\shygon-member-os`, its own session | Demo live at shygon-member-os.vercel.app (fictional data); real workspace not connected. The untracked copy in this repo is superseded |
 | SHYGON AI company OS / storage | `E:\SHYGON_AI_STORAGE` | Separate sessions; NOT AUDITED |
 

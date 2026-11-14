@@ -44,7 +44,7 @@ AAROH is not a business card with extras. It is a verified personal object that 
 
 | # | Pillar | What makes it different | State today |
 |---|---|---|---|
-| A1 | **Verified Tap** | Every tap carries a one-time NTAG 424 DNA SUN signature, checked server-side at `/d/<code>`. The page says "Genuine SHYGON AAROH No. 037 of 100, Chapter 1", or warns of a copy or rewritten tag. Rewriting or copying a tag gains nothing. | Owner decision 2026-10-16 (`/d/<code>` + NTAG 424 DNA). **Not built.** PROPOSED: U1 |
+| A1 | **Verified Tap** | Every tap carries a one-time SUN signature from the card's MIFARE DESFire EV3 chip (owner 2026-11-10; was NTAG 424 DNA), checked server-side at `/d/<code>`. The page says "Genuine SHYGON AAROH No. 037 of 100, Chapter 1", or warns of a copy or rewritten tag. Rewriting or copying a tag gains nothing. | Owner decision 2026-10-16 (`/d/<code>` + NTAG 424 DNA); chip changed to MIFARE DESFire EV3 2026-11-10 (DEC-2026-043 A-1). Built locally 2026-10-31 (U1) |
 | A2 | **Context modes** | One card, one active mode, switched by the owner and validated on the server. A mode never shows another mode's data: BQ-1 proves Business never leaks while Info is live, including after the kill switch. | **BUILT-LOCAL:** Business + Info (034, 035, `/api/modes`, contract v0.9). Info OFF in the catalogue |
 | A3 | **Guardian layer** | Emergency Profile and Return-to-Owner live on the card people already carry. A finder reaches the owner without seeing a number. "Delivered" is claimed only with a signed provider receipt. | **BUILT-LOCAL:** 029 + 031, host switches off. Blocked by MSG91 + DLT, counsel, supervised trial |
 | A4 | **Consent-ledger Connect** | Contacts are exchanged only by mutual consent. The append-only ledger records who shared what and when. Withdrawal and block really remove access. | **BUILT-LOCAL:** 032 + `CONNECT_PUBLIC` off (B-10). Counsel review (DEC-2026-017) |
@@ -98,7 +98,11 @@ AAROH is not a business card with extras. It is a verified personal object that 
   - [Gear Trakr](https://apps.apple.com/us/app/-/id1625312631)
   - [NFCW on Tagnito](https://www.nfcw.com/?p=86196)
   - [US8537002B2](https://patents.google.com/patent/US8537002)
-- NTAG 424 DNA / SUN:
+- MIFARE DESFire EV3 / SDM (the chip, owner 2026-11-10):
+  - [NXP MF3D(H)x3 short data sheet](https://www.nxp.com/docs/en/data-sheet/MF3D_H_X3_SDS.pdf)
+  - [NXP AN12752, EV3 compared with EV1 and EV2](https://www.nxp.com/docs/en/application-note/AN12752.pdf)
+  - [NXP AN12753, EV3 quick start guide](https://www.nxp.com/docs/en/application-note/AN12753.pdf)
+- NTAG 424 DNA / SUN (the scheme NXP says EV3's SDM is compatible with; the source of the test vectors):
   - [WakDev knowledge base](https://www.wakdev.com/en/knowledge-base/nfc-chips/nxp-ntag424-dna.html)
   - [NXP datasheet NT4H2421Gx](https://docs.ampnuts.ru/nxp.com.datasheet/NT4H2421Gx.pdf)
   - [ntag424 crate docs](https://docs.rs/ntag424)

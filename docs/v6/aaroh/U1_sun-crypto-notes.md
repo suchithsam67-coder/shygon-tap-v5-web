@@ -7,6 +7,7 @@
 | Proves | differentiation-plan §4 A1 (first half) and §5 U1 ("CMAC verification with NXP's published test vectors, read-counter refusal") |
 | Does not prove | the `/d/<code>` resolver, key custody, replay storage, the badge — all still U1 + DEC-2026-043 |
 | Evidence labels | OBSERVED = ran here; INFERRED = reasoned from a cited document |
+| Chip (2026-11-11) | **MIFARE DESFire EV3**, not NTAG 424 DNA (owner 2026-11-10; DEC-2026-043 A-1). NXP calls EV3's SUN "compatible with NTAG DNA" (MF3D(H)x3 short data sheet §2.1.6), so the NTAG 424 DNA sources below still define the scheme. The byte-level match is INFERRED until gates G-1 (the EV3 data sheet) and G-2 (a real EV3 known answer) in DEC-2026-043 §12 |
 
 ## 1. What the library is
 

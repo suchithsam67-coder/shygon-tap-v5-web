@@ -1,4 +1,6 @@
-# DEC-2026-043: Verified Tap (NTAG 424 DNA SUN at `/d/<code>`)
+# DEC-2026-043: Verified Tap (SUN at `/d/<code>`; chip MIFARE DESFire EV3 since amendment A-1, was NTAG 424 DNA)
+
+> **Amended 2026-11-11 (A-1, §12).** The owner decided on 2026-11-10: "use desfare only, update it everywhere". The chip is **MIFARE DESFire**, and Verified Tap needs **EV3**. Where §1–§11 say NTAG 424 DNA about AAROH's chip, §12 supersedes them. They stay as written, as the record of what was decided then. Where they cite NTAG 424 DNA documents (AN12196, NT4H2421Gx) for the SUN scheme, they still apply: NXP calls EV3's SUN "compatible with NTAG DNA" (§12.1). The owner approved D-1 to D-4 on 2026-11-12 (§12.7).
 
 | Field | Value |
 |---|---|
@@ -339,6 +341,166 @@ The build uses test-only keys, `VERIFIED_TAP` stays off, and nothing is hosted. 
   - AN10922 §2.2.1's example key (twice);
   - AN12196 §3.4.2.2's example ciphertexts (three lines);
   - an AN12196 session-key example.
+  - Clarified 2026-11-12 (OpenCode review OC-6 #6): line 306 is not a key. It is a 31-hex truncated AN12196 ciphertext, a negative-test input. It is still a published fixture, so E-1 stands unchanged.
 - **Where they appear.** In commit `c466ddee68d1bcb4a25266e44cfba5af856ac75e` (this branch) and `6c7f8db58f3af5af45c1222bc6ff3681be612981` (`opencode/u1-sun-crypto`).
 - **The proposed fix.** The repository's rule (`.gitleaksignore`) needs an APPROVED decision per fingerprint. Proposed: add the 14 fingerprints, `<commit>:netlify/tests/sun.mjs:generic-api-key:<line>` for both commits and all seven lines, under "E-1: published NXP / IETF test vectors".
 - **Done.** The fingerprints were added after the owner's approval. `npm run test:secrets` no longer reports them; only the known V6-014 finding remains.
+
+## 12. Amendment A-1 (2026-11-11): the chip is MIFARE DESFire EV3, not NTAG 424 DNA
+
+**The decision** [OBSERVED]:
+- **The owner, 2026-11-10:** "use desfare only, update it everywhere".
+  - The store session recorded it in `ea13379` on `v6/aaroh-store` (print package and manufacturing hand-off) and relayed it to Session A.
+  - It replaces "NTAG 424 DNA" in the owner's 2026-10-16 decision (§2) and answers OQ-2 (DEC-2026-015).
+- **In this session, 2026-11-11:** the owner answered "Start DESFire change" to "Start the DESFire change next (amend DEC-2026-043, then a crypto review)?".
+- **Unchanged:**
+  - Q1 option A, the verdicts and their wording (Q4), D-a (Q8), the counter limit off (Q9);
+  - the A0 rule: a tap proves the object, never the person;
+  - every legacy path (`/t/`, V5 cards).
+
+**State of this amendment:**
+- The chip change itself, and the sweep in §12.6, follow the owner's instruction.
+- §12.3 to §12.5 were PROPOSED. The owner **APPROVED D-1 to D-4 on 2026-11-12** (§12.7).
+- Nothing is keyed, personalised, ordered or deployed. The release stays BLOCKED.
+
+### 12.1 What NXP's public documents say [OBSERVED 2026-11-11, read from NXP's own PDFs]
+
+| Fact | Source |
+|---|---|
+| Only EV3 has Secure Dynamic Messaging: "Secure Dynamic Messaging: EV1 No, EV2 No, EV3 Yes". SDM is "a new feature that was introduced with MIFARE DESFire EV3" | MF3D(H)x3 short data sheet Rev 3.1 (2024-01-11), Table 1; AN12752 Rev 1.4 (2023-07-24), §7.5 |
+| EV3's SUN is mirrored as text into the NDEF message, "compatible with NTAG DNA" | Short data sheet §2.1.6 |
+| SDM sits on a Standard Data File created with SDM enabled (FileOption bit 6). Its settings: mirror offsets for the VCUID, SDMReadCtr, PICCData, the MAC input, encrypted file data and the MAC, plus an SDMReadCtrLimit. Three extra access rights: SDM Meta Read (encrypts the PICCData), SDM File Read and SDM Counter Retrieval. Each takes an application key number, free (0xE) or never (0xF) | AN12752 §5.2 (Table 7), §5.2.1 (Table 8) and its SDM access-rights section |
+| A 7-byte UID, with an optional Random ID: a 3-byte random number at anticollision, chosen by SetConfiguration | Short data sheet §7.4 and Table 5 |
+| Ciphers: single DES, 2KTDEA, 3KTDEA and AES-128. No LRP is listed for EV3 | Short data sheet Table 1 |
+| FormatPICC at PICC level deletes every application and file | Short data sheet Table 5 |
+| Memory of 2, 4, 8 or 16 kB; 17 pF (MF3Dx3) or 70 pF (MF3DHx3) input capacitance; sawn wafer, MOA4 or MOA8 | Short data sheet §2 and ordering information |
+| Common Criteria EAL5+ (hardware and software); NFC Forum Type 4 Tag certified | Short data sheet §1 and §2.1.6 |
+| The SDM details are in the full data sheet, DS4870xx, which NXP issues only through its secure-files portal. Those details are the byte layouts, the session keys and the truncation. AN12753 also cites AN12757 ("MIFARE DESFire EV3 Features and hints"), which was not found in public | AN12752 §8 [1]; AN12753 references |
+
+### 12.2 Crypto review of what is built [Session A, 2026-11-11]
+
+| Built piece | On DESFire EV3 | Change now |
+|---|---|---|
+| `netlify/lib/sun.mjs`: AES-CMAC (RFC 4493) and AN10922 diversification | AN10922 is NXP's DESFire-family method. The suite's own AN10922 vector diversifies "UID ‖ DESFire AID ‖ system id" | none |
+| PICCData decryption (AES-128-CBC, zero IV; tag `0xC7`, UID 7 bytes, counter 3 bytes LSB first); session key from SV2 = `3CC300010080` ‖ UID ‖ counter; truncation to the 8 odd-indexed bytes | **INFERRED identical**: from "compatible with NTAG DNA" and the matching settings and access rights in §12.1. **Not confirmed byte for byte**: the public documents do not give the layouts | none; gates G-1 and G-2 |
+| `acceptCounter` and the 24-bit limit `0xFFFFFF` | INFERRED: the read-counter mirror is "LSB first", but its width and its end behaviour are not stated in public | none; G-1 |
+| AES only | EV3 offers AES-128 application keys | none. The SDM keys must be AES keys (§12.4) |
+| 037 (`tap_device_auth`, `tap_verify_events`, the four functions), `/api/verify`, D-a by `cards.id`, `uid_hmac` | independent of the chip | header comments only |
+| 041's possession proof (a server HMAC after a genuine tap) | independent of the chip | a header comment only |
+| `test:sun` 27, `test:verified-tap` 17, `test:card-lifecycle` 9 | they prove the AN12196 scheme with NXP's NTAG 424 DNA vectors. No EV3 vector is public | labels only; G-2 adds an EV3 vector |
+
+**Result:** no code change is justified now.
+- Verified Tap on EV3 rests on NXP's statement that its SUN is compatible. That remains INFERRED until G-1 and G-2 pass.
+- If G-1 finds a difference, it becomes a code change through this decision, with tests first.
+
+### 12.3 Gates before any real key or chip [APPROVED 2026-11-12 as D-4]
+
+- **G-1. The EV3 data sheet.** The adult authorised signatory (F-2), never the founder, obtains DS4870xx under NXP's terms. Alternatively, the personalisation bureau (Q3) confirms it in writing. Then check it against `sun.mjs`, item by item:
+  - the PICCData tag byte and layout;
+  - CBC with a zero IV;
+  - the SV2 constant and its byte order;
+  - the MAC truncation;
+  - the counter's width, and what happens at `0xFFFFFF` and at a set limit;
+  - what the mirrored UID (the VCUID) is when Random ID is on.
+- **G-2. A real EV3 known answer.** Personalise one EV3 sample to the configuration record (P-6) with test keys and read it once.
+  - Its `e`, `c`, test keys and counter become a fixed vector in `test:sun`.
+  - A staging verifier accepts it exactly once.
+  - The sample's keys stay test-only. The sample is then kept as a reference or destroyed.
+- **G-3. Real phones** (P-9, unchanged). At least one current iPhone and two Androids, with the card's metal or transparent build and the chosen inlay.
+
+### 12.4 What personalisation adds on DESFire (P-6) [APPROVED 2026-11-12 as D-4]
+
+NTAG 424 DNA arrives with its NDEF application and files already in place. A blank DESFire EV3 holds nothing until the station creates it, and it has a card-level master key that NTAG 424 DNA does not have. P-6 therefore adds the following.
+1. **Change the PICC master key** from its transport value to a diversified key, in its own key domain (D-a).
+   - Why: a card left on the transport key can be formatted (FormatPICC) and rebuilt by anyone with a writer, with the URL pointing anywhere.
+   - Such a card cannot produce a valid MAC, but it could send a visitor to another site.
+2. **PICC key settings:** creating or deleting an application needs the PICC master key. Formatting is turned off if the configuration offers it (G-1 confirms the option).
+3. **One AAROH application** holds the NFC Forum Type 4 NDEF structure: the capability container and the NDEF file.
+   - It has AES-128 keys only.
+   - The NDEF file is created with SDM enabled.
+   - SDM Meta Read and SDM File Read use separate application keys (the P-5 key domains).
+   - SDM Counter Retrieval needs a key; it is never free.
+4. **Write lock:** the NDEF file's Write and ChangeAccessRights rights go to a server-held key or to never, so no customer tool can rewrite the URL. This is P-6 step 4 in DESFire terms.
+5. **Random ID off** for V01 (D-3), unless G-1 shows that SDM still mirrors the real UID.
+6. **Batch validation adds three checks:** an unauthenticated FormatPICC fails, an unauthenticated CreateApplication fails, and an unauthenticated NDEF write fails.
+
+The configuration record (P-6 step 2) is written byte for byte against DS4870xx (G-1).
+
+### 12.5 Questions for the owner [APPROVED 2026-11-12, §12.7]
+
+| # | Question | Recommendation |
+|---|---|---|
+| D-1 | Which DESFire generation? | **EV3.** It is the only generation NXP documents with SDM. On EV1 or EV2, AAROH falls back to option B: a static `/d/<code>` with no authenticity claim. A later generation only once its data sheet shows SDM |
+| D-2 | Memory and capacitance? | **2 kB**, unless a second application (doc 08's Phase 5 door access) should share the chip; then 4 kB. 17 pF or 70 pF is the inlay maker's antenna choice for the metal and transparent builds (Q7). The adult signatory confirms both with the inlay maker |
+| D-3 | Random ID? | **Off** for V01 |
+| D-4 | Adopt G-1 to G-3 and §12.4 as conditions before any real key or chip? | **Yes** |
+
+Q2 (key custody), Q3 (who personalises) and Q7 (inlay feasibility) stay open, now on EV3 terms. For Q3, a bureau that already personalises EV3 with SDM, or a station built on an NXP MIFARE SAM AV3 (P-5), fits best.
+
+### 12.6 What this amendment changed in the repository
+
+- **Labels and comments only. No logic, SQL statement, schema or API shape changed:**
+  - `netlify/lib/sun.mjs` and `netlify/functions/verify.mjs`;
+  - the three test suites' headers;
+  - the header comments of 037 and 041, and `APPLY_ALL.sql` rebuilt from them.
+- **Documents:**
+  - contract AAROH-API **v0.15.1** (wording only, with a CHANGELOG row);
+  - the capability matrix, the differentiation plan and the U1 crypto notes;
+  - the backlog (V6-127, and V6-133 for these gates);
+  - `docs/DECISIONS.md` (DEC-2026-015 answered; this amendment);
+  - SHYGON OS docs 00, 01, 02, 04, 07, 08 (the chip table reworked) and 11;
+  - the migrations README;
+  - readiness report §27.
+- **Left to their owners, and told:**
+  - Session B: `e2e/verified-tap.spec.ts`, `frontend-audit.md`.
+  - The coordinator (`coord/v01-scope`): `docs/shygon-os/v01/` (the inventory's Verified Tap row, risk R-16, the technical architecture's chip line).
+  - The store session already changed the print package (`ea13379`).
+- **Not changed:** NTAG21x mentions (V5's legacy cards), and the competitor research that names NTAG 424 DNA.
+
+### 12.7 Approval of D-1 to D-4 (2026-11-12) [OBSERVED in session]
+
+The owner answered "Approve D-1 to D-4" to Session A's question, "Approve D-1 to D-4 (EV3, 2 kB, Random ID off, adopt the gates)?".
+
+| # | Answer |
+|---|---|
+| D-1 | **MIFARE DESFire EV3** |
+| D-2 | **2 kB.** The adult signatory still confirms two things with the inlay maker (Q7): the input capacitance (17 pF or 70 pF) and whether the metal and transparent builds can carry the inlay. A second application on the chip (doc 08's Phase 5) would need a new decision and more memory |
+| D-3 | **Random ID off** |
+| D-4 | **G-1 to G-3 and §12.4 are conditions** before any real key or chip |
+
+**What this unlocks:** nothing physical. It fixes two things:
+- what the adult signatory asks the inlay maker and the personalisation bureau for: EV3, 2 kB, SDM, and the §12.4 configuration;
+- what must pass before any key or chip exists.
+
+**Still open:**
+- Q2 (key custody), Q3 (who personalises) and Q7 (inlay fit);
+- G-1 to G-3.
+
+No order, key, personalisation or hosting is approved. The release stays BLOCKED.
+
+## 13. The OpenCode review (OC-6) and its fixes (2026-11-12)
+
+**The review** [OBSERVED]:
+- OpenCode's independent review is `036906b` on `opencode/review-verified-tap`: `docs/v6/aaroh/reviews/2026-11-02_opencode-review-verified-tap.md`, now also on this branch.
+- The coordinator checked it at this branch's HEAD and handed it over on 2026-11-12.
+- Its verdict:
+  - no P0 and no P1;
+  - no path to a false `genuine`;
+  - nothing leaks in an answer;
+  - the grants are closed.
+- It found four P2s and two nits.
+
+**DESFire (A-1):** the review relies on nothing specific to NTAG 424 DNA (no TagTamper, no LRP). Session A confirmed this. The §12.4 personalisation duties stay with G-1 to G-3.
+
+**Approval** [OBSERVED]: the owner, in session on 2026-11-12, answered "Approve both" (these fixes, and taking over V6-094) to "Approve building both: the review fixes (migration 043) and Codex's admin logs with the two-factor check?".
+
+| # | Finding | Fix | Proof |
+|---|---|---|---|
+| 1 (P2) | The log named the failed check (`bad_picc`, `bad_mac`) | `verify.checked` logs `refused: true` only | The canary check asserts that no log line names a check. Negative control: it fails |
+| 2 (P2) | The rate limits were counted, unlocked, before the events of concurrent checks existed | Migration **043**: `verify_tap_result` counts both limits again under locks (a transaction advisory lock on the visitor, the card's row lock). Over a limit, nothing is decided, consumed or recorded, and `/api/verify` answers 429 | The race is made deterministic by switching off the early checks: the answer is 429, and the counter and the events are unchanged. Negative control: it fails |
+| 3 (P2) | §7 tests 14 and 15 were not run | Test 14 built: a forced failure after the counter update gives 503 with the counter unchanged, and the same tap verifies afterwards. Test 15 still waits for Q2 | Negative control (the failed insert swallowed): it fails |
+| 4 (nit) | The switch-off answer comes faster than an unknown code's | Contract v0.15.2 now says exactly what is equal: the status and the body. With the switch off nothing is read, by design. The switch state is site-wide | Wording |
+| 5 (nit) | Published test vectors could be set as master keys | They are refused by SHA-256 digest, as is any key of one repeated byte. The verdict is `unavailable`, and the log line carries no key | A test. Negative control: it fails |
+| 6 (nit) | E-1's description of line 306 | `.gitleaksignore` and §11 now say that line 306 is a 31-hex truncated AN12196 ciphertext, a negative-test input, not a key | No fingerprint changed |
+
+**Not changed:** `verify_device_lookup` keeps its early, cheap checks. The decision is now authoritative under the locks.

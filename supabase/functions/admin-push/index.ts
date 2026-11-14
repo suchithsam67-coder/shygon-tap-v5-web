@@ -21,11 +21,15 @@
  *      Sends one notification to that admin's own devices only. Nothing else.
  *
  * Secrets required (Supabase > Edge Functions > Secrets):
- *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY;
+ *   SUPABASE_ANON_KEY (Supabase provides it) for the second-factor check (contract §12a)
  * Expo's push service needs no key for tokens obtained by the app itself.
  */
 
-import { corsHeaders, json, MissingSecretError, requireEnv, resolveAdmin, serviceClient } from '../_shared/admin.ts';
+import {
+  corsHeaders, json, MFA_REQUIRED, mfaRequiredBody, MissingSecretError, requireEnv, resolveAdmin, serviceClient,
+} from '../_shared/admin.ts';
+import { requestLog } from '../_shared/log.ts';
 
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
 /** Expo accepts at most 100 messages per request. */
@@ -44,8 +48,13 @@ interface ExpoMessage {
 }
 
 Deno.serve(async (request: Request) => {
-  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  const log = requestLog('admin-push', request);
+  const respond = (body: unknown, status = 200) => log.respond(json(body, status));
+  if (request.method === 'OPTIONS') return log.respond(new Response('ok', { headers: corsHeaders }));
+  if (request.method !== 'POST') {
+    log.warn('security.admin-refused', { reason: 'bad-method', status: 405 });
+    return respond({ error: 'Method not allowed' }, 405);
+  }
 
   try {
     const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
@@ -55,13 +64,14 @@ Deno.serve(async (request: Request) => {
     const isDispatcher = bearer.length > 0 && timingSafeEqual(bearer, serviceKey);
 
     if (isDispatcher) {
-      return await dispatchPending(service);
+      return log.respond(await dispatchPending(service, log));
     }
 
     // Not the dispatcher — the only other caller allowed is an administrator
     // asking to test their own device.
-    const admin = await resolveAdmin(service, request, 'orders.read');
-    if (!admin) return json({ error: 'Not permitted.' }, 403);
+    const admin = await resolveAdmin(service, request, 'orders.read', log);
+    if (admin === MFA_REQUIRED) return respond(mfaRequiredBody, 403);
+    if (!admin) return respond({ error: 'Not permitted.' }, 403);
 
     let body: Record<string, unknown> = {};
     try {
@@ -71,12 +81,12 @@ Deno.serve(async (request: Request) => {
     }
 
     if (body.test !== true) {
-      return json({ error: 'Only { "test": true } is accepted from an admin session.' }, 400);
+      return respond({ error: 'Only { "test": true } is accepted from an admin session.' }, 400);
     }
 
-    const tokens = await tokensFor(service, admin.userId);
+    const tokens = await tokensFor(service, admin.userId, log);
     if (tokens.length === 0) {
-      return json({ error: 'No device is registered for push on this account.' }, 409);
+      return respond({ error: 'No device is registered for push on this account.' }, 409);
     }
 
     const receipts = await sendToExpo(
@@ -90,21 +100,22 @@ Deno.serve(async (request: Request) => {
         priority: 'default' as const,
         channelId: 'operations',
       })),
+      log,
     );
 
-    return json({ success: true, devices: tokens.length, accepted: receipts.accepted });
+    return respond({ success: true, devices: tokens.length, accepted: receipts.accepted });
   } catch (error) {
     if (error instanceof MissingSecretError) {
-      console.error(error.message);
-      return json({ error: 'Push notifications are not configured on this server.' }, 503);
+      log.error('config.missing', { code: 'missing-configuration' });
+      return respond({ error: 'Push notifications are not configured on this server.' }, 503);
     }
-    console.error('admin-push error', error);
-    return json({ error: 'Could not send notifications.' }, 500);
+    log.error('admin-push.error', { code: 'unexpected-error' });
+    return respond({ error: 'Could not send notifications.' }, 500);
   }
 });
 
 // deno-lint-ignore no-explicit-any
-async function dispatchPending(service: any): Promise<Response> {
+async function dispatchPending(service: any, log: ReturnType<typeof requestLog>): Promise<Response> {
   const { data: pending, error } = await service
     .from('admin_notifications')
     .select('id, admin_id, category, severity, title, body, link, metadata')
@@ -113,7 +124,7 @@ async function dispatchPending(service: any): Promise<Response> {
     .limit(MAX_PER_RUN);
 
   if (error) {
-    console.error('pending notification lookup failed', error.message);
+    log.error('admin-push.notification-lookup-failed', { code: 'notification-lookup-failed' });
     return json({ error: 'Could not read the notification queue.' }, 500);
   }
   if (!pending || pending.length === 0) {
@@ -129,7 +140,7 @@ async function dispatchPending(service: any): Promise<Response> {
     .is('revoked_at', null);
 
   if (tokenError) {
-    console.error('token lookup failed', tokenError.message);
+    log.error('admin-push.device-lookup-failed', { code: 'device-lookup-failed' });
     return json({ error: 'Could not read registered devices.' }, 500);
   }
 
@@ -161,7 +172,7 @@ async function dispatchPending(service: any): Promise<Response> {
   }
 
   const result = messages.length > 0
-    ? await sendToExpo(service, messages)
+    ? await sendToExpo(service, messages, log)
     : { accepted: 0, rejected: 0 };
 
   // Stamped even when there was no device to send to: the row has been through
@@ -174,7 +185,7 @@ async function dispatchPending(service: any): Promise<Response> {
 
   if (stampError) {
     // Better a duplicate buzz on the next run than a silent operational alert.
-    console.error('failed to stamp dispatched notifications', stampError.message);
+    log.error('admin-push.notification-stamp-failed', { code: 'notification-stamp-failed', count: dispatchedIds.length });
   }
 
   return json({
@@ -187,7 +198,7 @@ async function dispatchPending(service: any): Promise<Response> {
 }
 
 // deno-lint-ignore no-explicit-any
-async function tokensFor(service: any, adminId: string): Promise<string[]> {
+async function tokensFor(service: any, adminId: string, log: ReturnType<typeof requestLog>): Promise<string[]> {
   const { data, error } = await service
     .from('admin_push_tokens')
     .select('expo_token')
@@ -195,7 +206,7 @@ async function tokensFor(service: any, adminId: string): Promise<string[]> {
     .is('revoked_at', null);
 
   if (error) {
-    console.error('token lookup failed', error.message);
+    log.error('admin-push.device-lookup-failed', { code: 'device-lookup-failed', adminId });
     return [];
   }
   return (data ?? []).map((r: { expo_token: string }) => r.expo_token);
@@ -209,6 +220,7 @@ async function sendToExpo(
   // deno-lint-ignore no-explicit-any
   service: any,
   messages: ExpoMessage[],
+  log: ReturnType<typeof requestLog>,
 ): Promise<{ accepted: number; rejected: number }> {
   let accepted = 0;
   let rejected = 0;
@@ -224,13 +236,13 @@ async function sendToExpo(
         body: JSON.stringify(batch),
       });
       if (!response.ok) {
-        console.error('expo push rejected the batch', response.status, await response.text());
+        log.error('expo.push-rejected', { code: 'expo-rejected', status: response.status, count: batch.length });
         rejected += batch.length;
         continue;
       }
       payload = await response.json();
-    } catch (error) {
-      console.error('expo push request failed', error);
+    } catch {
+      log.error('expo.request-failed', { code: 'expo-request-failed', count: batch.length });
       rejected += batch.length;
       continue;
     }
@@ -255,7 +267,7 @@ async function sendToExpo(
         .from('admin_push_tokens')
         .update({ revoked_at: new Date().toISOString() })
         .in('expo_token', dead);
-      if (error) console.error('failed to revoke dead tokens', error.message);
+      if (error) log.error('expo.dead-token-revoke-failed', { code: 'dead-token-revoke-failed', count: dead.length });
     }
   }
 

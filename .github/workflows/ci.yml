@@ -235,6 +235,24 @@ jobs:
       - name: Account phone verification (local stack)
         run: npm run test:phone-verify
 
+      # Administrator MFA, opt-in (V01 T-12, DEC-2026-046 step 2, approved for the
+      # local build): migration 040 through supabase-js's MFA API against the local
+      # stand-in's TOTP factors.
+      - name: Admin MFA opt-in (local stack)
+        run: npm run test:admin-mfa
+
+      # Card pairing ("tap to activate") and report stolen (V01 T-08/T-09,
+      # DEC-2026-047, approved for the local build): migration 041, /api/verify
+      # and /api/cards with a simulated chip and random TEST keys.
+      - name: Card pairing and report stolen (local stack)
+        run: npm run test:card-lifecycle
+
+      # The server-side 18+ record (V01 T-13, DEC-2026-048, approved for the
+      # local build): migration 044's sign-up record and /api/account
+      # age.status / age.confirm.
+      - name: The 18+ record (local stack)
+        run: npm run test:age-gate
+
       # The hosted release-check runners P1 / P2 (scripts/release/), exercised
       # against the local stack only, with a negative control (a stand-in host
       # that trusts forged headers) and the production / plain-http refusals.

@@ -36,3 +36,23 @@ CREATE OR REPLACE FUNCTION auth.uid() RETURNS UUID
 LANGUAGE sql STABLE AS $$
   SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
+
+-- As on a hosted project: the request's JWT claims (aal among them), read from
+-- the same setting the local gateway fills for every request.
+CREATE OR REPLACE FUNCTION auth.jwt() RETURNS JSONB
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(NULLIF(current_setting('request.jwt.claims', true), ''), '{}')::jsonb;
+$$;
+
+-- Supabase Auth's second factors (the columns migration 040 reads). On a hosted
+-- project GoTrue owns this table; locally the auth stand-in writes it.
+CREATE TABLE IF NOT EXISTS auth.mfa_factors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  friendly_name TEXT,
+  factor_type TEXT NOT NULL DEFAULT 'totp' CHECK (factor_type IN ('totp', 'phone', 'webauthn')),
+  status TEXT NOT NULL DEFAULT 'unverified' CHECK (status IN ('unverified', 'verified')),
+  secret TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

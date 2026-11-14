@@ -12,14 +12,20 @@
 //   POST /auth/v1/logout?scope=local|global|others
 //   POST /auth/v1/recover  ·  GET /auth/v1/verify   password-reset and confirm links
 //   GET  /auth/v1/settings
+//   POST /auth/v1/factors  ·  POST /auth/v1/factors/:id/challenge  ·  POST /auth/v1/factors/:id/verify
+//   DELETE /auth/v1/factors/:id   authenticator-app second factors (TOTP, RFC 6238; DEC-2026-046).
+//        A verified code raises the session to aal2; a refresh keeps the session's
+//        level. Factors live in auth.mfa_factors, as on a hosted project.
 //
 // Mail is never sent. Links that would have been emailed are kept in an
 // outbox that only the local stack exposes (GET /auth/v1/__local/outbox),
 // so a test can follow them the way a person would follow the email.
 import crypto from 'node:crypto';
 import { signJwt, verifyJwt } from './jwt.mjs';
+import { newTotpSecret, totpMatches } from './totp.mjs';
 
 const ACCESS_TOKEN_SECONDS = 3600;
+const CHALLENGE_SECONDS = 300;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 class AuthError extends Error {
@@ -58,13 +64,29 @@ ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS raw_app_meta_data JSONB DEFAULT 
 
 export function createAuth({ db, exclusive, secret, issuer, autoconfirm = true, minPasswordLength = 6 }) {
   const sessions = new Map(); // session id -> user id
+  const levels = new Map(); // session id -> { aal, amr }
   const refreshTokens = new Map(); // token -> { sessionId, userId, used }
   const links = new Map(); // one-time token -> { userId, type, expires }
+  const challenges = new Map(); // challenge id -> { factorId, userId, expires }
   const outbox = [];
 
   const query = (sql, params) => exclusive(() => db.query(sql, params));
 
-  function toUser(row) {
+  const toFactor = (f) => ({
+    id: f.id,
+    friendly_name: f.friendly_name ?? undefined,
+    factor_type: f.factor_type,
+    status: f.status,
+    created_at: iso(f.created_at),
+    updated_at: iso(f.updated_at),
+  });
+
+  async function factorsOf(userId) {
+    const { rows } = await query('SELECT * FROM auth.mfa_factors WHERE user_id = $1 ORDER BY created_at', [userId]);
+    return rows;
+  }
+
+  function toUser(row, factors = []) {
     const appMetadata = row.raw_app_meta_data ?? { provider: 'email', providers: ['email'] };
     return {
       id: row.id,
@@ -91,6 +113,7 @@ export function createAuth({ db, exclusive, secret, issuer, autoconfirm = true, 
       created_at: iso(row.created_at),
       updated_at: iso(row.updated_at ?? row.created_at),
       is_anonymous: false,
+      ...(factors.length ? { factors: factors.map(toFactor) } : {}),
     };
   }
 
@@ -104,10 +127,12 @@ export function createAuth({ db, exclusive, secret, issuer, autoconfirm = true, 
     return rows[0] ?? null;
   }
 
-  function issueSession(row) {
-    const user = toUser(row);
+  function issueSession(row, level = null, factors = []) {
+    const user = toUser(row, factors);
     const now = Math.floor(Date.now() / 1000);
     const sessionId = crypto.randomUUID();
+    const { aal, amr } = level ?? { aal: 'aal1', amr: [{ method: 'password', timestamp: now }] };
+    levels.set(sessionId, { aal, amr });
     const accessToken = signJwt(
       {
         aud: 'authenticated',
@@ -120,8 +145,8 @@ export function createAuth({ db, exclusive, secret, issuer, autoconfirm = true, 
         app_metadata: user.app_metadata,
         user_metadata: user.user_metadata,
         role: 'authenticated',
-        aal: 'aal1',
-        amr: [{ method: 'password', timestamp: now }],
+        aal,
+        amr,
         session_id: sessionId,
         is_anonymous: false,
       },
@@ -200,7 +225,8 @@ export function createAuth({ db, exclusive, secret, issuer, autoconfirm = true, 
       }
       if (!row.email_confirmed_at) throw new AuthError(400, 'email_not_confirmed', 'Email not confirmed');
       const { rows } = await query('UPDATE auth.users SET last_sign_in_at = now() WHERE id = $1 RETURNING *', [row.id]);
-      return issueSession(rows[0]);
+      // A password alone is aal1; the user's factors tell the client a second step is due.
+      return issueSession(rows[0], null, await factorsOf(row.id));
     }
     if (grant === 'refresh_token') {
       const entry = refreshTokens.get(String(body?.refresh_token ?? ''));
@@ -208,10 +234,13 @@ export function createAuth({ db, exclusive, secret, issuer, autoconfirm = true, 
         throw new AuthError(400, 'refresh_token_not_found', 'Invalid Refresh Token: Refresh Token Not Found');
       }
       entry.used = true;
+      // As GoTrue does: a refreshed session keeps the level it had (aal2 stays aal2).
+      const level = levels.get(entry.sessionId) ?? null;
       sessions.delete(entry.sessionId);
+      levels.delete(entry.sessionId);
       const row = await userById(entry.userId);
       if (!row) throw new AuthError(400, 'user_not_found', 'User not found');
-      return issueSession(row);
+      return issueSession(row, level, await factorsOf(row.id));
     }
     throw new AuthError(400, 'unsupported_grant_type', 'unsupported_grant_type');
   }
@@ -252,6 +281,7 @@ export function createAuth({ db, exclusive, secret, issuer, autoconfirm = true, 
       const current = sessionId === payload.session_id;
       if (scope === 'global' || (scope === 'local' && current) || (scope === 'others' && !current)) {
         sessions.delete(sessionId);
+        levels.delete(sessionId);
       }
     }
   }
@@ -289,6 +319,83 @@ export function createAuth({ db, exclusive, secret, issuer, autoconfirm = true, 
     return { redirect: `${redirectTo}#${fragment}` };
   }
 
+  // --- second factors (TOTP), as GoTrue's MFA API answers supabase-js ----------
+
+  async function ownFactor(userId, factorId) {
+    const { rows } = await query('SELECT * FROM auth.mfa_factors WHERE id::text = $1 AND user_id = $2', [factorId, userId]);
+    if (!rows[0]) throw new AuthError(404, 'mfa_factor_not_found', 'Factor not found');
+    return rows[0];
+  }
+
+  async function enroll(headers, body) {
+    const { row, payload } = await sessionUser(headers);
+    if ((body?.factor_type ?? 'totp') !== 'totp') {
+      throw new AuthError(422, 'mfa_factor_type_not_supported', 'Only TOTP factors are supported by the local stack');
+    }
+    // A user who already has a verified factor adds another only from an aal2 session.
+    const verified = (await factorsOf(row.id)).some((f) => f.status === 'verified');
+    if (verified && payload.aal !== 'aal2') {
+      throw new AuthError(403, 'insufficient_aal', 'AAL2 required to enroll a new factor');
+    }
+    const secret = newTotpSecret();
+    const issuer = String(body?.issuer ?? 'SHYGON').slice(0, 64);
+    const { rows } = await query(
+      `INSERT INTO auth.mfa_factors (user_id, friendly_name, factor_type, status, secret)
+       VALUES ($1, $2, 'totp', 'unverified', $3) RETURNING *`,
+      [row.id, body?.friendly_name ? String(body.friendly_name).slice(0, 120) : null, secret],
+    );
+    const uri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(row.email ?? '')}?secret=${secret}&issuer=${encodeURIComponent(issuer)}`;
+    return {
+      id: rows[0].id,
+      type: 'totp',
+      friendly_name: rows[0].friendly_name ?? undefined,
+      // GoTrue returns an SVG QR code here; the local stand-in leaves the image out.
+      totp: { qr_code: 'data:image/svg+xml;utf-8,', secret, uri },
+    };
+  }
+
+  async function challenge(headers, factorId) {
+    const { row } = await sessionUser(headers);
+    const factor = await ownFactor(row.id, factorId);
+    const id = crypto.randomUUID();
+    const expires = Math.floor(Date.now() / 1000) + CHALLENGE_SECONDS;
+    challenges.set(id, { factorId: factor.id, userId: row.id, expires });
+    return { id, type: 'totp', expires_at: expires };
+  }
+
+  async function verifyFactor(headers, factorId, body) {
+    const { row, payload } = await sessionUser(headers);
+    const factor = await ownFactor(row.id, factorId);
+    const entry = challenges.get(String(body?.challenge_id ?? ''));
+    if (!entry || entry.factorId !== factor.id || entry.userId !== row.id) {
+      throw new AuthError(422, 'mfa_challenge_not_found', 'Challenge not found');
+    }
+    if (entry.expires < Math.floor(Date.now() / 1000)) {
+      challenges.delete(String(body.challenge_id));
+      throw new AuthError(422, 'mfa_challenge_expired', 'MFA challenge has expired, verify against another challenge or create a new challenge.');
+    }
+    if (!totpMatches(factor.secret, String(body?.code ?? ''))) {
+      throw new AuthError(422, 'mfa_verification_failed', 'Invalid TOTP code entered');
+    }
+    challenges.delete(String(body.challenge_id));
+    await query(`UPDATE auth.mfa_factors SET status = 'verified', updated_at = now() WHERE id = $1`, [factor.id]);
+    // The same sign-in, raised to aal2: the old session ends, a new one starts.
+    sessions.delete(payload.session_id);
+    levels.delete(payload.session_id);
+    const now = Math.floor(Date.now() / 1000);
+    return issueSession(row, { aal: 'aal2', amr: [{ method: 'totp', timestamp: now }, ...(payload.amr ?? [])] }, await factorsOf(row.id));
+  }
+
+  async function unenroll(headers, factorId) {
+    const { row, payload } = await sessionUser(headers);
+    const factor = await ownFactor(row.id, factorId);
+    if (factor.status === 'verified' && payload.aal !== 'aal2') {
+      throw new AuthError(403, 'insufficient_aal', 'AAL2 required to unenroll a verified factor');
+    }
+    await query('DELETE FROM auth.mfa_factors WHERE id = $1', [factor.id]);
+    return { id: factor.id };
+  }
+
   /** Handles one /auth/v1 request; `path` is what follows /auth/v1. */
   async function handle({ method, path, url, headers, body }) {
     const json = (status, value) => ({
@@ -307,7 +414,18 @@ export function createAuth({ db, exclusive, secret, issuer, autoconfirm = true, 
     try {
       if (method === 'POST' && path === '/signup') return json(200, await signup(parsed, url));
       if (method === 'POST' && path === '/token') return json(200, await token(parsed, url));
-      if (method === 'GET' && path === '/user') return json(200, toUser((await sessionUser(headers)).row));
+      if (method === 'GET' && path === '/user') {
+        const { row } = await sessionUser(headers);
+        return json(200, toUser(row, await factorsOf(row.id)));
+      }
+      if (method === 'POST' && path === '/factors') return json(200, await enroll(headers, parsed));
+      const factorPath = /^\/factors\/([0-9a-f-]{36})(?:\/(challenge|verify))?$/.exec(path);
+      if (factorPath) {
+        const [, factorId, action] = factorPath;
+        if (method === 'POST' && action === 'challenge') return json(200, await challenge(headers, factorId));
+        if (method === 'POST' && action === 'verify') return json(200, await verifyFactor(headers, factorId, parsed));
+        if (method === 'DELETE' && !action) return json(200, await unenroll(headers, factorId));
+      }
       if (method === 'PUT' && path === '/user') return json(200, await updateUser(headers, parsed));
       if (method === 'POST' && path === '/logout') {
         await logout(headers, url);

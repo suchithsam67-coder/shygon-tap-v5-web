@@ -1,11 +1,11 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.13
+# SHYGON AAROH backend API contract — AAROH-API v0.17
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.13** (2026-11-05): account phone verification (§4b; migration 039; V01 task T-11, finding F4); `card-otp` needs a verified phone (§7 C-2). v0.12 (`d258382`): the owner data export (§4a). v0.11.1 (`2e1acab`): §6 hardening after the OpenCode review of Lost mode. v0.11 (`abe6871`): Verified Tap (§10d; migration 037). v0.10 (`39d87ca`): Lost mode (§6; migration 036). v0.9.2 (`2686606`): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
+| Contract version | **AAROH-API v0.17** (2026-11-14): the 18+ confirmation (§4c; migration 044; V01 task T-13; DEC-2026-048): recorded by the database at sign-up, `age.status` and `age.confirm` on `/api/account`, and `ageConfirmation` in the export. v0.16 (2026-11-12): the admin edge functions `admin-refund` and `admin-push` (V6-094, built by Codex and taken over by Session A) write structured, privacy-safe logs and require the second factor exactly as the admin RPCs do (§12a): `403 { error, code: 'admin:mfa_required' }`. No customer operation changed. v0.15.2 (2026-11-12): the OpenCode Verified Tap review fixes (§10d; migration 043). The rate limits are also decided under locks; published test keys are refused as masters; the 404 equivalence is stated precisely. No operation, field or answer shape changed. v0.15.1 (2026-11-11): wording only, the chip is MIFARE DESFire EV3 (DEC-2026-043 A-1); no operation changed. v0.15 (2026-11-10): card pairing ("tap to activate") and "report stolen" (§7 C-6 to C-8, §10d `pairing`; migration 041; V01 tasks T-08, T-09). v0.14 (`a11a3d7`): administrator MFA, opt-in (§12a; migration 040; V01 task T-12). v0.13 (`b2b5f91`): account phone verification (§4b; migration 039; V01 task T-11, finding F4); `card-otp` needs a verified phone (§7 C-2). v0.12 (`d258382`): the owner data export (§4a). v0.11.1 (`2e1acab`): §6 hardening after the OpenCode review of Lost mode. v0.11 (`abe6871`): Verified Tap (§10d; migration 037). v0.10 (`39d87ca`): Lost mode (§6; migration 036). v0.9.2 (`2686606`): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
-| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041), **036** (APPROVED 2026-10-25, DEC-2026-041 A-1), **037** (APPROVED for the local build 2026-10-31, DEC-2026-043), **038** (APPROVED for the local build 2026-11-03, DEC-2026-044), **039** (APPROVED for the local build 2026-11-05, DEC-2026-045); none applied anywhere. 027 is held aside (DEC-2026-037). |
+| Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041), **036** (APPROVED 2026-10-25, DEC-2026-041 A-1), **037** (APPROVED for the local build 2026-10-31, DEC-2026-043), **038** (APPROVED for the local build 2026-11-03, DEC-2026-044), **039** (APPROVED for the local build 2026-11-05, DEC-2026-045), **040** (step 2 APPROVED for the local build 2026-11-10, DEC-2026-046), **041** (APPROVED for the local build 2026-11-10, DEC-2026-047); none applied anywhere. 027 is held aside (DEC-2026-037). |
 | Capability matrix | `docs/v6/aaroh/capability-matrix.md`: all 12 AAROH capabilities, their process definitions and honest availability states. |
 | Production | **Nothing in this contract runs on production.** Production is the V5 schema with drift (V6-106). 020–030 are not applied there, and no V6 code is deployed. |
 
@@ -104,7 +104,7 @@ No operation is labelled LIVE: nothing is deployed.
 - Salted daily visitor hash, a 10-second dedupe and 60 events per visitor per Tap per hour (025).
 - Known limitation: the visitor hash uses the first `X-Forwarded-For` entry, which a client can vary, so analytics counts can be inflated (backlog V6-112). It exposes nothing.
 
-**P-4 `/d/<card_code>`: BLOCKED.** The owner decided on `/d/<code>` with NTAG 424 DNA (2026-10-16). It needs:
+**P-4 `/d/<card_code>`: BLOCKED.** The owner decided on `/d/<code>` with NTAG 424 DNA (2026-10-16); the chip is now MIFARE DESFire EV3 (owner 2026-11-10, DEC-2026-043 A-1). It needs:
 - the card registry schema (`card_code`, `serial_number`, `chip_uid`, status; `design-assets/PRINT.md`), which is not designed or approved;
 - server-side SUN/CMAC verification with SDM keys held outside the database;
 - card sales, deferred by DEC-2026-035.
@@ -214,6 +214,38 @@ Reserved shape for v0.x, not implemented: `GET /d/<card_code>` → server resolv
 - Customer strings need the owner's approval at your gate.
 
 ---
+
+## 4c. The 18+ confirmation — `POST /api/account` (v0.17)
+
+**Status:** LIVE-LOCAL (`test:age-gate`). DEC-2026-048 was approved for the local build on 2026-11-14 (migration 044; V01 task T-13; founder decision F-26, "Option A: 18+ now").
+
+**At sign-up, nothing to call.** The database records the confirmation when the account is created, from the sign-up data that `supabase.auth.signUp({ options: { data } })` sends:
+- `adult_confirmed: true`: **the JSON value true** confirms. A string, a number or a missing key records "not confirmed";
+- `policies_version`: the Terms and Privacy version shown (`LEGAL.lastUpdated`), at most 40 characters;
+- `adult_confirmed_at` (optional): the browser's time. It is kept for information only; the time of record is the server's.
+
+**Rules:**
+- It is written once, when the account is created. Editing the sign-up data later (`auth.updateUser`) changes nothing.
+- A sign-up never fails because of these values.
+
+| Operation | Answer | Status |
+|---|---|---|
+| `{ op: 'age.status' }` | `{ confirmed, confirmedAt, source }`. `source` is `signup` or `reconfirm`; all null when not confirmed | LIVE-LOCAL |
+| `{ op: 'age.confirm', adult: true, policiesVersion? }` | `{ confirmed: true, confirmedAt }`. Records the confirmation once, with the server's time, for an account that has none (accounts from before the gate, or a sign-up without the box). `adult` must be the JSON value true | LIVE-LOCAL |
+
+**Errors:** `{ error: { code, message } }`.
+
+| HTTP | Code | When |
+|---|---|---|
+| 401 | `unauthenticated` | no or invalid token |
+| 400 | `invalid_request` | `adult` is not true; `policiesVersion` is not a string of at most 40 characters |
+| 409 | `already_confirmed` | the account already has a confirmation. This bounds `age.confirm` to one record per account |
+
+**Frontend impact (Session B):**
+- The sign-up keys above, exactly as in `e048a66`.
+- After sign-in, call `age.status`. When `confirmed` is false, show the one-time "I am 18 or older" prompt, then call `age.confirm`.
+- The strings are approved at your gate; the Terms and Privacy wording by counsel (F-23).
+- The owner export (§4a) now carries `ageConfirmation`: `{ confirmed, at, source, policiesVersion }`, or null when the account has no record.
 
 ## 5. Tap settings (signed in, the Tap owner)
 
@@ -327,6 +359,11 @@ T-2 rules, enforced server-side:
 | C-3 | `rpc('set_card_nickname', { p_card_id, p_nickname })` | LIVE-LOCAL |
 | C-4 | `rpc('request_card_replacement', { p_card_id, p_reason })` | LIVE-LOCAL (sets `suspended`; nothing writes `replaced`) |
 | C-5 | `rpc('get_card_tap_history', { p_card_id, p_limit })` | LIVE-LOCAL |
+| C-6 | `POST /api/cards` `{ op: 'owner.cards.list' }` → `{ cards: [{ id, cardId, nickname, status, edition, activatedAt, deactivatedAt, verifiedTap: { registered, retired } }] }`. Never the activation code or the chip's UID (v0.15) | LIVE-LOCAL (`test:card-lifecycle`) |
+| C-7 | `{ op: 'owner.card.activate', cardId, possession }` → `{ card }`: **tap to activate** an AAROH card (one with a chip). `possession` comes from a genuine `tap.verify` on that card (§10d), lasts 10 minutes and works once. It needs the owner's own session. Errors: 400 `invalid_card`, `invalid_proof`; 410 `proof_expired`; 404 `card_not_found`; 409 `not_registered` (no chip: use C-2), `proof_mismatch`, `proof_used`, `already_active`, `card_retired`, `not_pairable` (suspended: contact support). Only `pending` or `shipped` cards; no expiry is set | LIVE-LOCAL |
+| C-8 | `{ op: 'owner.card.retire', cardId, confirm: true }` → `{ card }`: **report stolen.** Terminal for the owner; only SHYGON support can undo it. An AAROH card then opens nothing: `/d/<code>` answers 404 `unavailable`. A card without a chip (`verifiedTap.registered: false`) is recorded as retired, but **`/t/<slug>` still opens the Tap (F3)**: say so, and offer Lost mode or pausing the Tap. Errors: 400 `invalid_card`, `confirm_required`; 404 `card_not_found`; 409 `card_retired` | LIVE-LOCAL |
+
+**AAROH cards (v0.15):** a card with a chip becomes `active` only through C-7. Any other path (the printed code, `card-otp`, delivery, the admin app) leaves it unchanged, and the refusal is logged in its history. A retired one is never revived by any path. V5 cards keep every live path.
 
 **For AAROH, every card operation is BLOCKED.** No cards are sold (DEC-2026-035 D-10, DEC-037), and the AAROH registry (§3 P-4) does not exist.
 
@@ -708,7 +745,7 @@ Request = { id, demo: true, status: 'received' | 'acknowledged' | 'in_progress' 
 - Real keys, chips and hosting wait for DEC-2026-043 Q2 (key custody), Q3 (who personalises) and Q7 (the inlay).
 
 **What it proves, and what it never proves.**
-- It proves the card's NTAG 424 DNA chip holds the keys SHYGON issued for its code, and that this read is newer than any accepted before.
+- It proves the card's MIFARE DESFire EV3 chip (v0.15.1; was NTAG 424 DNA) holds the keys SHYGON issued for its code, and that this read is newer than any accepted before.
 - It never proves who holds the card, never signs anyone in, and never grants anything. A live relay or a stolen card still verifies.
 
 **The card URL** (written at personalisation): `https://<host>/d/<code>?e=<32 hex>&c=<16 hex>`.
@@ -731,9 +768,10 @@ Request = { id, demo: true, status: 'received' | 'acknowledged' | 'in_progress' 
 | `already_checked` | the MAC matched but this counter was already seen (a copied or re-opened link, a repeat read) | "We couldn't confirm this tap as new. Please tap the card again." |
 | `not_confirmed` | decryption, the MAC or the chip UID did not match. The answer never says which | "We couldn't verify this tap. Please tap the card again or contact SHYGON support." |
 | `needs_service` | the card is retired, or at its counter limit | "This card needs service. Please contact SHYGON." |
-| `unavailable` | the server cannot decide now (no keys for the card's key epoch) | "Verification is temporarily unavailable. This tap hasn't been marked as verified." |
+| `unavailable` | the server cannot decide now (no keys for the card's key epoch; v0.15.2: or a configured master key is a published test vector) | "Verification is temporarily unavailable. This tap hasn't been marked as verified." |
 | `not_verified` | no `e` / `c` (a QR, a typed or shared link) | nothing about authenticity |
 | `null` | the Tap is in Lost mode | render the Lost page; no verdict |
+| (v0.15) `slug: null` with any verdict | **pairing:** a card issued to an owner but not yet active. Its page opens no Tap. A `genuine` answer adds `possession` (opaque, 10 minutes, single use): if the visitor is signed in as the card's owner, offer "Activate this card" (C-7) | "Tap to activate". Never show the owner's page from a card that is not active |
 
 - **Never "fake" or "counterfeit".** Any doubt is `unavailable` or `not_confirmed`, never `genuine`.
 
@@ -742,12 +780,12 @@ Request = { id, demo: true, status: 'received' | 'acknowledged' | 'in_progress' 
 | HTTP | Code | When |
 |---|---|---|
 | 400 | `invalid_request`, `unknown_op` | a malformed code, `e` / `c` alone or not hex of the right length, an oversized body, any op but `tap.verify` |
-| 404 | `unavailable` | the switch is off; the code is unknown; the card is not active; the Tap is not live; or the host gave no trusted visitor address. These cases are indistinguishable |
+| 404 | `unavailable` | the switch is off; the code is unknown; the card is not active; the Tap is not live; or the host gave no trusted visitor address. These answers are identical in status and body. **v0.15.2:** their timing is not equalised. With the switch off nothing is read at all, so a quick 404 can show that the switch is off; that is site-wide, never about one card or code (OpenCode review OC-6 #4) |
 | 405 | `method_not_allowed` | anything but POST. A GET consumes nothing |
-| 429 | `rate_limited` (+`retryAfter`) | 30 checks per visitor per hour, or 20 refused checks per card per hour |
+| 429 | `rate_limited` (+`retryAfter`) | 30 checks per visitor per hour, or 20 refused checks per card per hour. **v0.15.2:** counted again where the verdict is decided, under locks (migration 043), so a burst of simultaneous checks cannot pass them. A refused check consumes nothing |
 | 503 | `temporarily_unavailable` | the database failed. Never a positive verdict |
 
-**Rules (`test:verified-tap`, 17 checks; `test:sun`, 27):**
+**Rules (`test:verified-tap`, 20 checks; `test:sun`, 27):**
 - **Keys:**
   - per card, derived (AN10922) from two master keys per key epoch, by the card's device id (D-a: the 16 bytes of `cards.id`);
   - never stored; never in the browser, a log or an answer.
@@ -805,7 +843,11 @@ The frontend must show these, not infer them. **These are engineering labels, no
 |---|---|
 | `rpc('admin_list_emergency_events', { p_status?: text \| 'reported', p_limit?: 1–200, p_offset? })` → events with `userId`, statuses, `reportReason`, and per recipient `last4, status, attempts, provider, providerMessageId, providerStatus, lastError, attemptLog[]`. **No contact names, no full numbers.** Needs `support.read`; every call writes `admin_audit_log` `emergency.events.read` | LIVE-LOCAL; PROPOSED (DEC-2026-038; listed as PROPOSED in `test:admin-contract`) |
 | `rpc('admin_list_rescue_reports', { p_limit?: 1–200, p_offset? })`: reported Return-to-Owner threads with `ownerUserId`, `reportReason` and messages. Needs `support.read`; audited `rescue.reports.read` | LIVE-LOCAL; APPROVED (DEC-2026-038 Q12) |
-| Every other `admin_*` RPC | Unchanged; frozen admin contract (doc 12 §2) |
+| `rpc('admin_mfa_status')` (v0.14) → `{ factorEnrolled, aal, required, satisfied, requiredForAll }` for an active administrator, with or without the second factor; 42501 for anyone else | LIVE-LOCAL (`test:admin-mfa`) |
+| Every other `admin_*` RPC | Unchanged in shape; frozen admin contract (doc 12 §2). **v0.14:** an administrator who has a verified second factor (Supabase Auth TOTP) must call with an `aal2` session, or with every administrator once SHYGON switches it on (`admin_mfa_set_required`, service only; OFF). Otherwise every `admin_*` RPC, `admin_me()` included, answers `P0001` with the message `admin:mfa_required`, and the admin read policies return nothing beyond the caller's own rows. This is never 42501, so the current admin app does not sign the operator out |
+| (v0.16) The edge functions `admin-refund` and `admin-push` | The same rule as every `admin_*` RPC: an administrator with a verified second factor, or every administrator once the switch is on, must call with an `aal2` session. The functions ask the database in the caller's own session (`admin_mfa_status`). Otherwise `403 { error: 'Enter your authenticator code to continue.', code: 'admin:mfa_required' }`; the message does not match the app's sign-out rule. If the database cannot be asked, the answer is the ordinary 403 refusal. Every refusal writes one `security.admin-refused` log line with a fixed reason; no e-mail, phone number or token is ever logged | LIVE-LOCAL (`test:admin-edge`) |
+
+**For the admin app (the Admin APK session, recorded by the coordinator as F-28; DEC-2026-046 Q2):** after the password, call `auth.mfa.getAuthenticatorAssuranceLevel()`. If `nextLevel` is `aal2` and differs from `currentLevel`, ask for the code (`auth.mfa.challenge` / `auth.mfa.verify`). Offer `auth.mfa.enroll({ factorType: 'totp' })` from settings (show `totp.uri` / `totp.secret`). Treat `admin:mfa_required` as "enter your code", never as "not an administrator". The two edge functions (`admin-refund`, `admin-push`) apply it too (v0.16): treat their `403` with `code: 'admin:mfa_required'` the same way.
 
 ---
 
@@ -814,6 +856,12 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.17 | 2026-11-14 | **New: the 18+ confirmation** (V01 task T-13; DEC-2026-048, approved for the local build; migration 044): §4c. The database records it at sign-up from `adult_confirmed` / `policies_version`; `age.status` and `age.confirm` on `POST /api/account`; §4a's export gains `ageConfirmation`. No other operation changed. | Send the sign-up keys exactly as specified (`adult_confirmed: true` as a JSON boolean). After sign-in, prompt once when `age.status` says not confirmed. Customer strings need the owner's approval at your gate; the Terms and Privacy need counsel. |
+| v0.16 | 2026-11-12 | **The admin edge functions** (V6-094; Codex's structured logs, taken over by Session A; DEC-2026-046 §9): `admin-refund` and `admin-push` require the second factor as the admin RPCs do, and answer `403` with `code: 'admin:mfa_required'` when it is missing. Their other answers are unchanged. No customer operation changed. | None for the customer frontend. For the admin app: handle `code: 'admin:mfa_required'` from both functions like the RPC refusal ("enter your code"). |
+| v0.15.2 | 2026-11-12 | **The OpenCode Verified Tap review fixes** (OC-6; DEC-2026-043 §13; migration 043). §10d: `rate_limited` can also come from the decision itself, after a burst; a published test key configured as a master gives `unavailable`; the 404 row says exactly what is identical (status and body; not timing). No operation, field or answer shape changed. | None required. Treat `rate_limited` the same wherever it appears (it already has one meaning). |
+| v0.15.1 | 2026-11-11 | **Wording only: the chip is MIFARE DESFire EV3** (owner 2026-11-10, "use desfare only, update it everywhere"; DEC-2026-043 A-1). §3 P-4 and §10d name the chip. No operation, field, verdict or answer changed. | None in code. Anything you wrote that names the chip (e.g. comments in `e2e/verified-tap.spec.ts`, `frontend-audit.md`) says MIFARE DESFire EV3; customer strings should name no chip at all. |
+| v0.15 | 2026-11-10 | **New: card pairing and report stolen** (V01 tasks T-08, T-09; DEC-2026-047, approved for the local build; migration 041): §7 C-6 to C-8 on `POST /api/cards`; §10d a `pending` or `shipped` card answers `slug: null`, with `possession` on `genuine`. AAROH cards activate only by tap, never expire, and once retired open nothing. No other operation changed. | Build "Activate this card" on `/d/<code>` (signed-in owner, `slug: null`, `possession`), the card list and "Report stolen" with its confirmation. For a card without a chip, say `/t/` still opens. Customer strings need the owner's approval at your gate. |
+| v0.14 | 2026-11-10 | **Administrator MFA, opt-in** (V01 task T-12; DEC-2026-046 step 2, approved for the local build; migration 040): §12a `admin_mfa_status`, and the `admin:mfa_required` refusal for an administrator whose session lacks a required second factor. Nothing changes for administrators without a factor; the mandatory switch is OFF. No customer operation changed. | None for the customer frontend. For the admin app: see §12a. |
 | v0.13 | 2026-11-05 | **New: account phone verification** (V01 task T-11, finding F4; DEC-2026-045, approved for the local build; migration 039): §4b `phone.status`, `phone.verify.start` and `phone.verify.confirm` on `/api/account`. **Changed:** `card-otp` (§7 C-2) sends a code only to a verified account phone, and a replacement number waits 24 hours. The order text falls back to the account phone only when it is verified. §4a gains `phoneVerification`. | Build the "Verify your phone" screen. Handle `card-otp`'s 409 `phone_not_verified` and `phone_cooling_down` (+`retryAfter`). Tell the owner that editing the phone unverifies it. Customer strings need the owner's approval at your gate. |
 | v0.12 | 2026-11-03 | **New: the owner data export** (V01 task T-10; DEC-2026-044, approved for the local build; migration 038): §4a `POST /api/account` (`owner.export`) → `{ export, vcard }`. The owner's own data from every AAROH table, without other people's data or security values; 5 per 24 hours; audited in `account_events`. O-4 (the browser export) is superseded. No earlier operation changed. | Move "Download your data" to §4a and remove the browser export (O-4). Save the JSON and the `.vcf`. Show `excluded` and the 429 wait. Customer strings need the owner's approval at your gate. |
 | v0.11.1 | 2026-11-02 | Hardening after the OpenCode review of Lost mode (`docs/v6/aaroh/reviews/2026-10-30_opencode-review-lost-mode.md`). No new operation, request field, response field or error code.<br>(1) `owner.preview` now checks the same catalogue switch and Tap state as P-6. Before, a Lost preview answered `{}` while SHYGON had Lost off, and an Info preview answered the page while Info was off or the Tap was paused or suspended; the visitor got `null` in both cases.<br>(2) §6 P-6: the database cannot see `RESCUE_RELAY`. While it is off, P-6 may still answer `{ mode: 'lost' }`, and `public.status` answers `available: false`. The four database-side reasons for `null` are now named.<br>(3) §6 `owner.activate`: a Lost activation repeated while `RESCUE_RELAY` is off answers 409 `mode_unavailable`, not the replay. Nothing changes.<br>(4) Migration 036: the activation reads the Return to Owner opt-in under a share lock, so an opt-out racing it waits. 036 is regenerated; it has not been applied anywhere. | (a) On a Lost page, always call `public.status` before showing the form, and show the neutral "unavailable" copy when it answers `false`. This was already the v0.10 two-step; it is now the only way the relay-off case is visible. (b) `owner.preview` may now answer `view: null` for a mode SHYGON has switched off. Show the same "not available" state as `owner.state`, not an empty page. (c) A 409 `mode_unavailable` on a retried Lost activation means the relay went off: refresh `owner.state`; the Tap is still on Lost. |
