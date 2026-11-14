@@ -10,7 +10,7 @@
 | **Accountable Owner (A)** | The repository owner (the founder), who holds the product roles (DEC-2026-018 Option B). Counsel (F-23) approves the legal wording. The founder signs nothing (the adult authorised signatory does, F-2) |
 | Responsible (R) | Session A (backend): the record. Session B (frontend): the sign-up boxes and the one-time prompt (`e048a66`, parked) |
 | Consulted | The coordination session (registry T-13; founder register F-26) |
-| State | **PROPOSED (draft), 2026-11-14.** Docs only. Nothing is built, migrated or deployed |
+| State | **APPROVED FOR THE LOCAL BUILD, 2026-11-14, and built (§11).** The owner, in session: "Approve the build", answering "Approve building DEC-2026-048 on the recommended answers (Q1–Q5, option A)?". Local only: nothing is applied, pushed or deployed. History: PROPOSED (`15862db`) |
 
 Labels: **OBSERVED** (in this repository, the live baseline or a decision record), **INFERRED**, **PROPOSED**.
 
@@ -161,3 +161,30 @@ The table is service-only. An admin read can be added later through the frozen-c
 - `handle_new_user`.
 - Phone verification (039).
 - Student mode and any under-18 design, which is a later decision with parental consent and counsel (F-26).
+
+## 11. As built (2026-11-14, local)
+
+**Approval** [OBSERVED in session, 2026-11-14]: the owner answered "Approve the build" to "Approve building DEC-2026-048 on the recommended answers (Q1–Q5, option A)?". So:
+- Q1: the record as proposed;
+- Q2: option A (record and prompt; the database never refuses a sign-up);
+- Q3: the accounts without a confirmation are asked once;
+- Q4: a self-declaration only;
+- Q5: the export shows the confirmation.
+
+**Built:**
+- **Migration 044:**
+  - `account_age_confirmations`: closed; the service role may only SELECT and INSERT; one `signup` row per account (a partial unique index);
+  - `record_signup_age_confirmation()` on a second AFTER INSERT trigger on `auth.users`, which never fails a sign-up. `handle_new_user` is untouched;
+  - `account_age_status` and `account_age_confirm` (service only). `account_age_confirm` holds an advisory lock per account, so two confirmations write one row;
+  - `account_export_build` (from 041's text) gains `ageConfirmation`. The rollback restores 041's text verbatim.
+- **`/api/account`:** `age.status` and `age.confirm` (`adult` must be the JSON value true).
+- **Contract AAROH-API v0.17** (§4c).
+- **`test:age-gate`:** 11 checks, in `ci` and `ci.yml`.
+- **The gates:** the export-parity map, the RLS matrix and the admin-contract relations now include the table.
+
+**Evidence** [OBSERVED, Node 20.18.0]: the readiness report §31.
+
+**Not built:**
+- Session B's boxes and prompt;
+- counsel's wording;
+- option C's enforcement (not chosen).

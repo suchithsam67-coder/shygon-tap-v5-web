@@ -1080,3 +1080,32 @@ The two admin edge functions check access on their own.
 - any hosted check.
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 31. 2026-11-14: the server-side 18+ record (V01 T-13) built locally (migration 044, contract v0.17)
+
+**Approval:** the owner, in session on 2026-11-14: "Approve the build" (DEC-2026-048, Q1–Q5 as recommended, option A). The founder's decision F-26 ("Option A: 18+ now") came through the coordinator.
+
+**Built:**
+- the closed, append-only `account_age_confirmations`, written once at sign-up by a second trigger on `auth.users`. The time of record is the server's; only the JSON value true confirms; a sign-up never fails because of it;
+- `age.status` and `age.confirm` on `/api/account`, for the accounts without a confirmation;
+- `ageConfirmation` in the owner export;
+- contract v0.17 (§4c).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]:
+
+| Group | Results |
+|---|---|
+| `test:age-gate` | **11 passed**, 0 failed (closure; sign-up recording with the server's time; only the JSON value true confirms; bad data never fails a sign-up; later edits change nothing; the triggers are independent; `age.status`; `age.confirm` once, explicit only; two confirmations write one row; the export; deletion) |
+| Negative control | 044 without its sign-up trigger: **all 11 checks failed** (no record at sign-up, the export showed nothing, the trigger list lacked it). The good file was restored and compared byte for byte |
+| `test:db` | verify 21; adversarial 64; RLS matrix **1754** (62 tables, 7 callers; `account_age_confirmations` closed to all 7); identity 69 (`handle_new_user` unchanged); admin-notes 12; golden **25** (a stage for 044, byte-identical); admin-contract 21 (an approved new, closed relation); rollbacks **24** (044 restores 041's export builder exactly); account-deletion 9; history 2 |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 20; account-export 12 (the new table exported and covered by the deletion procedure); phone-verify 12; admin-mfa 9; card-lifecycle 9; age-gate 11; local-host 9; admin-edge 16; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 (7 moderate) |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`) |
+
+**Not run or not built:**
+- the hosted auth service's own sign-up (the trigger ran on the local stand-in's `auth.users`);
+- two real connections racing (PGlite has one; `age.confirm` takes an advisory lock per account);
+- Session B's pages;
+- counsel's view;
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).

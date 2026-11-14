@@ -173,6 +173,7 @@ const APPROVED_NEW_RELATIONS = {
     .map((t) => [t, 'DEC-2026-043, approved for the local build 2026-10-31 (migration 037)'])),
   admin_security_settings: 'DEC-2026-046 step 2, approved for the local build 2026-11-10 (migration 040)',
   card_events: 'DEC-2026-047, approved for the local build 2026-11-10 (migration 041)',
+  account_age_confirmations: 'DEC-2026-048, approved for the local build 2026-11-14 (migration 044)',
   ...Object.fromEntries(['account_phone_verifications', 'account_phone_challenges']
     .map((t) => [t, 'DEC-2026-045, approved for the local build 2026-11-05 (migration 039)'])),
 };

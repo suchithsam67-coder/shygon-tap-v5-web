@@ -1,8 +1,8 @@
-# SHYGON AAROH backend API contract — AAROH-API v0.16
+# SHYGON AAROH backend API contract — AAROH-API v0.17
 
 | | |
 |---|---|
-| Contract version | **AAROH-API v0.16** (2026-11-12): the admin edge functions `admin-refund` and `admin-push` (V6-094, built by Codex and taken over by Session A) write structured, privacy-safe logs and require the second factor exactly as the admin RPCs do (§12a): `403 { error, code: 'admin:mfa_required' }`. No customer operation changed. v0.15.2 (2026-11-12): the OpenCode Verified Tap review fixes (§10d; migration 043). The rate limits are also decided under locks; published test keys are refused as masters; the 404 equivalence is stated precisely. No operation, field or answer shape changed. v0.15.1 (2026-11-11): wording only, the chip is MIFARE DESFire EV3 (DEC-2026-043 A-1); no operation changed. v0.15 (2026-11-10): card pairing ("tap to activate") and "report stolen" (§7 C-6 to C-8, §10d `pairing`; migration 041; V01 tasks T-08, T-09). v0.14 (`a11a3d7`): administrator MFA, opt-in (§12a; migration 040; V01 task T-12). v0.13 (`b2b5f91`): account phone verification (§4b; migration 039; V01 task T-11, finding F4); `card-otp` needs a verified phone (§7 C-2). v0.12 (`d258382`): the owner data export (§4a). v0.11.1 (`2e1acab`): §6 hardening after the OpenCode review of Lost mode. v0.11 (`abe6871`): Verified Tap (§10d; migration 037). v0.10 (`39d87ca`): Lost mode (§6; migration 036). v0.9.2 (`2686606`): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
+| Contract version | **AAROH-API v0.17** (2026-11-14): the 18+ confirmation (§4c; migration 044; V01 task T-13; DEC-2026-048): recorded by the database at sign-up, `age.status` and `age.confirm` on `/api/account`, and `ageConfirmation` in the export. v0.16 (2026-11-12): the admin edge functions `admin-refund` and `admin-push` (V6-094, built by Codex and taken over by Session A) write structured, privacy-safe logs and require the second factor exactly as the admin RPCs do (§12a): `403 { error, code: 'admin:mfa_required' }`. No customer operation changed. v0.15.2 (2026-11-12): the OpenCode Verified Tap review fixes (§10d; migration 043). The rate limits are also decided under locks; published test keys are refused as masters; the 404 equivalence is stated precisely. No operation, field or answer shape changed. v0.15.1 (2026-11-11): wording only, the chip is MIFARE DESFire EV3 (DEC-2026-043 A-1); no operation changed. v0.15 (2026-11-10): card pairing ("tap to activate") and "report stolen" (§7 C-6 to C-8, §10d `pairing`; migration 041; V01 tasks T-08, T-09). v0.14 (`a11a3d7`): administrator MFA, opt-in (§12a; migration 040; V01 task T-12). v0.13 (`b2b5f91`): account phone verification (§4b; migration 039; V01 task T-11, finding F4); `card-otp` needs a verified phone (§7 C-2). v0.12 (`d258382`): the owner data export (§4a). v0.11.1 (`2e1acab`): §6 hardening after the OpenCode review of Lost mode. v0.11 (`abe6871`): Verified Tap (§10d; migration 037). v0.10 (`39d87ca`): Lost mode (§6; migration 036). v0.9.2 (`2686606`): hardening after the OpenCode review (§6, §10b; no new operation). v0.9.1 (`06c5e0e`): the visitor-alert SMS wording (§10). v0.9 (2026-10-24, `b04a72d`): P-1 respects the active mode (BQ-1, migration 035). v0.1 `c8b869d`, v0.2 `b12967a`, v0.3 `6be94e3`, v0.4 `d1ff25d`, v0.5 `f1d2af1`, v0.6 `126d2a9`, v0.7 `96571ed`, v0.7.1 `34a482d`, v0.7.2 `32a4ac9`, v0.8 `eab740f`; changes in §13. DEC-2026-038, -039 and -040 are **APPROVED**; DEC-2026-041 implementation scope and BQ-1 are **APPROVED** (2026-10-24). |
 | Owner | Session A (backend). Changes only through a version bump and a CHANGELOG entry (§13), with the frontend impact stated. |
 | Branch / base | `v6/aaroh-backend`, from `4d730c4` (V6 RC `6d00f2f` + migration 028). Read this file with `git show v6/aaroh-backend:docs/v6/aaroh/api-contract.md`. |
 | Database | live schema baseline (captured 2026-09-30) + migrations 020–026, 028, **029, 030, 031** (APPROVED 2026-10-19, DEC-2026-038), **032** (APPROVED 2026-10-20, DEC-2026-039), **033** (APPROVED 2026-10-20, DEC-2026-040), **034, 035** (APPROVED 2026-10-24, DEC-2026-041), **036** (APPROVED 2026-10-25, DEC-2026-041 A-1), **037** (APPROVED for the local build 2026-10-31, DEC-2026-043), **038** (APPROVED for the local build 2026-11-03, DEC-2026-044), **039** (APPROVED for the local build 2026-11-05, DEC-2026-045), **040** (step 2 APPROVED for the local build 2026-11-10, DEC-2026-046), **041** (APPROVED for the local build 2026-11-10, DEC-2026-047); none applied anywhere. 027 is held aside (DEC-2026-037). |
@@ -214,6 +214,38 @@ Reserved shape for v0.x, not implemented: `GET /d/<card_code>` → server resolv
 - Customer strings need the owner's approval at your gate.
 
 ---
+
+## 4c. The 18+ confirmation — `POST /api/account` (v0.17)
+
+**Status:** LIVE-LOCAL (`test:age-gate`). DEC-2026-048 was approved for the local build on 2026-11-14 (migration 044; V01 task T-13; founder decision F-26, "Option A: 18+ now").
+
+**At sign-up, nothing to call.** The database records the confirmation when the account is created, from the sign-up data that `supabase.auth.signUp({ options: { data } })` sends:
+- `adult_confirmed: true`: **the JSON value true** confirms. A string, a number or a missing key records "not confirmed";
+- `policies_version`: the Terms and Privacy version shown (`LEGAL.lastUpdated`), at most 40 characters;
+- `adult_confirmed_at` (optional): the browser's time. It is kept for information only; the time of record is the server's.
+
+**Rules:**
+- It is written once, when the account is created. Editing the sign-up data later (`auth.updateUser`) changes nothing.
+- A sign-up never fails because of these values.
+
+| Operation | Answer | Status |
+|---|---|---|
+| `{ op: 'age.status' }` | `{ confirmed, confirmedAt, source }`. `source` is `signup` or `reconfirm`; all null when not confirmed | LIVE-LOCAL |
+| `{ op: 'age.confirm', adult: true, policiesVersion? }` | `{ confirmed: true, confirmedAt }`. Records the confirmation once, with the server's time, for an account that has none (accounts from before the gate, or a sign-up without the box). `adult` must be the JSON value true | LIVE-LOCAL |
+
+**Errors:** `{ error: { code, message } }`.
+
+| HTTP | Code | When |
+|---|---|---|
+| 401 | `unauthenticated` | no or invalid token |
+| 400 | `invalid_request` | `adult` is not true; `policiesVersion` is not a string of at most 40 characters |
+| 409 | `already_confirmed` | the account already has a confirmation. This bounds `age.confirm` to one record per account |
+
+**Frontend impact (Session B):**
+- The sign-up keys above, exactly as in `e048a66`.
+- After sign-in, call `age.status`. When `confirmed` is false, show the one-time "I am 18 or older" prompt, then call `age.confirm`.
+- The strings are approved at your gate; the Terms and Privacy wording by counsel (F-23).
+- The owner export (§4a) now carries `ageConfirmation`: `{ confirmed, at, source, policiesVersion }`, or null when the account has no record.
 
 ## 5. Tap settings (signed in, the Tap owner)
 
@@ -824,6 +856,7 @@ The frontend must show these, not infer them. **These are engineering labels, no
 | Version | Date | Change | Frontend impact |
 |---|---|---|---|
 | v0.1 | 2026-10-19 | First publication. Existing operations documented as found on `4d730c4`. New: `/api/emergency` (§10), `security` notifications (§9), `admin_list_emergency_events` (§12a). Tap column guard (030) added to T-2. | New feature surface; no existing call changes. A browser draft must not include the eight server-managed columns (it does not today). |
+| v0.17 | 2026-11-14 | **New: the 18+ confirmation** (V01 task T-13; DEC-2026-048, approved for the local build; migration 044): §4c. The database records it at sign-up from `adult_confirmed` / `policies_version`; `age.status` and `age.confirm` on `POST /api/account`; §4a's export gains `ageConfirmation`. No other operation changed. | Send the sign-up keys exactly as specified (`adult_confirmed: true` as a JSON boolean). After sign-in, prompt once when `age.status` says not confirmed. Customer strings need the owner's approval at your gate; the Terms and Privacy need counsel. |
 | v0.16 | 2026-11-12 | **The admin edge functions** (V6-094; Codex's structured logs, taken over by Session A; DEC-2026-046 §9): `admin-refund` and `admin-push` require the second factor as the admin RPCs do, and answer `403` with `code: 'admin:mfa_required'` when it is missing. Their other answers are unchanged. No customer operation changed. | None for the customer frontend. For the admin app: handle `code: 'admin:mfa_required'` from both functions like the RPC refusal ("enter your code"). |
 | v0.15.2 | 2026-11-12 | **The OpenCode Verified Tap review fixes** (OC-6; DEC-2026-043 §13; migration 043). §10d: `rate_limited` can also come from the decision itself, after a burst; a published test key configured as a master gives `unavailable`; the 404 row says exactly what is identical (status and body; not timing). No operation, field or answer shape changed. | None required. Treat `rate_limited` the same wherever it appears (it already has one meaning). |
 | v0.15.1 | 2026-11-11 | **Wording only: the chip is MIFARE DESFire EV3** (owner 2026-11-10, "use desfare only, update it everywhere"; DEC-2026-043 A-1). §3 P-4 and §10d name the chip. No operation, field, verdict or answer changed. | None in code. Anything you wrote that names the chip (e.g. comments in `e2e/verified-tap.spec.ts`, `frontend-audit.md`) says MIFARE DESFire EV3; customer strings should name no chip at all. |

@@ -43,7 +43,7 @@ const EXPORTED = [
   'rescue_settings', 'rescue_threads', 'rescue_messages', 'rescue_blocks', 'rescue_audit',
   'connect_settings', 'connections', 'consent_grants', 'connect_audit',
   'prive_demo_requests', 'prive_demo_request_events', 'notifications', 'support_tickets', 'support_messages', 'account_events',
-  'account_phone_verifications', 'card_events',
+  'account_phone_verifications', 'card_events', 'account_age_confirmations',
 ];
 const EXCLUDED = {
   card_otp_challenges: 'security: one-time code hashes',
@@ -273,7 +273,9 @@ await t.check('the deletion procedure clears every exported table, except the or
     emergency_event_recipients: 'recipients', rescue_messages: 'messages', consent_grants: 'consent grants',
     prive_demo_request_events: 'steps', support_messages: 'messages',
     // A card's history stays with the card, which the procedure unlinks and keeps as a hardware record.
-    card_events: 'cards' };
+    card_events: 'cards',
+    // The 18+ record (044) goes with its account (ON DELETE CASCADE from auth.users).
+    account_age_confirmations: 'the account' };
   const unexplained = missing.filter((x) => !cascade[x]);
   assertEqual(unexplained, [], 'exported tables the procedure does not mention');
   return 'checked against the data again in section C';
@@ -346,6 +348,7 @@ await t.check('the owner gets their own data in every exported section', async (
     account_events: x.accountEvents.some((e) => e.eventType === 'tap_published'),
     account_phone_verifications: x.phoneVerification?.last4 === '5678' && typeof x.phoneVerification.verifiedAt === 'string',
     card_events: x.cards[0]?.history?.[0]?.reason === 'tap to activate' && x.cards[0].history[0].to === 'active',
+    account_age_confirmations: typeof x.ageConfirmation?.confirmed === 'boolean' && x.ageConfirmation.source === 'signup',
   };
   assertEqual(Object.keys(PRESENT).sort(), [...EXPORTED].sort(), 'every exported table has a round-trip check');
   const missing = Object.entries(PRESENT).filter(([, ok]) => !ok).map(([k]) => k);

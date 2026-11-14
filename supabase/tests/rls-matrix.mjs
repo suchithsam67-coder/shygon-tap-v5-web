@@ -245,6 +245,9 @@ const MODEL = {
   admin_security_settings: { owner: NONE, select: sel(NONE, NONE) },
   // Card history (041, DEC-2026-047): closed and append-only; owners see it through /api/cards' export.
   card_events: { owner: NONE, select: sel(NONE, NONE) },
+  // The 18+ record (044, DEC-2026-048): closed and append-only; written at sign-up by
+  // the database and read by the owner only through /api/account.
+  account_age_confirmations: { owner: NONE, select: sel(NONE, NONE) },
   ui_plans: { owner: NONE, select: sel(NONE, NONE) },
   webhook_events: { owner: NONE, select: sel(NONE, NONE) },
 };
