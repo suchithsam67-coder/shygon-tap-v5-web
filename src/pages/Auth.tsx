@@ -32,7 +32,9 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  // Sign-up consent: never pre-ticked, required, and recorded on the account.
+  // Sign-up confirmations: two separate boxes, never pre-ticked, both required,
+  // and recorded on the account. SHYGON Tap is for adults only (V01 T-13).
+  const [adult, setAdult] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -78,9 +80,9 @@ export default function Auth() {
 
       if (mode === 'signup') {
         if (!name.trim()) throw new Error('Please enter your full name.');
-        if (!agreed) {
-          throw new Error('Please confirm you are 18 or older and agree to the Terms and Privacy Policy.');
-        }
+        if (!adult) throw new Error('Please confirm you are 18 or older. SHYGON Tap is for adults only.');
+        if (!agreed) throw new Error('Please agree to the Terms and Conditions and the Privacy Policy.');
+        const confirmedAt = new Date().toISOString();
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
@@ -88,8 +90,12 @@ export default function Auth() {
             data: {
               full_name: name.trim(),
               // Evidence of consent: when, and to which version of the policies.
-              terms_accepted_at: new Date().toISOString(),
+              terms_accepted_at: confirmedAt,
               policies_version: LEGAL.lastUpdated,
+              // The adults-only confirmation, given separately. This is the browser's
+              // time; the server records its own when it stores the confirmation.
+              adult_confirmed: true,
+              adult_confirmed_at: confirmedAt,
             },
           },
         });
@@ -258,13 +264,25 @@ export default function Auth() {
               <label className="flex items-start gap-3 text-sm leading-relaxed text-[var(--ds-text-secondary)] cursor-pointer">
                 <input
                   type="checkbox"
+                  checked={adult}
+                  onChange={(e) => setAdult(e.target.checked)}
+                  required
+                  className="mt-1 h-5 w-5 shrink-0 accent-[var(--ds-accent)] cursor-pointer"
+                />
+                <span>I am 18 or older.</span>
+              </label>
+            )}
+            {mode === 'signup' && (
+              <label className="flex items-start gap-3 text-sm leading-relaxed text-[var(--ds-text-secondary)] cursor-pointer">
+                <input
+                  type="checkbox"
                   checked={agreed}
                   onChange={(e) => setAgreed(e.target.checked)}
                   required
                   className="mt-1 h-5 w-5 shrink-0 accent-[var(--ds-accent)] cursor-pointer"
                 />
                 <span>
-                  I am 18 or older and I agree to the{' '}
+                  I agree to the{' '}
                   <a href={LEGAL_PAGES.terms.path} target="_blank" rel="noreferrer" className="font-semibold text-[var(--ds-text)] underline underline-offset-2">
                     Terms and Conditions<span className="sr-only"> (opens in a new tab)</span>
                   </a>{' '}

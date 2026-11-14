@@ -27,14 +27,21 @@ export function server(): SupabaseClient {
   return createClient(s.gatewayUrl, s.serviceRoleKey, options as never);
 }
 
-/** A customer signed in through the API (for set-up that is not under test). */
-export async function apiCustomer(name: string) {
+/**
+ * A customer signed in through the API (for set-up that is not under test).
+ * Signed up as the sign-up form does since V01 T-13, 18+ confirmed (v0.17
+ * §4c), unless `adult: false` makes an account like those from before the gate.
+ */
+export async function apiCustomer(name: string, { adult = true }: { adult?: boolean } = {}) {
   const s = stack();
   const client = createClient(s.gatewayUrl, s.anonKey, options as never);
   const email = `${name.toLowerCase().replace(/\W+/g, '.')}.${Date.now()}@example.test`;
   // A throwaway account on the local stack; generated so no literal looks like a credential.
   const password = `journey-${randomUUID()}`;
-  const { data, error } = await client.auth.signUp({ email, password, options: { data: { full_name: name } } });
+  const data_ = adult
+    ? { full_name: name, adult_confirmed: true, adult_confirmed_at: new Date().toISOString(), policies_version: 'e2e' }
+    : { full_name: name };
+  const { data, error } = await client.auth.signUp({ email, password, options: { data: data_ } });
   if (error || !data.user || !data.session) throw new Error(`sign-up failed: ${error?.message}`);
   return { client, email, password, userId: data.user.id, token: data.session.access_token };
 }

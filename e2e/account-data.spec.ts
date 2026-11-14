@@ -59,6 +59,8 @@ test('a customer downloads their own data, then asks for deletion; nothing is de
   expect(data.notifications.length).toBeGreaterThan(0);
   // The closed AAROH sections are there too, which the old browser export could not read.
   for (const section of ['modes', 'emergency', 'returnToOwner', 'connect', 'cards']) expect(data).toHaveProperty(section);
+  // The 18+ confirmation recorded at sign-up (v0.17 §4c), so the owner can see it.
+  expect(data.ageConfirmation).toMatchObject({ confirmed: true, source: 'signup', policiesVersion: 'e2e' });
   const text = JSON.stringify(data);
   expect(text).not.toContain(someoneElse.userId);
   expect(text).not.toContain(someoneElse.email);

@@ -23,10 +23,19 @@ const sections: LegalSection[] = [
     id: 'eligibility',
     title: 'Who can use SHYGON Tap',
     body: (
-      <p>
-        You must be 18 or older and able to enter a binding contract under Indian law. We sell and deliver in
-        India only.
-      </p>
+      <>
+        <p>
+          You must be 18 or older and able to enter a binding contract under Indian law. We sell and deliver in
+          India only.
+        </p>
+        <p>
+          SHYGON Tap and AAROH cards are for adults only. When you create an account (or, for an account made
+          before we asked, the next time you sign in), you confirm that you are 18 or older, and we record that
+          confirmation and when you gave it. Do not create an account for anyone
+          under 18. If we learn that an account belongs to someone under 18, we will close it and delete its data
+          as our Privacy Policy describes.
+        </p>
+      </>
     ),
   },
   {

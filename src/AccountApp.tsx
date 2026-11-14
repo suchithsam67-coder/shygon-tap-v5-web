@@ -13,6 +13,7 @@ import LiquidGlassDefs from './components/LiquidGlassDefs';
 import ScrollProgress from './components/ScrollProgress';
 import { ProtectedRoute } from './components/app/ProtectedRoute';
 import { OwnerPage } from './components/app/OwnerPage';
+import { AgeConfirmation } from './components/app/AgeConfirmation';
 import { AuthProvider } from './lib/auth';
 import { AccountProvider } from './lib/account';
 import { ToastProvider } from './components/app/Toast';
@@ -75,7 +76,13 @@ const ShippingPolicy = lazy(() => import('./pages/legal/ShippingPolicy'));
 function Protected({ title, children }: { title: string; children: React.ReactNode }) {
   const { pathname } = useLocation();
   usePageMeta(useMemo(() => privateMeta(title, pathname), [title, pathname]));
-  return <ProtectedRoute>{children}</ProtectedRoute>;
+  // An account with no 18+ confirmation on record is asked once (v0.17 §4c).
+  return (
+    <ProtectedRoute>
+      {children}
+      <AgeConfirmation />
+    </ProtectedRoute>
+  );
 }
 
 /**

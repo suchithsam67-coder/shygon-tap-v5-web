@@ -90,6 +90,21 @@ export const startPhoneVerification = () =>
 export const confirmPhoneVerification = (code: string) =>
   call<{ verified: true; verifiedAt: string; usableFrom: string | null }>({ op: 'phone.verify.confirm', code });
 
+/**
+ * The 18+ confirmation (v0.17 §4c; DEC-2026-048). The database records it at
+ * sign-up from the sign-up data; an account without one (made before the gate)
+ * confirms once, here. `adult` is always the JSON value true: the server
+ * refuses anything else.
+ */
+export interface AgeStatus {
+  confirmed: boolean;
+  confirmedAt: string | null;
+  source: 'signup' | 'reconfirm' | null;
+}
+export const getAgeStatus = () => call<AgeStatus>({ op: 'age.status' });
+export const confirmAge = (policiesVersion: string) =>
+  call<{ confirmed: true; confirmedAt: string }>({ op: 'age.confirm', adult: true, policiesVersion });
+
 /** True while a replaced number is still waiting before it may confirm card changes. */
 export const stillWaiting = (status: Pick<PhoneStatus, 'usableFrom'>, now = Date.now()) =>
   Boolean(status.usableFrom && Date.parse(status.usableFrom) > now);

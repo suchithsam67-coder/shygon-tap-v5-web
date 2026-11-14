@@ -184,8 +184,10 @@ const sections: LegalSection[] = [
     title: 'Children',
     body: (
       <p>
-        SHYGON Tap is for adults. You must be 18 or older to create an account or buy. We do not knowingly
-        collect data from anyone under 18; if you believe we have, contact us and we will delete it.
+        SHYGON Tap is for adults. You must be 18 or older to create an account or buy. When you create an
+        account (or, for an account made before we asked, the next time you sign in), we record that you
+        confirmed you are 18 or older, and when. We do not knowingly collect data
+        from anyone under 18; if you believe we have, contact us and we will delete it.
       </p>
     ),
   },

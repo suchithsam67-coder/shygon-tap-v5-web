@@ -22,9 +22,27 @@ async function signUpInBrowser(page: Page, name: string) {
   await page.getByLabel('Full name').fill(name);
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill('journey-pass-1');
-  await page.getByRole('checkbox').check();
+  // Two separate confirmations, both required: adults only (V01 T-13), then the Terms and Privacy Policy.
+  await page.getByRole('checkbox', { name: 'I am 18 or older.' }).check();
+  await page.getByRole('checkbox', { name: /I agree to the Terms and Conditions/ }).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await page.waitForURL('**/shygontap/account');
+  // The auth server stored the age confirmation with the account (read back from the session it returned).
+  const metadata = await page.evaluate(() => JSON.parse(localStorage.getItem('shygon-tap-auth') ?? 'null')?.user?.user_metadata ?? null);
+  expect(metadata).toMatchObject({ adult_confirmed: true });
+  expect(metadata.adult_confirmed_at).toBe(metadata.terms_accepted_at);
+  // The database recorded it at sign-up (v0.17 §4c), so no prompt asks again.
+  const age = await page.evaluate(async () => {
+    const token = JSON.parse(localStorage.getItem('shygon-tap-auth') ?? 'null')?.access_token;
+    const response = await fetch('/api/account', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ op: 'age.status' }),
+    });
+    return response.json();
+  });
+  expect(age).toMatchObject({ confirmed: true, source: 'signup' });
+  await expect(page.getByTestId('age-confirmation')).toHaveCount(0);
   const { data } = await server().from('profiles').select('id').eq('email', email).single();
   return { email, userId: data!.id as string };
 }

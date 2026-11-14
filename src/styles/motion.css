@@ -131,6 +131,12 @@ body:has(.storefront) .button:hover svg:last-child:not(:first-child) { transform
 .otp-success { display: grid; justify-items: center; gap: 10px; padding: 12px 0 6px; text-align: center; }
 .otp-success svg { color: var(--ds-color-state-success); animation: otp-pop 0.5s cubic-bezier(0.2, 0, 0, 1.4) both; }
 .otp-success p { color: var(--ds-text-secondary); }
+/* ---------------------------------------------- the 18+ confirmation (v0.17) */
+.age-box { display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; color: var(--ds-text); font-weight: 600; cursor: pointer; }
+.age-box input { margin-top: 3px; width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--ds-accent); cursor: pointer; }
+.age-note { margin: 12px 0 0; font-size: 13px; line-height: 1.6; color: var(--ds-text-tertiary); }
+.age-note a { color: var(--ds-text); text-decoration: underline; text-underline-offset: 3px; }
+
 /* ------------------------------------------------- verify your phone (v0.13) */
 .phone-verify { display: grid; gap: 12px; }
 .phone-verify form { display: grid; gap: 0; }
