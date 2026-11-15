@@ -1109,3 +1109,30 @@ The two admin edge functions check access on their own.
 - any hosted check.
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 32. 2026-11-15: card activation from the proof alone (migration 045, contract v0.18)
+
+**Approval:** the owner, in session on 2026-11-15: "Approve the build". This was Session B's question Q-C4, recorded in DEC-2026-047 §8.
+
+**Built:**
+- `card_owner_activate` finds the card from the possession proof's code when no card id is sent. Every other check is unchanged, and a refusal uses no proof.
+- `/api/cards`: `cardId` is optional.
+- Contract v0.18 (§7 C-7).
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]:
+
+| Group | Results |
+|---|---|
+| `test:card-lifecycle` | **10 passed**, 0 failed (one new check: the proof alone activates the right card; another account, an unregistered code, a malformed id and a missing proof activate nothing and use no proof) |
+| Negative control | 045 without its proof-only branch: only the new check failed ("activated from the proof alone": 404 `card_not_found`). The good file was restored and compared byte for byte |
+| `test:db` | verify 21; adversarial 64; RLS matrix 1754 (62 tables, 7 callers); identity 69; admin-notes 12; golden **26** (a stage for 045); admin-contract 21; rollbacks **25** (045 restores 041's `card_owner_activate` exactly); account-deletion 9; history 2 |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED; payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 20; account-export 12; phone-verify 12; admin-mfa 9; card-lifecycle 10; age-gate 11; local-host 9; admin-edge 16; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 |
+| After a comment fix in 045 (its DEC section reference) | `db:bundle:check` exit 0; `test:card-lifecycle` 10; rollbacks 25; lint exit 0 |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`) |
+
+**Not run or not built:**
+- Session B's switch to the new call;
+- real chips;
+- any hosted check.
+
+**Verdict unchanged:** release BLOCKED (§18).

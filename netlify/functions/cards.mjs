@@ -11,9 +11,11 @@ import { readPossession } from '../lib/possession.mjs';
  * Authorization: Bearer <the customer's access token>.
  *
  *   owner.cards.list       my cards, without activation codes or chip UIDs
- *   owner.card.activate    { cardId, possession }: "tap to activate" an AAROH card.
+ *   owner.card.activate    { possession, cardId? }: "tap to activate" an AAROH card.
  *                          `possession` comes from a genuine Verified Tap on that
- *                          card (/api/verify) within 10 minutes; single use.
+ *                          card (/api/verify) within 10 minutes; single use. Since
+ *                          v0.18 (migration 045) the card may be left out: it is
+ *                          found from the proof's code. If named, it must match.
  *   owner.card.retire      { cardId, confirm: true }: report stolen. Terminal: the
  *                          card opens nothing (/d/<code> answers unavailable).
  *                          A card without a chip (V5) keeps opening /t/ (F3).
@@ -70,10 +72,13 @@ const answer = (r, log, event) => {
 const OPS = {
   'owner.cards.list': async (cfg, user) => json({ cards: await rpc(cfg, 'card_owner_list', { p_user: user.id }) }),
   'owner.card.activate': async (cfg, user, body, log) => {
-    if (typeof body.cardId !== 'string' || !UUID.test(body.cardId)) return fail('invalid_card');
+    // v0.18: the card is optional; the proof names the chip (DEC-2026-047 §8).
+    if (body.cardId !== undefined && (typeof body.cardId !== 'string' || !UUID.test(body.cardId))) return fail('invalid_card');
     const proof = readPossession(cfg.secret, body.possession);
     if (!proof.ok) return fail(proof.reason === 'expired' ? 'proof_expired' : 'invalid_proof');
-    const r = await rpc(cfg, 'card_owner_activate', { p_user: user.id, p_card: body.cardId, p_code: proof.code, p_counter: proof.counter });
+    const r = await rpc(cfg, 'card_owner_activate', {
+      p_user: user.id, p_card: body.cardId ?? null, p_code: proof.code, p_counter: proof.counter,
+    });
     return answer(r, log, 'activated');
   },
   'owner.card.retire': async (cfg, user, body, log) => {
