@@ -32,18 +32,68 @@ async function slowPhone(page: Page) {
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
 }
 
-/** Largest paint and layout shift (observer-only entries in Chromium) once the largest paint has settled. */
+/**
+ * Largest paint and layout shift (observer-only entries in Chromium) once the page has settled.
+ *
+ * Chromium stops reporting largest-paint candidates at the first real input, so
+ * nothing may touch the page before this runs. Settled means: the document has
+ * finished loading, every image currently on screen has finished loading, and
+ * the page has been idle — no request started and no new candidate — for three
+ * seconds. Only then is the last entry the page's true largest paint; the
+ * landing page needs the idle half of that, because its hero card is not in the
+ * DOM until the route chunk has rendered, so its own download is what marks the
+ * end of loading. The cap ends the wait if a resource never settles, so a
+ * broken page fails instead of hanging.
+ */
 async function vitals(page: Page) {
   return page.evaluate(
     () =>
-      new Promise<{ lcp: number; cls: number; scripts: number; scriptBytes: number }>((resolve) => {
+      new Promise<{
+        lcp: number;
+        cls: number;
+        scripts: number;
+        scriptBytes: number;
+        element: string;
+        paints: number;
+        waitedMs: number;
+      }>((resolve) => {
         let lcp = NaN;
         let cls = 0;
+        let paints = 0;
+        let lastPaintAt = 0;
+        let element = '';
         new PerformanceObserver((list) => {
           for (const entry of list.getEntries() as (PerformanceEntry & { value: number; hadRecentInput: boolean })[]) {
             if (!entry.hadRecentInput) cls += entry.value;
           }
         }).observe({ type: 'layout-shift', buffered: true });
+        new PerformanceObserver((list) => {
+          const entries = list.getEntries() as (PerformanceEntry & { size: number; url?: string })[];
+          if (!entries.length) return;
+          const last = entries[entries.length - 1];
+          lcp = last.startTime;
+          lastPaintAt = performance.now();
+          paints += entries.length;
+          const node = (last as { element?: { tagName?: string; id?: string } | null }).element;
+          element = `${node?.tagName ?? '?'}${node?.id ? '#' + node.id : ''} ${Math.round(last.size)}px${
+            last.url ? ` ${last.url.split('/').pop()}` : ''
+          }`;
+        }).observe({ type: 'largest-contentful-paint', buffered: true });
+
+        const started = performance.now();
+        /** The time the page last asked for anything. */
+        const lastRequestAt = () =>
+          (performance.getEntriesByType('resource') as PerformanceResourceTiming[]).reduce(
+            (latest, entry) => Math.max(latest, entry.startTime),
+            0,
+          );
+        /** No image that is on screen right now is still loading. */
+        const imagesSettled = () =>
+          Array.from(document.images).every((img) => {
+            const box = img.getBoundingClientRect();
+            const onScreen = box.bottom > 0 && box.top < innerHeight && box.right > 0 && box.left < innerWidth;
+            return !onScreen || img.complete;
+          });
         const finish = () => {
           const scripts = (performance.getEntriesByType('resource') as PerformanceResourceTiming[]).filter(
             (entry) => entry.initiatorType === 'script' || entry.name.endsWith('.js'),
@@ -53,16 +103,21 @@ async function vitals(page: Page) {
             cls: Number(cls.toFixed(3)),
             scripts: scripts.length,
             scriptBytes: scripts.reduce((sum, entry) => sum + (entry.encodedBodySize || entry.transferSize || 0), 0),
+            element,
+            paints,
+            waitedMs: Math.round(performance.now() - started),
           });
         };
-        // Settled: no new largest-paint candidate for a second.
-        let timer = setTimeout(finish, 1500);
-        new PerformanceObserver((list) => {
-          const entries = list.getEntries();
-          lcp = entries[entries.length - 1].startTime;
-          clearTimeout(timer);
-          timer = setTimeout(finish, 1000);
-        }).observe({ type: 'largest-contentful-paint', buffered: true });
+        const QUIET_MS = 3000;
+        const CAP_MS = 30_000;
+        const tick = () => {
+          const now = performance.now();
+          const lastActivity = Math.max(paints > 0 ? lastPaintAt : 0, lastRequestAt());
+          const quiet = now - (lastActivity || started) >= QUIET_MS;
+          if (now - started >= CAP_MS || (document.readyState === 'complete' && imagesSettled() && quiet)) finish();
+          else setTimeout(tick, 250);
+        };
+        tick();
       }),
   );
 }
@@ -77,6 +132,7 @@ test('the public Tap is fast on a slow phone: largest paint under 2.5 s, no layo
   await page.goto(`/t/${data!.slug}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Speedy Owner' })).toBeVisible();
   const result = await vitals(page);
+  await dismissCookieNotice(page);
   console.log(`[perf] /t/<slug> on slow 4G, 4x CPU: ${JSON.stringify(result)}`);
   test.info().annotations.push({ type: 'perf', description: `public Tap ${JSON.stringify(result)}` });
   expect(result.lcp).toBeLessThan(2500);
@@ -86,8 +142,11 @@ test('the public Tap is fast on a slow phone: largest paint under 2.5 s, no layo
 test('the landing page stays usable on a slow phone: largest paint under 4 s', async ({ page }) => {
   await slowPhone(page);
   await page.goto('/shygontap', { waitUntil: 'domcontentloaded' });
-  await dismissCookieNotice(page);
+  // The notice is dismissed after the measurement: Chromium ends largest-paint
+  // reporting at the first input, so a click during the measurement would
+  // freeze it on whatever had painted by then and hide the hero's paint.
   const result = await vitals(page);
+  await dismissCookieNotice(page);
   console.log(`[perf] /shygontap on slow 4G, 4x CPU: ${JSON.stringify(result)}`);
   test.info().annotations.push({ type: 'perf', description: `landing ${JSON.stringify(result)}` });
   expect(result.lcp).toBeLessThan(4000);
