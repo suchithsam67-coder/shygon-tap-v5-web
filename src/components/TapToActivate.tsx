@@ -7,7 +7,7 @@ import { cardsMessageOf } from '../lib/cardWords';
 import type { Verdict } from '../lib/publicVerifyClient';
 
 /**
- * "Tap to activate" (V01 T-08; AAROH-API v0.15 §10d and §7 C-7; DEC-2026-047).
+ * "Tap to activate" (V01 T-08; AAROH-API v0.15 §10d, and §7 C-7 as of v0.18; DEC-2026-047).
  *
  * An AAROH card that is the owner's but not active yet answers /d/<code> with
  * no Tap. Its page never shows the owner's Tap. A genuine tap brings a
@@ -15,18 +15,19 @@ import type { Verdict } from '../lib/publicVerifyClient';
  * card in hand and the session together. A stolen session without the card,
  * or the card without the session, activates nothing.
  *
- * The page knows the tap's proof but not which of the owner's cards it is (the
- * list never carries the chip's code), so it tries the owner's cards that can
- * still be paired, in turn. A wrong card is refused (proof_mismatch) without
- * using the proof; the right one activates. The proof stays in memory only.
- * Customer wording is DRAFT for the owner's gate.
+ * Since v0.18 (migration 045) the server finds the card from the proof itself,
+ * so the page sends the proof alone. It still reads the owner's cards first,
+ * only to say before any press whether this account has a card waiting; a tap
+ * from another account's card is refused (card_not_found) without using the
+ * proof. The proof stays in memory only. Customer wording is DRAFT for the
+ * owner's gate.
  */
 
 type Step =
   | { kind: 'checking' }
   | { kind: 'signed-out' }
-  | { kind: 'ready'; candidates: string[] }
-  | { kind: 'activating'; candidates: string[] }
+  | { kind: 'ready' }
+  | { kind: 'activating' }
   | { kind: 'not-yours' }
   | { kind: 'done' }
   | { kind: 'problem'; text: string }
@@ -48,7 +49,7 @@ export function TapToActivate({ verdict, possession }: { verdict: Verdict | null
   const [step, setStep] = useState<Step>({ kind: 'checking' });
   const [attempt, setAttempt] = useState(0);
 
-  // Who is signed in on this phone, and which of their cards can still be paired.
+  // Who is signed in on this phone, and whether any of their cards can still be paired.
   useEffect(() => {
     if (!canActivate) return;
     let live = true;
@@ -56,8 +57,7 @@ export function TapToActivate({ verdict, possession }: { verdict: Verdict | null
       const { data } = await supabase.auth.getSession();
       if (!data.session) return { kind: 'signed-out' } as Step;
       const { cards } = await listOwnerCards();
-      const candidates = cards.filter(pairable).map((card) => card.id);
-      return (candidates.length ? { kind: 'ready', candidates } : { kind: 'not-yours' }) as Step;
+      return (cards.some(pairable) ? { kind: 'ready' } : { kind: 'not-yours' }) as Step;
     })().then(
       (next) => live && setStep(next),
       (failure: unknown) => live && setStep({ kind: 'list-failed', text: cardsMessageOf(failure) }),
@@ -67,22 +67,20 @@ export function TapToActivate({ verdict, possession }: { verdict: Verdict | null
     };
   }, [canActivate, attempt]);
 
-  async function activate(candidates: string[]) {
+  async function activate() {
     if (!possession) return;
-    setStep({ kind: 'activating', candidates });
-    for (const id of candidates) {
-      try {
-        await activateCardByTap(id, possession);
-        setStep({ kind: 'done' });
-        return;
-      } catch (failure) {
-        // Not this card: the proof is unused, so try the next one.
-        if (failure instanceof CardsError && (failure.code === 'proof_mismatch' || failure.code === 'card_not_found')) continue;
-        setStep({ kind: 'problem', text: cardsMessageOf(failure) });
+    setStep({ kind: 'activating' });
+    try {
+      await activateCardByTap(possession);
+      setStep({ kind: 'done' });
+    } catch (failure) {
+      // Not one of this account's cards: the proof is unused.
+      if (failure instanceof CardsError && (failure.code === 'card_not_found' || failure.code === 'proof_mismatch')) {
+        setStep({ kind: 'not-yours' });
         return;
       }
+      setStep({ kind: 'problem', text: cardsMessageOf(failure) });
     }
-    setStep({ kind: 'not-yours' });
   }
 
   if (canActivate && step.kind === 'done') {
@@ -131,7 +129,7 @@ export function TapToActivate({ verdict, possession }: { verdict: Verdict | null
             <button
               type="button"
               className="tap-state-button"
-              onClick={() => void activate(step.candidates)}
+              onClick={() => void activate()}
               disabled={step.kind === 'activating'}
             >
               {step.kind === 'activating' ? 'Activating…' : 'Activate this card'}

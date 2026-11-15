@@ -4,9 +4,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { TapToActivate } from './TapToActivate';
 
 /**
- * "Tap to activate" on /d/<code> (AAROH-API v0.15 §10d and §7 C-7;
- * DEC-2026-047): the card in hand (a genuine tap's proof) and the owner's own
- * session, together. The network is replaced at `fetch`, and the session at
+ * "Tap to activate" on /d/<code> (AAROH-API v0.15 §10d, and §7 C-7 as of
+ * v0.18; DEC-2026-047): the card in hand (a genuine tap's proof) and the
+ * owner's own session, together. Since v0.18 the proof alone names the card. The network is replaced at `fetch`, and the session at
  * the Supabase client.
  */
 
@@ -23,20 +23,20 @@ const card = (id: string, status: string, registered = true, retired = false) =>
 
 type Reply = { status: number; body: unknown };
 let list: Reply;
-let activate: (cardId: string) => Reply;
+let activate: () => Reply;
 const calls: Record<string, unknown>[] = [];
 
 beforeEach(() => {
   calls.length = 0;
   session.current = { access_token: 'owner-token' };
   list = { status: 200, body: { cards: [card('c-1', 'shipped')] } };
-  activate = (id) => ({ status: 200, body: { card: card(id, 'active') } });
+  activate = () => ({ status: 200, body: { card: card('c-1', 'active') } });
   vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
     expect(url).toBe('/api/cards');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer owner-token');
     const body = JSON.parse(String(init.body)) as Record<string, unknown>;
     calls.push(body);
-    const reply = body.op === 'owner.cards.list' ? list : activate(String(body.cardId));
+    const reply = body.op === 'owner.cards.list' ? list : activate();
     return new Response(JSON.stringify(reply.body), { status: reply.status, headers: { 'content-type': 'application/json' } });
   });
 });
@@ -60,18 +60,17 @@ describe('tap to activate', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Activate this card' }));
     expect(await screen.findByRole('heading', { name: 'Card activated' })).toBeTruthy();
     expect(screen.getByText('Tap it again to open your Tap.')).toBeTruthy();
-    expect(activations()).toEqual([{ op: 'owner.card.activate', cardId: 'c-1', possession: PROOF }]);
+    // v0.18: the proof alone; the server finds the card from it.
+    expect(activations()).toEqual([{ op: 'owner.card.activate', possession: PROOF }]);
     expect(screen.getByRole('link', { name: 'Your cards' }).getAttribute('href')).toBe('/shygontap/cards');
   });
 
-  it('several cards waiting: a wrong one is refused without using the proof, and the next one activates', async () => {
+  it('several cards waiting: still one request, the proof alone, never a card id', async () => {
     list = { status: 200, body: { cards: [card('c-1', 'pending'), card('c-active', 'active'), card('c-v5', 'shipped', false), card('c-2', 'shipped')] } };
-    activate = (id) => (id === 'c-1' ? failure(409, 'proof_mismatch') : { status: 200, body: { card: card(id, 'active') } });
     show();
     fireEvent.click(await screen.findByRole('button', { name: 'Activate this card' }));
     expect(await screen.findByRole('heading', { name: 'Card activated' })).toBeTruthy();
-    // Only cards that can still be paired are tried: chip, not retired, pending or shipped.
-    expect(activations().map((c) => c.cardId)).toEqual(['c-1', 'c-2']);
+    expect(activations()).toEqual([{ op: 'owner.card.activate', possession: PROOF }]);
   });
 
   it('signed out: asks to sign in on this phone and tap again; nothing is sent', async () => {
@@ -90,8 +89,8 @@ describe('tap to activate', () => {
     expect(activations()).toEqual([]);
   });
 
-  it('every candidate refuses the proof: not this account', async () => {
-    activate = () => failure(409, 'proof_mismatch');
+  it("a tap of another account's card (card_not_found, the proof unused): not this account", async () => {
+    activate = () => failure(404, 'card_not_found');
     show();
     fireEvent.click(await screen.findByRole('button', { name: 'Activate this card' }));
     expect((await screen.findByRole('alert')).textContent).toContain('This card is not on the account you are signed in with.');

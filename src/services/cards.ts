@@ -162,9 +162,11 @@ async function cards<T>(body: Record<string, unknown>): Promise<T> {
 }
 
 export const listOwnerCards = () => cards<{ cards: OwnerCard[] }>({ op: 'owner.cards.list' });
-/** Tap to activate (C-7): `possession` comes from a genuine tap of this card, within 10 minutes; single use. */
-export const activateCardByTap = (cardId: string, possession: string) =>
-  cards<{ card: OwnerCard }>({ op: 'owner.card.activate', cardId, possession });
+/**
+ * Tap to activate (C-7): `possession` comes from a genuine tap of the card, within 10 minutes; single use.
+ * Since v0.18 the server finds the card from the proof, so the page sends the proof alone.
+ */
+export const activateCardByTap = (possession: string) => cards<{ card: OwnerCard }>({ op: 'owner.card.activate', possession });
 /** Report stolen (C-8): terminal for the owner; only SHYGON support can undo it. */
 export const reportCardStolen = (cardId: string) => cards<{ card: OwnerCard }>({ op: 'owner.card.retire', cardId, confirm: true });
 

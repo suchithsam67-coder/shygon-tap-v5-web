@@ -146,6 +146,27 @@ test('tap to activate needs the owner: another signed-in account cannot activate
   expect(await card.status()).toBe('shipped');
 });
 
+test("v0.18, the proof alone: an account with its own card waiting cannot activate another account's card, and its own still activates", async ({ page }) => {
+  const theirs = await shippedCard('Pairing Card Holder');
+  const mine = await shippedCard('Pairing Other Holder');
+  await signIn(page, mine.owner.email, mine.owner.password);
+
+  // Another account's card: offered (this account has a card waiting), refused by the server, nothing changed.
+  await page.goto(theirs.tapUrl());
+  await page.getByRole('button', { name: 'Activate this card' }).click();
+  await expect(page.getByTestId('vt-pairing')).toHaveAttribute('data-state', 'not-yours');
+  await expect(page.getByRole('alert')).toContainText('This card is not on the account you are signed in with.');
+  expect(await theirs.status()).toBe('shipped');
+  expect(await mine.status()).toBe('shipped');
+
+  // Its own card, tapped: activated from the proof alone.
+  await page.goto(mine.tapUrl());
+  await page.getByRole('button', { name: 'Activate this card' }).click();
+  await expect(page.getByRole('heading', { name: 'Card activated' })).toBeVisible();
+  expect(await mine.status()).toBe('active');
+  expect(await theirs.status()).toBe('shipped');
+});
+
 test('the pairing page: no serious or critical WCAG 2.2 AA violation', async ({ page }) => {
   const card = await shippedCard('Axe Pairing Owner');
   await signIn(page, card.owner.email, card.owner.password);
