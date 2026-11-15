@@ -150,3 +150,27 @@ Built on `v6/aaroh-backend` to §3 with Q1–Q7 as recommended; readiness report
 - **`test:card-lifecycle` 9,** in `ci` and `ci.yml`. The T-10 export-parity map now classifies `card_events` (exported with its card). `test:security` covers `/api/cards` (6 functions).
   - **Negative control** [OBSERVED]: 041 without its guard trigger failed 3 checks. A direct write activated a shipped AAROH card and revived a retired one.
 - **Not built:** support's undo (a new personalisation; Q7); the `/d/` "Activate" step and the card pages (Session B); real chips and keys (DEC-2026-043 Q2, Q3, Q7).
+
+## 8. Change: activation from the proof alone (2026-11-15, local)
+
+**Why:** Session B's question Q-C4 (`docs/v6/aaroh/card-pairing-wording.md` on its branch).
+- After a tap, the `/d/<code>` page holds the possession proof but not the card's id.
+- The card list (C-6) rightly leaves out the chip's code.
+- So the page had to try each of the owner's pairable cards in turn.
+
+**Approval** [OBSERVED in session]: the owner answered "Approve the build" to "Approve building tap-only card activation (migration 045, contract v0.18)?".
+
+**Built:**
+- **Migration 045:** `card_owner_activate` (from 041's text) accepts a null card and then takes the card the proof's code is registered to.
+  - The proof is signed by the server, so the code is authentic.
+  - Every check that follows is unchanged: the owner's own card, registered, pairable, not retired, a genuine and unused counter.
+  - A refusal uses no proof.
+  - The rollback restores 041's text verbatim.
+- **`/api/cards`:** `cardId` is optional. If given, it must be a valid id and must match the proof.
+- **Contract AAROH-API v0.18** (§7 C-7).
+- **`test:card-lifecycle` 10** (one new check):
+  - another account's proof, a code registered to no card, a malformed id and a missing proof activate nothing and use no proof;
+  - the right proof alone activates the card, with the same history.
+- **Negative control:** without the new branch, only the new check failed (the card was not found from the proof).
+
+**Evidence:** the readiness report §32.

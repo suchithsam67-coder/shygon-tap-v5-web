@@ -153,6 +153,22 @@ await t.check('a proof is single use, a suspended card is not pairable, a card w
   return 'no path around the tap';
 });
 
+await t.check('v0.18 (045): the proof alone activates the right card; another account, an unregistered code or a bad card id activates nothing and uses no proof', async () => {
+  const p = await issued();
+  const proof = (await verify({ code: p.code, ...p.tap(7) })).body.possession;
+  assert(typeof proof === 'string', 'a genuine tap carries a proof');
+  const stranger = await signUp(stack, { name: 'Sam Stranger' });
+  assertEqual(codeOf(await cards({ op: 'owner.card.activate', possession: proof }, stranger.token)), 'card_not_found', 'another account, proof only');
+  assertEqual(codeOf(await cards({ op: 'owner.card.activate', cardId: 'not-a-uuid', possession: proof }, p.owner.token)), 'invalid_card', 'a malformed card id');
+  assertEqual(codeOf(await cards({ op: 'owner.card.activate', possession: possessionProof(SECRET, newCode(), 7) }, p.owner.token)), 'card_not_found', 'a code registered to no card');
+  assertEqual(codeOf(await cards({ op: 'owner.card.activate' }, p.owner.token)), 'invalid_proof', 'no proof at all');
+  assertEqual(await statusOf(p.card), 'shipped', 'still shipped: no refusal used the proof');
+  const r = await cards({ op: 'owner.card.activate', possession: proof }, p.owner.token);
+  assertEqual([r.status, r.body.card?.id, r.body.card?.status], [200, p.card, 'active'], 'activated from the proof alone');
+  assertEqual(await events(p.card), ['shipped>active owner: tap to activate'], 'the same history');
+  return 'the /d/ page needs no card id';
+});
+
 // ---------------------------------------------------------------------------
 t.section('D. The guard');
 
