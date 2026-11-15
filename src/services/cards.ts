@@ -32,6 +32,8 @@ export function cardStatusOf(card: Pick<CardRow, 'status'>): { label: string; to
   if (card.status === 'active') return { label: 'Active', tone: 'ok' };
   if (card.status === 'suspended') return { label: 'Deactivated', tone: 'off' };
   if (card.status === 'replaced') return { label: 'Replaced', tone: 'idle' };
+  // Reported stolen (v0.15 C-8): terminal for the owner.
+  if (card.status === 'retired') return { label: 'Switched off', tone: 'off' };
   return { label: 'Not activated', tone: 'idle' };
 }
 
@@ -105,3 +107,67 @@ export function requestCardOtp(cardId: string, action: CardAction): Promise<OtpC
 export function verifyCardOtp(challengeId: string, code: string): Promise<{ card: Partial<CardRow>; action: CardAction }> {
   return call({ step: 'verify', challengeId, code });
 }
+
+/**
+ * `POST /api/cards` (AAROH-API v0.15 §7 C-6 to C-8; DEC-2026-047): the owner's
+ * cards as the server sees them, never with the activation code or the chip's
+ * UID; "tap to activate" for an AAROH card; and "report stolen".
+ *
+ * An AAROH card (`verifiedTap.registered`) becomes active only by a tap: a
+ * genuine Verified Tap hands the /d/<code> page a `possession` proof, and the
+ * owner's own session spends it. Any other path (card-otp included) leaves the
+ * card unchanged, so the card page offers none for such a card.
+ */
+export interface OwnerCard {
+  id: string;
+  cardId: string | null;
+  nickname: string | null;
+  status: string | null;
+  edition: { design: string; number: number; of: number; chapterSize: number | null } | null;
+  activatedAt: string | null;
+  deactivatedAt: string | null;
+  verifiedTap: { registered: boolean; retired: boolean };
+}
+
+export class CardsError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string,
+  ) {
+    super(message);
+  }
+}
+
+async function cards<T>(body: Record<string, unknown>): Promise<T> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new CardsError('Please sign in again.', 401, 'unauthenticated');
+  let response: Response;
+  try {
+    response = await fetch('/api/cards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new CardsError(navigator.onLine === false ? 'You are offline. Reconnect and try again.' : 'We could not reach SHYGON. Try again.', 0, 'network');
+  }
+  const result = (await response.json().catch(() => ({}))) as T & { error?: { code?: string; message?: string } };
+  if (!response.ok) {
+    throw new CardsError(result.error?.message ?? 'Something went wrong. Please try again.', response.status, result.error?.code ?? 'unknown');
+  }
+  return result;
+}
+
+export const listOwnerCards = () => cards<{ cards: OwnerCard[] }>({ op: 'owner.cards.list' });
+/** Tap to activate (C-7): `possession` comes from a genuine tap of this card, within 10 minutes; single use. */
+export const activateCardByTap = (cardId: string, possession: string) =>
+  cards<{ card: OwnerCard }>({ op: 'owner.card.activate', cardId, possession });
+/** Report stolen (C-8): terminal for the owner; only SHYGON support can undo it. */
+export const reportCardStolen = (cardId: string) => cards<{ card: OwnerCard }>({ op: 'owner.card.retire', cardId, confirm: true });
+
+/** An AAROH card that is the owner's and can still be paired: chip registered, not retired, pending or shipped. */
+export const pairable = (card: OwnerCard) =>
+  card.verifiedTap.registered && !card.verifiedTap.retired && (card.status === 'pending' || card.status === 'shipped');

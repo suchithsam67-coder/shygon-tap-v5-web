@@ -54,9 +54,27 @@ describe('verifyTap', () => {
   it('genuine keeps its edition; any other verdict drops one', async () => {
     const edition = { design: 'Obsidian', number: 37, of: 100, chapterSize: 100 };
     reply = { status: 200, body: { slug: 'asha', verdict: 'genuine', edition } };
-    expect(await verifyTap(CODE, SUN)).toEqual({ slug: 'asha', verdict: 'genuine', edition });
+    expect(await verifyTap(CODE, SUN)).toEqual({ slug: 'asha', verdict: 'genuine', edition, possession: null });
     reply = { status: 200, body: { slug: 'asha', verdict: 'already_checked', edition } };
-    expect(await verifyTap(CODE, SUN)).toEqual({ slug: 'asha', verdict: 'already_checked', edition: null });
+    expect(await verifyTap(CODE, SUN)).toEqual({ slug: 'asha', verdict: 'already_checked', edition: null, possession: null });
+  });
+
+  it('v0.15: a card that is not active yet has no slug; only a genuine tap of it keeps the possession proof', async () => {
+    const proof = `${CODE}.7.1800000000.${'a'.repeat(64)}`;
+    reply = { status: 200, body: { slug: null, verdict: 'genuine', possession: proof } };
+    expect(await verifyTap(CODE, SUN)).toEqual({ slug: null, verdict: 'genuine', edition: null, possession: proof });
+    reply = { status: 200, body: { slug: null, verdict: 'already_checked', possession: proof } };
+    expect(await verifyTap(CODE, SUN)).toEqual({ slug: null, verdict: 'already_checked', edition: null, possession: null });
+    reply = { status: 200, body: { slug: null, verdict: 'not_verified' } };
+    expect(await verifyTap(CODE, null)).toMatchObject({ slug: null, verdict: 'not_verified', possession: null });
+    // No Lost page for a card that is not active: no verdict reads as "unavailable".
+    reply = { status: 200, body: { slug: null, verdict: null } };
+    expect(await verifyTap(CODE, SUN)).toMatchObject({ slug: null, verdict: 'unavailable', possession: null });
+    // A proof on an active card's answer is never kept; an oversized one is dropped.
+    reply = { status: 200, body: { slug: 'asha', verdict: 'genuine', possession: proof } };
+    expect((await verifyTap(CODE, SUN)).possession).toBeNull();
+    reply = { status: 200, body: { slug: null, verdict: 'genuine', possession: 'x'.repeat(201) } };
+    expect((await verifyTap(CODE, SUN)).possession).toBeNull();
   });
 
   it('an incomplete edition is dropped; null stays null (Lost mode); an unknown verdict is "unavailable", never "genuine"', async () => {

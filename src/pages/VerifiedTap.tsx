@@ -5,6 +5,7 @@ import PublicTap, { TapLoading, TapNotFound, TapStatePage } from './PublicTap';
 import { VERIFY_CODE, VerifyError, sunFrom, verifyTap, type Edition, type Verdict, type VerifyAnswer } from '../lib/publicVerifyClient';
 import type { PageMeta } from '../seo/meta';
 import { usePageMeta } from '../seo/usePageMeta';
+import { TapToActivate } from '../components/TapToActivate';
 import './verified-tap.css';
 
 /**
@@ -19,6 +20,11 @@ import './verified-tap.css';
  *   page with no referrer and no caching (netlify.toml, vercel.json).
  * - Then the Tap's normal page (Business, Info or Lost, from P-6) under the
  *   verdict line. A Tap in Lost mode shows its Lost page and no verdict.
+ *
+ * - v0.15 (DEC-2026-047): a card issued to an owner but not active yet answers
+ *   with no Tap. Its page shows "This card isn't active yet", never the
+ *   owner's Tap, and a genuine tap lets its signed-in owner activate it
+ *   (TapToActivate). A card reported stolen answers 404: "Tap not found".
  *
  * While SHYGON has VERIFIED_TAP off, every check answers 404, so the visitor
  * gets the neutral "Tap not found". The verdict words are DRAFT (DEC-2026-043
@@ -100,7 +106,8 @@ export default function VerifiedTap() {
   );
   const [attempt, setAttempt] = useState(0);
 
-  usePageMeta(check.kind === 'done' ? null : GENERIC_META);
+  // The Tap's page sets its own; anything else, a card that is not active included, says nothing of the card.
+  usePageMeta(check.kind === 'done' && check.answer.slug ? null : GENERIC_META);
 
   // e and c out of the address bar, keeping anything else it carries.
   useEffect(() => {
@@ -137,6 +144,7 @@ export default function VerifiedTap() {
   if (check.kind === 'failed') return <CheckFailed error={check.error} retry={retry} />;
 
   const { answer } = check;
+  if (answer.slug === null) return <TapToActivate verdict={answer.verdict} possession={answer.possession} />;
   return (
     <>
       {answer.verdict && answer.verdict !== 'not_verified' && <VerdictLine verdict={answer.verdict} edition={answer.edition} />}

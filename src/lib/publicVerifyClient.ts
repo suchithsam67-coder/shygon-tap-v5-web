@@ -8,6 +8,11 @@
  * the address bar, a log or analytics. The answer proves only that SHYGON
  * issued the chip's keys and that this read is new. It never says who holds the
  * card and never grants anything.
+ *
+ * v0.15 (DEC-2026-047): a card issued to an owner but not yet active answers
+ * with `slug: null` (it opens no Tap), and a genuine tap adds `possession`,
+ * an opaque 10-minute, single-use proof that only the card's signed-in owner
+ * can spend ("Activate this card", /api/cards). It is kept in memory only.
  */
 
 export type Verdict = 'genuine' | 'already_checked' | 'not_confirmed' | 'needs_service' | 'unavailable' | 'not_verified';
@@ -22,10 +27,13 @@ export interface Edition {
 }
 
 export interface VerifyAnswer {
-  slug: string;
+  /** null (v0.15): the card is not active yet. Its page opens no Tap, only "activate". */
+  slug: string | null;
   /** null: the Tap is in Lost mode, which shows its own page and no verdict. */
   verdict: Verdict | null;
   edition: Edition | null;
+  /** Only with `slug: null` and `genuine`: the proof "Activate this card" spends. */
+  possession: string | null;
 }
 
 export class VerifyError extends Error {
@@ -89,6 +97,7 @@ export async function verifyTap(code: string, sun: { e: string; c: string } | nu
     slug?: unknown;
     verdict?: unknown;
     edition?: unknown;
+    possession?: unknown;
     error?: { code?: string; message?: string; retryAfter?: number };
   };
   if (!response.ok) {
@@ -100,8 +109,18 @@ export async function verifyTap(code: string, sun: { e: string; c: string } | nu
       result.error?.retryAfter ?? (Number.isFinite(retryHeader) && retryHeader > 0 ? retryHeader : undefined),
     );
   }
-  if (typeof result.slug !== 'string' || !result.slug) throw new VerifyError('Something went wrong. Please try again.', 502, 'invalid_answer');
+  const pairing = result.slug === null;
+  if (!pairing && (typeof result.slug !== 'string' || !result.slug)) throw new VerifyError('Something went wrong. Please try again.', 502, 'invalid_answer');
   const verdict: Verdict | null =
     result.verdict === null ? null : VERDICTS.includes(result.verdict as Verdict) ? (result.verdict as Verdict) : 'unavailable';
-  return { slug: result.slug, verdict, edition: verdict === 'genuine' ? toEdition(result.edition) : null };
+  // A card that is not active has no Lost page to show: no verdict there reads as "unavailable".
+  if (pairing && verdict === null) return { slug: null, verdict: 'unavailable', edition: null, possession: null };
+  const possession =
+    pairing && verdict === 'genuine' && typeof result.possession === 'string' && result.possession.length <= 200 ? result.possession : null;
+  return {
+    slug: pairing ? null : (result.slug as string),
+    verdict,
+    edition: verdict === 'genuine' ? toEdition(result.edition) : null,
+    possession,
+  };
 }

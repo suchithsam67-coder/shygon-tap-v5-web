@@ -20,3 +20,15 @@
 .vt-caution { background: #261d0c; }
 .vt-caution svg { color: #fbbf24; }
 .vt-edition { color: rgba(255, 255, 255, 0.82); font-weight: 600; letter-spacing: 0.04em; }
+
+/* A card that is not active yet (v0.15): "Activate this card" for its signed-in owner. */
+.vt-pair-wait { display: inline-flex; align-items: center; gap: 8px; }
+.vt-pair-ok { color: #6ee7a8; }
+.tap-state-page button.tap-state-button:disabled { opacity: 0.6; cursor: progress; }
+.vt-pairing a.tap-state-button { display: inline-block; color: #fff; font-size: 13px; text-decoration: none; }
+.vt-pairing p + p,
+.vt-pairing p + .vt-pair-wait { margin-top: 10px; }
+/* app.css (and its .spin) belongs to the account pages; this page loads only its own CSS. */
+.vt-pair-wait svg { animation: vt-spin 0.9s linear infinite; }
+@keyframes vt-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .vt-pair-wait svg { animation: none; } }

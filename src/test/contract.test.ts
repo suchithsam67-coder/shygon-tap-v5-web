@@ -27,6 +27,7 @@ const CLIENTS: Record<string, string[]> = {
   '/api/modes': ['src/services/tapMode.ts'],
   '/api/verify': ['src/lib/publicVerifyClient.ts'],
   '/api/account': ['src/services/account.ts'],
+  '/api/cards': ['src/services/cards.ts'],
 };
 const PUBLIC_TAP = 'src/lib/publicTapClient.ts';
 const PUBLIC_RPCS = ['get_public_profile', 'get_public_tap_mode', 'get_public_tap_state', 'record_tap_event'];
@@ -118,7 +119,8 @@ describe('every server call is in the published contract', () => {
       const ops = files.flatMap((file) => opProperties(code(file)));
       expect(ops.length).toBeGreaterThan(0);
       expect(ops.filter((op) => op === null), `${endpoint}: an op that is not a quoted name`).toEqual([]);
-      const missing = ops.filter((op) => !contract.includes(`\`${op}\``));
+      // Named in the contract as `op` or as op: 'op' (the card rows, §7 C-6 to C-8).
+      const missing = ops.filter((op) => !contract.includes(`\`${op}\``) && !contract.includes(`op: '${op}'`));
       expect(missing).toEqual([]);
     });
   }
@@ -133,7 +135,7 @@ describe('every server call is in the published contract', () => {
   it('nothing outside those clients calls the AAROH endpoints or PostgREST functions directly', () => {
     const allowed = new Set([...Object.values(CLIENTS).flat(), PUBLIC_TAP]);
     const strays = sourceFiles('src').filter(
-      (file) => !allowed.has(file) && /['"`]\/api\/(emergency|rescue|connect|modes|prive|verify|account)['"`]|rest\/v1\/rpc/.test(code(file)),
+      (file) => !allowed.has(file) && /['"`]\/api\/(emergency|rescue|connect|modes|prive|verify|account|cards)['"`]|rest\/v1\/rpc/.test(code(file)),
     );
     expect(strays).toEqual([]);
   });

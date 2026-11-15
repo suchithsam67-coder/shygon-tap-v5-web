@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Clock, Loader2, Nfc, PhoneCall, ShieldCheck, ShieldOff } from 'lucide-react';
+import { CheckCircle2, Clock, Loader2, Nfc, PhoneCall, ShieldAlert, ShieldCheck, ShieldOff } from 'lucide-react';
 import { AppShell } from '../components/app/AppShell';
 import { EmptyState, ErrorState, SkeletonRows } from '../components/app/States';
 import { useAuth } from '../lib/auth-context';
 import { useAccount } from '../lib/account-context';
 import { useToast } from '../components/app/toast-context';
+import { ConfirmDialog } from '../components/app/ConfirmDialog';
 import { useAsync } from '../hooks/useAsync';
 import { describeError } from '../lib/supabase';
 import type { CardRow } from '../lib/database.types';
@@ -14,13 +15,19 @@ import { CARD_SALES_OPEN, CARDS_COMING_SOON } from '../lib/commerce';
 import { cardArt, cardDesignNames, materialLabels, products, type MaterialId, type TierId } from '../data/shygonTapData';
 import {
   CardOtpError,
+  CardsError,
   cardStatusOf,
   fetchMyCards,
+  listOwnerCards,
+  reportCardStolen,
   requestCardOtp,
   verifyCardOtp,
   type CardAction,
   type OtpChallenge,
+  type OwnerCard,
 } from '../services/cards';
+import { cardsMessageOf } from '../lib/cardWords';
+import { LOST_RELEASED, PREVIEW_PAGES } from '../components/showroom/modes';
 import { stillWaiting } from '../services/account';
 import { usePhoneStatus } from '../hooks/usePhoneStatus';
 import { VERIFY_PHONE_PATH, cardPhoneProblem, whenUsable } from '../lib/phoneVerification';
@@ -32,7 +39,20 @@ import { VERIFY_PHONE_PATH, cardPhoneProblem, whenUsable } from '../lib/phoneVer
  * alerts the SHYGON admin panel. Since v0.13 the code goes only to a verified
  * number, so the page says so before a click, and the dialog explains the two
  * phone refusals (not verified; changed recently) in our words.
+ *
+ * v0.15 (DEC-2026-047): the server's list (C-6) says which cards have a secure
+ * chip. Such a card is activated only by tapping it (the /d/<code> page), so it
+ * gets no code buttons here: the database would refuse the change without an
+ * error. Any card can be reported stolen (C-8), terminal for the owner. A card
+ * without a chip keeps opening the Tap's address after that (F3), and the page
+ * says so.
  */
+
+/** A card as this page shows it: the table row, and the server's view of it (chip or not). */
+type Row = { card: CardRow; owner: OwnerCard | null; chip: boolean };
+
+/** Lost mode is offered only where it is released (or in a preview build). */
+const LOST_MODE_OPEN = LOST_RELEASED || PREVIEW_PAGES;
 
 const date = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -41,6 +61,32 @@ const statusOf = cardStatusOf;
 
 const cardName = (card: CardRow) =>
   card.card_uid ? `Card ${card.card_uid}` : `Card ${card.id.slice(0, 8).toUpperCase()}`;
+
+/** What "Report stolen" will do to this card, said before it is done. */
+const stolenWarning = (chip: boolean) =>
+  chip
+    ? 'It is switched off for good: tapping it will open nothing. Only SHYGON support can undo this, with a replacement card.'
+    : `It is switched off for good. This card has no secure chip, so tapping it will still open your Tap: to protect your Tap, pause it in Settings${LOST_MODE_OPEN ? ' or switch it to Lost mode' : ''}. Only SHYGON support can undo this.`;
+
+/** The line under a card's status. */
+function cardLine({ card, chip }: Row): string {
+  if (card.status === 'retired') {
+    return chip
+      ? `Reported stolen${card.deactivated_at ? ` on ${date(card.deactivated_at)}` : ''}. It opens nothing. Contact SHYGON support for a replacement.`
+      : `Reported stolen${card.deactivated_at ? ` on ${date(card.deactivated_at)}` : ''}. It has no secure chip, so tapping it still opens your Tap.`;
+  }
+  if (chip) {
+    if (card.status === 'pending' || card.status === 'shipped' || !card.status) {
+      return 'To activate it, sign in to SHYGON on your phone, then tap the card on the phone.';
+    }
+    if (card.status === 'active') return card.activated_at ? `Active since ${date(card.activated_at)}` : 'Active';
+    if (card.status === 'suspended') return 'Switched off. Contact SHYGON support to turn it back on.';
+  }
+  if (card.status === 'active' && card.activation_expires_at) return `Active until ${date(card.activation_expires_at)}`;
+  if (card.status === 'suspended' && card.deactivated_at) return `Deactivated on ${date(card.deactivated_at)}`;
+  if (card.activated_at) return `Last activated ${date(card.activated_at)}`;
+  return 'Activate it to make your Tap open when the card is tapped.';
+}
 
 /** The card's design from its SKU (card-<product>-<finish>-<material>), when it is one of ours. */
 function designOf(card: CardRow) {
@@ -57,18 +103,64 @@ export default function Cards() {
   const { profile } = useAccount();
   const toast = useToast();
 
+  // The table's rows, and the server's list (C-6) for which have a chip. Both,
+  // or neither: without the server's word a chip card would get code buttons
+  // that cannot work, so a failed list is an error with a retry.
   const { data, loading, error, reload, refresh } = useAsync(
-    () => (user ? fetchMyCards(user.id) : Promise.resolve([] as CardRow[])),
-    { enabled: Boolean(user), deps: [user?.id], onError: (err) => describeError(err) },
+    async (): Promise<Row[]> => {
+      if (!user) return [];
+      const [rows, server] = await Promise.all([fetchMyCards(user.id), listOwnerCards()]);
+      const byId = new Map(server.cards.map((card) => [card.id, card]));
+      return rows.map((card) => {
+        const owner = byId.get(card.id) ?? null;
+        // Unknown to the server: treated as a chip card, so no code buttons are offered.
+        return { card, owner, chip: owner ? owner.verifiedTap.registered : true };
+      });
+    },
+    {
+      enabled: Boolean(user),
+      deps: [user?.id],
+      onError: (err) => (err instanceof CardsError ? cardsMessageOf(err) : describeError(err)),
+    },
   );
   const cards = data ?? [];
   // While card sales are closed (D-10) a customer without a card has nothing
   // to activate here, so the OTP set-up advice would be a dead end.
   const cardsExpected = CARD_SALES_OPEN || cards.length > 0;
+  // Code activation is only for cards without a chip; the phone notes are for them.
+  const codeCards = cards.some((row) => !row.chip);
+  const chipCards = cards.some((row) => row.chip);
+  const codeExpected = CARD_SALES_OPEN || codeCards;
   // Whether the number can take a card code (v0.13 §4b). A failed read shows
   // nothing here; the dialog still explains a refusal.
-  const phone = usePhoneStatus(user?.id, profile?.phone, Boolean(profile?.phone) && cardsExpected);
+  const phone = usePhoneStatus(user?.id, profile?.phone, Boolean(profile?.phone) && codeExpected);
   const [pending, setPending] = useState<{ card: CardRow; action: CardAction } | null>(null);
+  const [stolen, setStolen] = useState<Row | null>(null);
+  const [retiring, setRetiring] = useState(false);
+
+  async function retire() {
+    if (!stolen || retiring) return;
+    setRetiring(true);
+    try {
+      await reportCardStolen(stolen.card.id);
+      toast.success(
+        'Card switched off',
+        stolen.chip ? 'Tapping it now opens nothing.' : 'It still opens your Tap: pause your Tap in Settings to stop that.',
+      );
+      setStolen(null);
+      refresh();
+    } catch (failure) {
+      // Switched off already (another tab): show it as it is.
+      if (failure instanceof CardsError && failure.code === 'card_retired') {
+        setStolen(null);
+        refresh();
+        return;
+      }
+      toast.error('Could not switch the card off', cardsMessageOf(failure));
+    } finally {
+      setRetiring(false);
+    }
+  }
 
   const done = useCallback(
     (action: CardAction) => {
@@ -83,9 +175,9 @@ export default function Cards() {
     <AppShell
       eyebrow="Your SHYGON Tap"
       title="Your cards"
-      description="Activate or deactivate your NFC card. Every change is confirmed with a one-time code sent to your registered mobile number."
+      description="Activate your NFC cards, and report one stolen. A card with a secure chip is activated by tapping it; any other card with a one-time code sent to your verified mobile number."
     >
-      {!profile?.phone && cardsExpected && (
+      {!profile?.phone && codeExpected && (
         <section className="panel card-otp-phone-note" role="note">
           <PhoneCall size={18} aria-hidden="true" />
           <p>
@@ -94,7 +186,7 @@ export default function Cards() {
           </p>
         </section>
       )}
-      {profile?.phone && cardsExpected && phone && phone.phone && !phone.verified && (
+      {profile?.phone && codeExpected && phone && phone.phone && !phone.verified && (
         <section className="panel card-otp-phone-note" role="note" data-testid="cards-phone-unverified">
           <PhoneCall size={18} aria-hidden="true" />
           <p>
@@ -103,7 +195,7 @@ export default function Cards() {
           </p>
         </section>
       )}
-      {cardsExpected && phone?.verified && stillWaiting(phone) && phone.usableFrom && (
+      {codeExpected && phone?.verified && stillWaiting(phone) && phone.usableFrom && (
         <section className="panel card-otp-phone-note" role="note" data-testid="cards-phone-waiting">
           <Clock size={18} aria-hidden="true" />
           <p>
@@ -133,7 +225,7 @@ export default function Cards() {
           <EmptyState
             icon={<Nfc size={22} />}
             title="No cards yet"
-            description="Your card appears here once your order is prepared. You can then activate it with a one-time code."
+            description="Your card appears here once your order is prepared. You can then activate it."
             action={
               <Link to="/shygontap/orders" className="btn btn-ghost btn-sm">
                 View orders
@@ -142,9 +234,11 @@ export default function Cards() {
           />
         ) : (
           <ul className="card-list">
-            {cards.map((card) => {
+            {cards.map((row) => {
+              const { card, chip } = row;
               const status = statusOf(card);
               const design = designOf(card);
+              const over = card.status === 'replaced' || card.status === 'retired';
               return (
                 <li key={card.id} className="card-list-row reveal-on-scroll">
                   {design ? (
@@ -159,22 +253,15 @@ export default function Cards() {
                   <div className="card-list-main">
                     <strong>{cardName(card)}</strong>
                     {design && <span className="card-list-design">{design.label}</span>}
+                    {chip && <span className="card-list-design">Secure chip</span>}
                     {formatEdition(card) && (
                       <span className="card-edition">Limited edition · {formatEdition(card)}</span>
                     )}
                     <span className={`card-status card-status-${status.tone}`}>{status.label}</span>
-                    <small>
-                      {card.status === 'active' && card.activation_expires_at
-                        ? `Active until ${date(card.activation_expires_at)}`
-                        : card.status === 'suspended' && card.deactivated_at
-                          ? `Deactivated on ${date(card.deactivated_at)}`
-                          : card.activated_at
-                            ? `Last activated ${date(card.activated_at)}`
-                            : 'Activate it to make your Tap open when the card is tapped.'}
-                    </small>
+                    <small>{cardLine(row)}</small>
                   </div>
                   <div className="card-list-actions">
-                    {card.status !== 'replaced' && (
+                    {!chip && !over && (
                       <button
                         type="button"
                         className="btn btn-blue btn-sm"
@@ -184,13 +271,18 @@ export default function Cards() {
                         {card.status === 'active' ? 'Renew activation' : 'Activate'}
                       </button>
                     )}
-                    {card.status === 'active' && (
+                    {!chip && card.status === 'active' && (
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
                         onClick={() => setPending({ card, action: 'deactivate' })}
                       >
                         <ShieldOff size={15} aria-hidden="true" /> Deactivate
+                      </button>
+                    )}
+                    {!over && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setStolen(row)}>
+                        <ShieldAlert size={15} aria-hidden="true" /> Report stolen
                       </button>
                     )}
                   </div>
@@ -202,11 +294,37 @@ export default function Cards() {
       </section>
 
       {cardsExpected && (
-        <p className="card-otp-footnote">
-          Lost your card? Deactivate it here straight away — tapping it will stop opening your Tap. An activation
-          lasts 14 days; renew it any time.
+        <p className="card-otp-footnote" data-testid="cards-footnote">
+          Stolen? Report it here.{chipCards && ' A card with a secure chip then opens nothing.'}
+          {(codeCards || CARD_SALES_OPEN) && (
+            <>
+              {' '}
+              A card without one keeps opening your Tap&apos;s address, so also pause your Tap in{' '}
+              <Link to="/shygontap/settings">Settings</Link>.
+            </>
+          )}
+          {LOST_MODE_OPEN && (
+            <>
+              {' '}
+              Lost it, and hoping it comes back? Switch your Tap to <Link to="/shygontap/mode">Lost mode</Link> so a finder can
+              return it.
+            </>
+          )}
+          {(codeCards || CARD_SALES_OPEN) && ' An activation with a code lasts 14 days; renew it any time.'}
         </p>
       )}
+
+      <ConfirmDialog
+        open={stolen !== null}
+        title="Report this card stolen?"
+        description={stolen ? stolenWarning(stolen.chip) : undefined}
+        confirmLabel="Switch it off for good"
+        tone="danger"
+        icon={<ShieldAlert size={20} />}
+        busy={retiring}
+        onConfirm={() => void retire()}
+        onCancel={() => setStolen(null)}
+      />
 
       {pending && (
         <OtpDialog
