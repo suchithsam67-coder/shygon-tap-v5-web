@@ -1,4 +1,5 @@
 import { MARK_PATH, MARK_VIEWBOX } from './brand/logoPaths';
+import { staticLandingShown } from '../lib/staticLanding';
 
 /**
  * The SHYGON Tap loading screen: the SHYGON mark breathing inside NFC rings,
@@ -8,6 +9,8 @@ import { MARK_PATH, MARK_VIEWBOX } from './brand/logoPaths';
  * delay, so a fast load shows nothing at all rather than a flicker.
  */
 export default function BrandLoader({ label = 'Loading…' }: { label?: string }) {
+  // The landing's static first paint is already on screen: nothing to cover it with (V01 T-14).
+  if (staticLandingShown()) return null;
   return (
     <div className="boot" role="status">
       <div className="boot-mark" aria-hidden="true">

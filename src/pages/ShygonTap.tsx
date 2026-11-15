@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import BrandMark from '../components/brand/BrandMark';
 import ThemeToggle from '../components/ThemeToggle';
+import { releaseStaticLanding, takeOverStaticLanding } from '../lib/staticLanding';
 import {
   ArrowDownRight,
   ArrowRight,
@@ -168,7 +169,8 @@ function Header() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [loggedIn, setLoggedIn] = useState(false)
-  const [cartCount, setCartCount] = useState(() => localStorage.getItem('shygon_pending_order') ? 1 : 0)
+  // No storage while the build renders the static first paint (V01 T-14): an empty cart.
+  const [cartCount, setCartCount] = useState(() => typeof localStorage !== 'undefined' && localStorage.getItem('shygon_pending_order') ? 1 : 0)
   const [scrolled, setScrolled] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
@@ -1467,7 +1469,30 @@ function CartDrawer({ onClose, passPrice }: { onClose: () => void; passPrice: nu
   return <div className="cart-overlay" onClick={onClose}><aside className="cart-drawer" onClick={e=>e.stopPropagation()}><div className="cart-drawer-head"><div><small>SHYGON TAP</small><h2>Your Cart</h2></div><button className="cart-close" onClick={onClose}><X/></button></div><div className="cart-item"><div className="cart-item-image"><img src={cardArt(product, item.material as MaterialId, item.tier as TierId)} alt={product.name}/></div><div className="cart-item-copy"><p>{product.eyebrow}</p><h3>{product.name}</h3><span>{materialLabels[item.material as MaterialId]} · {tierLabels[item.tier as TierId]} · {plan.name}</span><strong>{currency(item.total ?? 0)}{plan.priceSuffix}</strong><button onClick={()=>{onClose();scrollToId('builder')}}>Edit item</button></div></div><div className="cart-trust"><div><BadgeCheck size={17}/><span>Secure checkout</span></div><div><ShoppingBag size={17}/><span>Track your order</span></div><div><Sparkles size={17}/><span>Upgrade your UI later</span></div></div><div className="cart-subtotal"><span>Subtotal</span><strong>{currency(item.total ?? 0)}{plan.priceSuffix}</strong></div>{CARD_SALES_OPEN ? <button className="cart-checkout" onClick={()=>{onClose();navigate('/shygontap/auth')}}>Proceed to Checkout <ArrowRight size={18}/></button> : <CardsComingSoon />}<button className="cart-continue" onClick={onClose}>Continue Shopping</button></aside></div>
 }
 
+/**
+ * The landing's header and hero exactly as the page renders them: the build
+ * renders this into /shygontap's HTML, so the page opens already showing them
+ * (V01 T-14; src/seo/landingStatic.tsx). Only for that render.
+ */
+export function LandingStaticTop() {
+  return (
+    <>
+      <Header />
+      <main>
+        <Hero />
+      </main>
+    </>
+  )
+}
+
 export default function ShygonApp() {
+  // The static first paint gives way to this page in the same frame, before it
+  // is painted, and the hero's entrance does not play again (index.css).
+  useLayoutEffect(() => {
+    if (!takeOverStaticLanding()) return
+    return releaseStaticLanding
+  }, [])
+
   // The builder restores the visitor's last configuration. Read in the state
   // initialisers rather than an effect, so the saved selection is what renders
   // first instead of the defaults flashing and then being replaced.

@@ -21,6 +21,71 @@ function securityHeaders(root: string): { key: string; value: string }[] {
   return vercel.headers?.find((rule) => rule.source === '/(.*)')?.headers ?? []
 }
 
+/** The page whose HTML carries the landing's static first paint (V01 T-14). */
+const LANDING_FILE = 'shygontap.html'
+/** The chunks that render the landing; their stylesheets style the static copy. */
+const LANDING_CHUNKS = [/[\\/]src[\\/]AccountApp\.tsx$/, /[\\/]src[\\/]pages[\\/]ShygonTap\.tsx$/]
+
+/**
+ * The landing's header and hero, rendered with React's server renderer from
+ * the very components the page uses (src/seo/landingStatic.tsx), in a
+ * throwaway Vite server. The database client is swapped for a stand-in: the
+ * render runs no effects, and a build talks to no database.
+ */
+async function renderLandingStatic(root: string, mode: string, envDir: string): Promise<string> {
+  const { createServer } = await import('vite')
+  const stub = path.join(root, 'src/seo/supabaseStub.ts')
+  const server = await createServer({
+    root,
+    mode,
+    envDir,
+    configFile: false,
+    logLevel: 'error',
+    appType: 'custom',
+    server: { middlewareMode: true, hmr: false, ws: false },
+    optimizeDeps: { noDiscovery: true, include: [] },
+    plugins: [
+      react(),
+      {
+        name: 'shygon-landing-supabase-stub',
+        enforce: 'pre',
+        async resolveId(source, importer, options) {
+          const resolved = await this.resolve(source, importer, { ...options, skipSelf: true })
+          return resolved && /[\\/]src[\\/]lib[\\/]supabase\.ts$/.test(resolved.id) ? stub : resolved
+        },
+      },
+    ],
+  })
+  try {
+    const mod = (await server.ssrLoadModule('/src/seo/landingStatic.tsx')) as { renderLandingStatic: () => string }
+    return mod.renderLandingStatic()
+  } finally {
+    await server.close()
+  }
+}
+
+/**
+ * /shygontap opens on its real header and hero instead of the loading screen:
+ * the static copy goes beside #root (React replaces #root's content on its
+ * first render), with the stylesheets the live page loads for them, and the
+ * live page removes it in the same frame it renders (src/lib/staticLanding.ts).
+ * The hero's card images are in that HTML, so the browser asks for them at
+ * once. The design-system marker comes along: tokens.css applies under
+ * body:has(.storefront).
+ */
+function withStaticLanding(html: string, markup: string, stylesheets: string[]): string {
+  const start = html.indexOf('<div id="root">')
+  const end = html.lastIndexOf('</body>')
+  if (start < 0 || end < start || !html.slice(start, end).includes('class="boot"')) {
+    throw new Error(`${LANDING_FILE}: the app shell no longer has #root with the loading screen`)
+  }
+  const links = stylesheets.map((href) => `    <link rel="stylesheet" crossorigin href="/${href}">`).join('\n')
+  const head = html.replace('</head>', `${links}\n  </head>`)
+  const at = head.indexOf('<div id="root">')
+  const stop = head.lastIndexOf('</body>')
+  return `${head.slice(0, at)}<div id="landing-static"><div class="storefront" hidden></div>${markup}</div><div id="root"></div>\n  ${head.slice(stop)}`
+}
+
 /**
  * Static SEO output, build only. The app is client-rendered, and search
  * engines and link-preview scrapers (WhatsApp, LinkedIn, X) mostly don't run
@@ -34,18 +99,47 @@ function securityHeaders(root: string): { key: string; value: string }[] {
 function seoPages(site: string, sales: { cardSales: boolean }): Plugin {
   let root = ''
   let outDir = ''
+  let mode = 'production'
+  let envDir = ''
+  /** The stylesheets of the landing's chunks, in load order, beyond the entry's own. */
+  let landingCss: string[] = []
   return {
     name: 'shygon-seo-pages',
     apply: 'build',
     configResolved(config) {
       root = config.root
       outDir = path.resolve(config.root, config.build.outDir)
+      mode = config.mode
+      envDir = config.envDir || config.root
+    },
+    generateBundle(_options, bundle) {
+      const css: string[] = []
+      const seen = new Set<string>()
+      const visit = (fileName: string) => {
+        const chunk = bundle[fileName]
+        if (!chunk || chunk.type !== 'chunk' || seen.has(fileName)) return
+        seen.add(fileName)
+        if (chunk.isEntry) return
+        for (const imported of chunk.imports) visit(imported)
+        for (const file of chunk.viteMetadata?.importedCss ?? []) if (!css.includes(file)) css.push(file)
+      }
+      for (const pattern of LANDING_CHUNKS) {
+        // A lazy route's chunk is known by the modules it holds (its facade can be a virtual module).
+        const chunk = Object.values(bundle).find(
+          (item) => item.type === 'chunk' && !item.isEntry && item.moduleIds.some((id) => pattern.test(id)),
+        )
+        if (!chunk) throw new Error(`no chunk for ${pattern}: the landing's static first paint cannot be styled`)
+        visit(chunk.fileName)
+      }
+      landingCss = css
     },
     // The shell served for customer Taps and signed-in pages.
     transformIndexHtml(html) {
       return injectHead(html, renderHead(site, shellMeta(site, sales), { canonical: false }))
     },
-    closeBundle() {
+    async closeBundle() {
+      // Rollup also calls this after a failed build: let that error show, not a missing file.
+      if (!fs.existsSync(path.join(outDir, 'index.html'))) return
       const pages = prerenderedPages(site, sales)
 
       // Netlify and Vercel reach each file through an explicit rewrite; a page
@@ -77,10 +171,15 @@ function seoPages(site: string, sales: { cardSales: boolean }): Plugin {
       }
 
       const template = fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')
+      const landing = await renderLandingStatic(root, mode, envDir)
+      if (!landing.includes('id="home-title"')) throw new Error('the landing static render has no hero heading')
+      const entryCss = new Set([...template.matchAll(/href="\/([^"]+\.css)"/g)].map((m) => m[1]))
+      const landingSheets = landingCss.filter((file) => !entryCss.has(file))
       for (const page of pages) {
         const file = path.join(outDir, page.file)
         fs.mkdirSync(path.dirname(file), { recursive: true })
-        fs.writeFileSync(file, injectHead(template, renderHead(site, page.meta)))
+        const html = injectHead(template, renderHead(site, page.meta))
+        fs.writeFileSync(file, page.file === LANDING_FILE ? withStaticLanding(html, landing, landingSheets) : html)
       }
       const today = new Date().toISOString().slice(0, 10)
       fs.writeFileSync(path.join(outDir, 'sitemap.xml'), sitemapXml(site, today))

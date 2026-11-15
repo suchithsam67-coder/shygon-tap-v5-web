@@ -340,6 +340,14 @@ h1, h2, h3 { font-family: 'Geist', sans-serif; }
 .tap-path i:nth-child(2) { animation-delay: .25s; }.tap-path i:nth-child(3) { animation-delay: .5s; }
 .scroll-cue { position: absolute; bottom: 22px; left: 50%; z-index: 3; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 5px; border: 0; background: none; color: var(--ds-text-tertiary); cursor: pointer; font-size: var(--ds-font-size-xs); font-weight: var(--ds-font-weight-strong); letter-spacing: .22em; }
 .reveal-up { animation: revealUp .8s both; }.reveal-scale { animation: revealScale 1s .12s both; }
+/* The landing's static first paint already played the hero's entrance; the live hero that takes
+   its place in the same frame must not play it again (V01 T-14; src/lib/staticLanding.ts). */
+html[data-static-landing] .hero .reveal-up, html[data-static-landing] .hero .reveal-scale { animation: none; }
+/* The static first paint lies over #root rather than pushing it down: the live page then arrives
+   exactly where the copy was, so nothing moves at the switch (no layout shift). Its card paints at
+   full size from the start, so the live card, the same size, is not a later largest paint. */
+#landing-static { position: absolute; top: 0; left: 0; right: 0; z-index: 1; }
+#landing-static .reveal-scale { animation: none; }
 
 .section-heading { margin-bottom: 60px; }
 .section-heading h2 { max-width: 890px; margin: 0; font-size: var(--ds-font-size-4xl); letter-spacing: -.055em; line-height: .98; }
@@ -549,7 +557,9 @@ footer{padding:90px 0 25px;color:var(--ds-text);background:var(--ds-surface);bor
 @keyframes nfcPulse{0%{transform:scale(.75);opacity:.7}100%{transform:scale(1.55);opacity:0}}
 @keyframes pathDot{0%,100%{transform:translateY(0);opacity:.18}50%{transform:translateY(-12px);opacity:1}}
 @keyframes revealUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
-@keyframes revealScale{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+/* The landing hero (its only user): scale only, no fade. A transparent paint is not counted as the
+   largest paint, so a fade held the hero's paint back about 0.6 s (V01 T-14, option A, approved 2026-11-15). */
+@keyframes revealScale{from{transform:scale(.92)}to{transform:none}}
 @keyframes builderCardIn{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes priceIn{from{opacity:.2;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes modalIn{from{opacity:0}to{opacity:1}}

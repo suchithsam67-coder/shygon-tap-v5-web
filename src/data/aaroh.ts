@@ -394,6 +394,13 @@ export function aarohImages(edition: AarohEdition, finish: AarohFinishId) {
 export const aarohSrcSet = (large: string, small: string) =>
   `${small} ${AAROH_IMAGE_SIZE_SMALL.width}w, ${large} ${AAROH_IMAGE_SIZE.width}w`
 
+/**
+ * How wide the landing's hero card is drawn (AarohHero, full size). The
+ * landing's HTML preloads the hero with the same value (src/seo/build.ts), so
+ * the browser picks the same file for both and downloads it once.
+ */
+export const AAROH_HERO_SIZES = '(max-width: 660px) calc(100vw - 60px), 600px'
+
 /** The edition's theme as CSS custom properties, for a themed container. */
 export function aarohThemeStyle(edition: AarohEdition): Record<string, string> {
   const t = edition.theme

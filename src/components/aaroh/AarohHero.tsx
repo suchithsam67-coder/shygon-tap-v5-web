@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Pause, Play } from 'lucide-react';
-import { AAROH_DEFAULT_FINISH, AAROH_EDITIONS, type AarohEdition } from '../../data/aaroh';
+import { AAROH_DEFAULT_FINISH, AAROH_EDITIONS, AAROH_HERO_SIZES, type AarohEdition } from '../../data/aaroh';
 import { AAROH_CONSTELLATION } from '../../data/aarohProduct';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import AarohCard from './AarohCard';
@@ -140,7 +140,7 @@ export default function AarohHero({
               side={reduced ? 'front' : side}
               sweepKey={`${edition.id}-${beat}`}
               priority
-              sizes={compact ? '(max-width: 640px) 66vw, 420px' : '(max-width: 660px) calc(100vw - 60px), 600px'}
+              sizes={compact ? '(max-width: 640px) 66vw, 420px' : AAROH_HERO_SIZES}
             />
           </button>
           {!compact && current.kind === 'meaning' && (

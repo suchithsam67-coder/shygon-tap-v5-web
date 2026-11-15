@@ -187,6 +187,10 @@ html.theme-fading .theme-toggle::after { animation: theme-ring 0.8s cubic-bezier
 /* Dark shows the sun (switch to light); light shows the moon. */
 .theme-toggle[data-theme-state='dark'] .theme-toggle-moon { transform: rotate(-90deg) scale(0.4); opacity: 0; }
 .theme-toggle[data-theme-state='light'] .theme-toggle-sun { transform: rotate(90deg) scale(0.4); opacity: 0; }
+/* The landing's static first paint (V01 T-14) is rendered at build time in the default theme; for a
+   visitor on the light theme its toggle follows the page's theme, as the live one does. */
+html[data-theme='light'] #landing-static .theme-toggle .theme-toggle-moon { transform: none; opacity: 1; }
+html[data-theme='light'] #landing-static .theme-toggle .theme-toggle-sun { transform: rotate(90deg) scale(0.4); opacity: 0; }
 
 /* View-transition reveal: the new theme grows from the button as a circle with
    a feathered edge (a radial mask whose size is animated in lib/theme.ts). */
