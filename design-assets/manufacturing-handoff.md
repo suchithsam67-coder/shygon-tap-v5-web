@@ -11,7 +11,7 @@
 | Format | ID-1, corner radius 3.18 mm, designed **portrait**: 53.98 mm wide × 85.60 mm tall |
 | Target thickness | 0.84 mm nominal. Please confirm against ISO/IEC 7810 (0.76 ± 0.08 mm) and your inlay |
 | Faces | Both faces printed |
-| Chip | NXP MIFARE DESFire only (owner, 2026-11-10), as an NFC Forum Type 4 tag holding one URL (NDEF). Generation and memory size to be proposed by the supplier; it must support Secure Dynamic Messaging (SUN) |
+| Chip | NXP MIFARE DESFire EV3, 2 kB, Random ID off (DEC-2026-043 §12.7, approved 2026-11-12; DESFire only since 2026-11-10), as an NFC Forum Type 4 tag holding one URL (NDEF), with Secure Dynamic Messaging (SUN) for Verified Tap. To be confirmed by the supplier: the input capacitance (17 pF or 70 pF) and whether the metal and transparent builds can carry the inlay |
 | Personalisation | Per card: unique NDEF URL, unique QR code, unique printed serial. All three must match the issue record |
 | Quantities | Prototype run first. Production volumes to be confirmed |
 

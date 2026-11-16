@@ -38,7 +38,7 @@ The PDFs were checked in Microsoft Edge's built-in Acrobat viewer. Before any ru
 
 ## Serial numbers and the card registry (owner decision, 2026-10-16)
 
-**Chip: NXP MIFARE DESFire only (owner, 2026-11-10). Generation and memory size to confirm with the inlay maker; Verified Tap needs Secure Dynamic Messaging (SUN) on the chosen generation.**
+**Chip: NXP MIFARE DESFire EV3, 2 kB, Random ID off (DESFire only: owner, 2026-11-10; EV3, 2 kB and Random ID off approved 2026-11-12, DEC-2026-043 §12.7). Verified Tap needs its Secure Dynamic Messaging (SUN). Still to confirm with the inlay maker: the input capacitance (17 pF or 70 pF) and whether the metal and transparent builds can carry the inlay.**
 
 Cards are made as pre-numbered stock and tracked in a registry. Each physical card has four separate values:
 

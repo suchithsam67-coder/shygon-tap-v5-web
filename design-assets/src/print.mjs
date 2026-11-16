@@ -480,7 +480,7 @@ proof, the inlay maker's coil drawing and NFC read tests come before any run.
 ## Format
 - ID-1 card (ISO/IEC 7810), **landscape**: trim 85.60 × 53.98 mm, corner radius 3.18 mm.
 - Artwork 91.60 × 59.98 mm (3 mm bleed on every side). Safe area 4 mm inside trim.
-- Finished thickness 0.76 ± 0.08 mm after lamination. NFC inlay: ISO/IEC 14443-A, NXP MIFARE DESFire only (owner, 2026-11-10). Generation and memory size to confirm with the inlay maker; Verified Tap needs Secure Dynamic Messaging (SUN) on the chosen generation.
+- Finished thickness 0.76 ± 0.08 mm after lamination. NFC inlay: ISO/IEC 14443-A, NXP MIFARE DESFire EV3, 2 kB, Random ID off, with Secure Dynamic Messaging (SUN) for Verified Tap (DEC-2026-043 §12.7, approved 2026-11-12). Input capacitance (17 pF or 70 pF) and the inlay in the metal and transparent builds: to confirm with the inlay maker.
 - Lighting in the mockups is not printed. Relief and foil come only from their plates.
 
 ## Files
