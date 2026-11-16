@@ -4,6 +4,7 @@ import { defineConfig, loadEnv, type Plugin, type PluginOption } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import {
+  rulesAfterCatchAll,
   injectHead,
   llmsTxt,
   prerenderedPages,
@@ -152,6 +153,11 @@ function seoPages(site: string, sales: { cardSales: boolean }): Plugin {
         .filter((route) => !toml.includes(`from = "${route}"\n  to = "${route}.html"`))
       if (unrouted.length) {
         throw new Error(`netlify.toml has no rewrite for: ${unrouted.join(', ')}`)
+      }
+      // A rule after the /* catch-all never matches (V5's /admin, release audit 2026-11-15).
+      const shadowed = rulesAfterCatchAll(toml)
+      if (shadowed.length) {
+        throw new Error(`netlify.toml: these rules come after the /* catch-all and never match: ${shadowed.join(', ')}`)
       }
       const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8')) as {
         rewrites?: { source: string; destination: string }[]

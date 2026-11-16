@@ -93,6 +93,18 @@ export function renderHead(site: string, meta: PageMeta, opts: { canonical?: boo
 }
 
 /** Replaces the block between the seo markers in the built index.html. */
+/**
+ * Netlify answers with the first [[redirects]] rule that matches, so a rule
+ * after the catch-all (`from = "/*"`) never runs. That is how V5's /admin went
+ * to the 404 page (V5 release audit, 2026-11-15). Returns the shadowed rules'
+ * paths, in file order; the build fails if there are any.
+ */
+export function rulesAfterCatchAll(toml: string): string[] {
+  const rules = [...toml.replace(/\r\n/g, '\n').matchAll(/^\[\[redirects\]\]\n\s*from = "([^"]+)"/gm)].map((m) => m[1]!);
+  const catchAll = rules.indexOf('/*');
+  return catchAll === -1 ? [] : rules.slice(catchAll + 1);
+}
+
 export function injectHead(template: string, head: string): string {
   const start = '<!-- seo:start -->';
   const end = '<!-- seo:end -->';
