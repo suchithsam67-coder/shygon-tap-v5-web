@@ -14,7 +14,9 @@
 #     continue-on-error.
 #
 # Keep the step order identical to the `ci` script in package.json, which runs
-# the same gates locally.
+# the same gates locally. Locally, `npm run ci` (scripts/run-tests.mjs, V5 audit
+# B-8) runs every gate even after a failure and lists them all; here a failing
+# gate still stops the job, as the owner's rule above requires.
 name: ci
 
 on:
@@ -32,7 +34,9 @@ jobs:
   gates:
     name: gates
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 30 -> 60 (T-20, 2026-11-17): the gate set grew to 32 steps and takes about
+    # 35 minutes on the local machine; a timeout must never stand in for a result.
+    timeout-minutes: 60
     steps:
       - name: Checkout (full history, for the secret scan)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -117,6 +121,11 @@ jobs:
       # the customer; notes moved intact; admin contract held; rollback proven.
       - name: admin notes off customer rows (live baseline)
         run: npm run test:admin-notes
+
+      # V5 release-audit parity (migration 046; V5's 057 design): the card
+      # one-time-code limits are decided and recorded in one database call.
+      - name: card code limits are atomic (live baseline)
+        run: npm run test:card-otp-limits
 
       # Every migration's header rollback restores the schema before it, and the
       # whole chain rolls back to the live baseline and re-applies identically.
