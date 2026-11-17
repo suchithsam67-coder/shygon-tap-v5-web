@@ -7,6 +7,37 @@ Session A, 2026-11-17.
 - The approval covers a local rebase only: no push, no apply, no production contact.
 - The owner, in session on 2026-11-16, also approved this plan as item 3 of "Approve all three".
 
+## 0. Precondition: a fresh production schema (T-31 paused, 2026-11-17)
+
+**Why the rebase is paused.** Session A ran a read-only experiment in throwaway in-memory databases [OBSERVED].
+- **The V5 line, replayed, is not the production schema.** V5's test baseline plus migrations 001–057 applies cleanly, but it does not reproduce the 2026-09-30 production dump.
+  - The dump has objects that **neither repository's migrations create or drop**:
+    - tables `customer_customizations`, `customizations` and `ui_plans`;
+    - functions such as `request_card_replacement`, `customer_activate_card`, `fulfil_order` and `set_card_nickname`;
+    - every `*_select_owner_or_admin` policy.
+  - They were most likely created directly in the database.
+  - Against the dump, the replay has 15 tables, 83 functions and 21 policies the dump lacks. It lacks 3 tables, 10 functions and 19 policies the dump has. Another 13 tables and 34 functions differ.
+- **V6 on top of the replay:** 23 of 25 migrations apply.
+  - 024 fails: its `*_select_owner_or_admin` policies are absent.
+  - 041 fails: the replay's `cards` has no `card_id`.
+  - Three migrations would put a 09-30 function body back over a newer V5 one: 021 (`provision_tap_on_payment`), 025 (`enforce_tap_edit_rules`) and 035 (`get_public_profile`).
+
+**Consequence.** A rebase proven green on the replay would be proven against a schema that is not production's.
+
+**Decision** [OBSERVED]: the owner, in session on 2026-11-17, answered "Wait for fresh dump" to "Which base should the move build on?".
+
+**The input needed (human, read-only).**
+- Whoever holds production access takes a fresh schema-only dump of the production project, as approved on 2026-10-18:
+  `pg_dump --schema-only --no-owner --schema=public --verbose`
+- It is kept with its provenance: the project, the timestamp, and the git commit at capture time.
+- It holds no data and no secrets, and must never include credentials.
+
+**Then:**
+1. The base becomes that dump, plus V5's 054–057 (not applied on live), plus the Admin APK's 058.
+2. The comparison above is re-run against it.
+3. The steps below follow, with the same number rule.
+4. 024 and 041 are adapted, and 021, 025 and 035 are regenerated, to whatever production actually has.
+
 ## 1. What moves where
 
 **The base (the live line):**
