@@ -1,8 +1,14 @@
 -- ============================================================================
--- 042 — ADMIN APK: COVERAGE OF THE V5 FEATURES SHIPPED AFTER THE ADMIN PLATFORM
+-- 058 — ADMIN APK: COVERAGE OF THE V5 FEATURES SHIPPED AFTER THE ADMIN PLATFORM
 -- ============================================================================
--- Run AFTER 001–019 (the V5 baseline, tag v5-baseline). Number 042 was agreed
--- with the V6 backend session on 2026-11-11; V6 continues from 043.
+-- Run AFTER the live line 001–057 (../shygon-tap-website, audit/2026-11-15).
+-- Drafted as 042 against the V5 baseline (001–019); renumbered 058 on
+-- 2026-11-17 because live already has its own 042. V6 continues from 059.
+-- Verified on both lines: node supabase/tests/verify-058-admin-v5.mjs [root].
+--
+-- On the live line 047 makes activation_expires_at always NULL, so the
+-- "activation window expired" counts below read 0 there. That is correct, not
+-- a fault: on live a card's activation never expires.
 --
 -- WHY THIS EXISTS
 --   The admin platform (003, applied to live as 013) was written against the
@@ -88,7 +94,7 @@ BEGIN
 
   IF array_length(v_missing, 1) > 0 THEN
     RAISE EXCEPTION
-      'Cannot install 042: missing % . Apply the V5 baseline (001–019) first.',
+      'Cannot install 058: missing % . Apply the earlier migrations first.',
       array_to_string(v_missing, ', ');
   END IF;
 END $$;
@@ -273,7 +279,6 @@ BEGIN
         'order_status', f.order_status,
         'fulfillment_status', f.fulfillment_status,
         'fulfilled_at', f.fulfilled_at,
-        'confirmation_sms_status', f.confirmation_sms_status,
         'tracking_number', f.tracking_number,
         'shipping_carrier', f.shipping_carrier,
         'shipping_city', f.shipping_city,

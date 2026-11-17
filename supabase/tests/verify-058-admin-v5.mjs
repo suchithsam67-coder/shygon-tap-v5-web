@@ -4,19 +4,19 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Verifies supabase/migrations/042_admin_v5_coverage.sql by EXECUTING it.
+ * Verifies supabase/migrations/058_admin_v5_coverage.sql by EXECUTING it.
  *
- * `db:apply` proves 042 installs. That is not enough: PL/pgSQL does not check
- * column references until a function runs, which is exactly how 042's first
+ * `db:apply` proves 058 installs. That is not enough: PL/pgSQL does not check
+ * column references until a function runs, which is exactly how its first
  * draft would have passed `db:apply` while failing at runtime on any database
  * built from the migrations (the card-activation drift, now section 0b).
  *
- * So this applies 001–042 to a real Postgres, seeds a deliberately awkward data
+ * So this applies every migration up to 058 to a real Postgres, seeds a deliberately awkward data
  * set, and calls every new function as the real `authenticated` role with
  * Supabase's default broad grants — the same conditions PostgREST creates — so
  * RLS and require_admin() are what actually stand in the way.
  *
- *   node supabase/tests/verify-042-admin-v5.mjs [repo root]
+ *   node supabase/tests/verify-058-admin-v5.mjs [repo root]
  */
 const ROOT = process.argv[2] ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MIG = path.join(ROOT, 'supabase', 'migrations');
@@ -416,7 +416,7 @@ await check('admin_list_orders still exists with its original signature', async 
 await check('admin_list_orders row shape is unchanged (no new keys)', async () => {
   const page = await as('authenticated', OWNER, () => val(`SELECT public.admin_list_orders() v`));
   const keys = Object.keys(page.rows[0]).sort();
-  assert(!keys.includes('fulfillment_status'), 'a 042 key leaked into the frozen shape');
+  assert(!keys.includes('fulfillment_status'), 'a 058 key leaked into the frozen shape');
   return `${keys.length} keys, as before`;
 });
 await check('admin_get_order still answers', async () => {
