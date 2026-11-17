@@ -17,7 +17,11 @@ import { sendText, SmsError, smsProvider, toE164 } from '../lib/sms.mjs';
  *   - Codes come from crypto.randomInt and are stored only as an HMAC keyed
  *     with OTP_SECRET. The table is unreachable from browsers (RLS, no policies).
  *   - 10-minute expiry, 5 attempts per code, 45 s between sends, 5 sends per
- *     hour per account. A code is single-use (consumed with a conditional update).
+ *     hour per account. Since migration 046 (V5's 057, the same design) each
+ *     limit is decided and recorded in one database call: card_otp_begin locks
+ *     the account, checks both send limits and inserts; card_otp_take_attempt
+ *     spends an attempt BEFORE the code is compared. Parallel requests cannot
+ *     pass them. A code is single-use (consumed with a conditional update).
  *   - The card must belong to the caller; the number is the one on their account,
  *     and only once it is verified and past its wait (DEC-2026-045, finding F4):
  *     409 code 'phone_not_verified' or 'phone_cooling_down' (+ retryAfter) otherwise.
@@ -35,7 +39,6 @@ import { sendText, SmsError, smsProvider, toE164 } from '../lib/sms.mjs';
 const OTP_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const RESEND_COOLDOWN_MS = 45 * 1000;
-const MAX_SENDS_PER_HOUR = 5;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const json = (body, status = 200) =>
@@ -191,37 +194,34 @@ async function requestCode(cfg, user, body, request) {
     return json({ error: 'Your mobile number was changed recently. For your security, it can confirm card changes 24 hours after it was verified.', code: 'phone_cooling_down', retryAfter }, 409);
   }
 
-  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const recent = await rest(
-    cfg,
-    `card_otp_challenges?user_id=eq.${user.id}&created_at=gte.${since}&select=created_at&order=created_at.desc`,
-  );
-  if (recent.length >= MAX_SENDS_PER_HOUR) {
-    return json({ error: 'Too many codes requested. Please try again in an hour.' }, 429);
-  }
-  const last = recent[0] ? Date.parse(recent[0].created_at) : 0;
-  const wait = RESEND_COOLDOWN_MS - (Date.now() - last);
-  if (wait > 0) {
-    return json({ error: 'Please wait before requesting another code.', retryAfter: Math.ceil(wait / 1000) }, 429);
-  }
-
   const challengeId = crypto.randomUUID();
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
 
-  await rest(cfg, 'card_otp_challenges', {
+  // Migration 046 (V5's 057): the hourly limit, the gap between sends and the
+  // insert are one locked step, so parallel requests cannot all pass the check.
+  const begun = await rest(cfg, 'rpc/card_otp_begin', {
     method: 'POST',
-    prefer: 'return=minimal',
     body: {
-      id: challengeId,
-      user_id: user.id,
-      card_id: card.id,
-      action,
-      code_hash: hashCode(cfg.secret, challengeId, code),
-      phone_last4: phone.slice(-4),
-      expires_at: expiresAt,
+      p_challenge: challengeId,
+      p_user: user.id,
+      p_card: card.id,
+      p_action: action,
+      p_code_hash: hashCode(cfg.secret, challengeId, code),
+      p_phone_last4: phone.slice(-4),
+      p_channel: 'sms',
+      p_expires_at: expiresAt,
     },
   });
+  if (!begun?.ok) {
+    if (begun?.reason === 'cooldown') {
+      return json(
+        { error: 'Please wait before requesting another code.', retryAfter: begun.retryAfter ?? RESEND_COOLDOWN_MS / 1000 },
+        429,
+      );
+    }
+    return json({ error: 'Too many codes requested. Please try again in an hour.' }, 429);
+  }
 
   let delivery;
   try {
@@ -252,22 +252,22 @@ async function verifyCode(cfg, user, body) {
   if (!UUID.test(challengeId)) return json({ error: 'Request a new code.' }, 400);
   if (!/^\d{6}$/.test(code)) return json({ error: 'Enter the 6-digit code.' }, 400);
 
-  const [challenge] = await rest(
-    cfg,
-    `card_otp_challenges?id=eq.${challengeId}&user_id=eq.${user.id}&select=id,card_id,action,code_hash,attempts,expires_at,consumed_at`,
-  );
-  if (!challenge || challenge.consumed_at) return json({ error: 'This code has already been used. Request a new one.' }, 410);
-  if (Date.parse(challenge.expires_at) <= Date.now()) return json({ error: 'This code has expired. Request a new one.' }, 410);
-  if (challenge.attempts >= MAX_ATTEMPTS) return json({ error: 'Too many wrong attempts. Request a new code.' }, 429);
+  // Migration 046 (V5's 057): one attempt is spent atomically BEFORE the code is
+  // compared, so parallel guesses cannot all see the same count. The id is
+  // hashed in the form it was created with (crypto.randomUUID is lowercase).
+  const id = challengeId.toLowerCase();
+  const taken = await rest(cfg, 'rpc/card_otp_take_attempt', {
+    method: 'POST',
+    body: { p_challenge: id, p_user: user.id },
+  });
+  if (!taken?.ok) {
+    if (taken?.reason === 'expired') return json({ error: 'This code has expired. Request a new one.' }, 410);
+    if (taken?.reason === 'attempts') return json({ error: 'Too many wrong attempts. Request a new code.' }, 429);
+    return json({ error: 'This code has already been used. Request a new one.' }, 410);
+  }
 
-  if (!sameHash(hashCode(cfg.secret, challenge.id, code), challenge.code_hash)) {
-    const attempts = challenge.attempts + 1;
-    await rest(cfg, `card_otp_challenges?id=eq.${challenge.id}`, {
-      method: 'PATCH',
-      prefer: 'return=minimal',
-      body: { attempts },
-    });
-    const left = MAX_ATTEMPTS - attempts;
+  if (!sameHash(hashCode(cfg.secret, id, code), taken.codeHash)) {
+    const left = MAX_ATTEMPTS - taken.attempts;
     return json(
       { error: left > 0 ? `That code is not right. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many wrong attempts. Request a new code.', attemptsLeft: left },
       left > 0 ? 400 : 429,
@@ -275,7 +275,7 @@ async function verifyCode(cfg, user, body) {
   }
 
   // Single use: only the first request to flip consumed_at gets through.
-  const consumed = await rest(cfg, `card_otp_challenges?id=eq.${challenge.id}&consumed_at=is.null`, {
+  const consumed = await rest(cfg, `card_otp_challenges?id=eq.${id}&consumed_at=is.null`, {
     method: 'PATCH',
     prefer: 'return=representation',
     body: { consumed_at: new Date().toISOString() },
@@ -285,9 +285,9 @@ async function verifyCode(cfg, user, body) {
   try {
     const [card] = await rest(cfg, 'rpc/card_apply_verified_action', {
       method: 'POST',
-      body: { p_user_id: user.id, p_card_id: challenge.card_id, p_action: challenge.action },
+      body: { p_user_id: user.id, p_card_id: taken.cardId, p_action: taken.action },
     });
-    return json({ card, action: challenge.action });
+    return json({ card, action: taken.action });
   } catch (error) {
     const message =
       error.code === '22023' || error.code === 'P0002' ? error.message : 'We could not update your card. Please try again.';

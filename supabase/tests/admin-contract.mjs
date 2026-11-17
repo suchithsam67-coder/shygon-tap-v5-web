@@ -144,6 +144,15 @@ const APPROVED_ACL_CHANGES = {
   'get_public_tap(text)': { decision: 'DEC-2026-035 V6-071 (migration 025)', remove: ['anon', 'authenticated'] },
 };
 
+// Table grants an approved decision changes: exactly the SELECT privilege ('r')
+// taken from the listed grantees; every other letter and grantee stays as on live.
+const APPROVED_TABLE_ACL_CHANGES = {
+  orders: {
+    decision: 'V5 release-audit parity B-1 (migration 046, as V5\'s 054); owner "Approve all three", 2026-11-16',
+    removeSelect: ['anon', 'authenticated'],
+  },
+};
+
 // Policies an approved decision removes or re-targets. Their USING / WITH CHECK
 // expressions must stay identical; any other policy change fails.
 const OWNER_OR_ADMIN = ['cards', 'notifications', 'orders', 'profiles', 'support_messages',
@@ -472,7 +481,22 @@ await check('no policy changed, added or removed, except the approved ones', () 
 
 await check('no table grant or RLS switch changed on existing relations; new ones are closed', () => {
   const m = byKey(mig.tableGrants, (r) => r.relname);
-  const problems = diffRows(base.tableGrants, mig.tableGrants, (r) => r.relname, ['acl', 'relrowsecurity', 'relforcerowsecurity']);
+  const fixed = (rows) => rows.filter((r) => !APPROVED_TABLE_ACL_CHANGES[r.relname]);
+  const problems = diffRows(fixed(base.tableGrants), fixed(mig.tableGrants), (r) => r.relname, ['acl', 'relrowsecurity', 'relforcerowsecurity']);
+  for (const [relname, { decision, removeSelect }] of Object.entries(APPROVED_TABLE_ACL_CHANGES)) {
+    const before = base.tableGrants.find((r) => r.relname === relname);
+    const after = mig.tableGrants.find((r) => r.relname === relname);
+    const expected = aclItems(before.acl).map((i) => {
+      const who = grantee(i);
+      return removeSelect.includes(who) ? i.replace(/=([a-zA-Z*]+)\//, (_, p) => `=${p.replace('r', '')}/`) : i;
+    });
+    if (JSON.stringify(aclItems(after.acl)) !== JSON.stringify(expected)) {
+      problems.push(`${relname}: grants differ from the approved change (${decision}): ${after.acl}`);
+    }
+    if (after.relrowsecurity !== before.relrowsecurity || after.relforcerowsecurity !== before.relforcerowsecurity) {
+      problems.push(`${relname}: row level security changed`);
+    }
+  }
   const added = mig.tableGrants.filter((r) => !base.tableGrants.some((b) => b.relname === r.relname));
   for (const r of added) {
     if (!APPROVED_NEW_RELATIONS[r.relname] && !PROPOSED_NEW_RELATIONS[r.relname]) {

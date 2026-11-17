@@ -319,10 +319,17 @@ for (const t of tables.filter((x) => MODEL[x])) {
   const tally = { select: [0, 0], update: [0, 0], delete: [0, 0], insert: [0, 0] };
   const mark = (op, ok) => { tally[op][1]++; if (ok) tally[op][0]++; };
 
+  // A table read through column-level grants (orders since 046, as V5's 054)
+  // has no table-level SELECT, so its rows are identified by `id`, which the
+  // grant covers, instead of ctid, which no column grant can cover.
+  const columnGranted = (await db.query(`SELECT NOT has_table_privilege('authenticated', $1, 'SELECT')
+      AND has_any_column_privilege('authenticated', $1, 'SELECT') AS c`, [`public.${t}`])).rows[0].c;
+  const key = columnGranted && cols.includes('id') ? 'id::text' : 'ctid::text';
+
   for (const actor of ACTORS) {
     // SELECT: the exact row set.
-    const expected = await ctids((await asSuper(actor.uid, `SELECT ctid::text AS k FROM public.${t} WHERE (${selPred(m, actor)})`)).rows);
-    const got = await asActor(actor, `SELECT ctid::text AS k FROM public.${t}`);
+    const expected = await ctids((await asSuper(actor.uid, `SELECT ${key} AS k FROM public.${t} WHERE (${selPred(m, actor)})`)).rows);
+    const got = await asActor(actor, `SELECT ${key} AS k FROM public.${t}`);
     const seen = got.err ? [] : await ctids(got.rows.rows);
     const extra = seen.filter((k) => !expected.includes(k));
     const missing = expected.filter((k) => !seen.includes(k));
@@ -382,9 +389,14 @@ console.log('\n=== anonymous callers, strictly (migration 024) ===');
 const anon = ACTORS.find((x) => x.key === 'anon');
 for (const t of ['cards', 'notifications', 'orders', 'profiles', 'support_messages', 'support_tickets', 'tap_events', 'tap_profiles']) {
   const r = await asActor(anon, `SELECT count(*)::int AS n FROM public.${t}`);
-  const ok = record(!r.err && r.rows.rows[0].n === 0, `${t} anonymous SELECT`,
-    r.err ? `refused with an error (${r.err.code} ${r.err.message.slice(0, 60)}), expected 0 rows` : `${r.rows.rows[0].n} row(s)`);
-  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${t.padEnd(32)} 0 rows, no error`);
+  // orders: since 046 (V5's 054) anon holds no SELECT at all, which is stricter
+  // than "0 rows": a refusal with 42501 is the expected answer there.
+  const noPrivilege = t === 'orders';
+  const ok = noPrivilege
+    ? record(r.err?.code === '42501', `${t} anonymous SELECT`, r.err ? `refused with ${r.err.code}, expected 42501` : `${r.rows.rows[0].n} row(s), expected a refusal`)
+    : record(!r.err && r.rows.rows[0].n === 0, `${t} anonymous SELECT`,
+      r.err ? `refused with an error (${r.err.code} ${r.err.message.slice(0, 60)}), expected 0 rows` : `${r.rows.rows[0].n} row(s)`);
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${t.padEnd(32)} ${noPrivilege ? 'no privilege (42501; 046)' : '0 rows, no error'}`);
 }
 for (const f of ['public.require_admin(text)', 'public.admin_has(text)', 'public.is_admin()']) {
   const priv = (await db.query(`SELECT has_function_privilege('anon', $1, 'EXECUTE') AS p`, [f])).rows[0].p;

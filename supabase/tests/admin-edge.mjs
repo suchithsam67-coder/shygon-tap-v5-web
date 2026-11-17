@@ -346,6 +346,42 @@ await t.check('the check fails closed: when the database cannot answer, the ordi
   return 'never allowed on doubt';
 });
 
+// ---------------------------------------------------------------------------
+t.section('V5 audit B-1 parity (migration 046): the refund reason is an internal note');
+
+await t.check('a refund writes its reason to order_admin_notes, never onto the order row the customer can read', async () => {
+  // orders.customer_id references the account itself (auth.users) on live.
+  const [{ id: orderId }] = await sql(`INSERT INTO public.orders (order_id, user_id, customer_id, product_name, amount, amount_in_paise,
+      payment_status, order_status, razorpay_payment_id)
+    VALUES ('ST-REFUND-046', $1, $1, 'Business experience', 999, 99900, 'paid', 'processing', 'pay_test_046') RETURNING id`, [customer.userId]);
+  // The gateway is stubbed for this one call: no request leaves the machine.
+  const realFetch = globalThis.fetch;
+  let gateway = 0;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).startsWith('https://api.razorpay.com/')) {
+      gateway++;
+      return new Response(JSON.stringify({ id: 'rfnd_test_046', status: 'processed' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return realFetch(url, init);
+  };
+  let r;
+  try {
+    r = await call('admin-refund', { token: full.token, body: { order_id: orderId, reason: 'Damaged in transit' } });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assertEqual([r.status, r.body?.success, gateway], [200, true, 1], 'refunded through the stubbed gateway');
+  const [row] = await sql(`SELECT admin_note, payment_status FROM public.orders WHERE id = $1`, [orderId]);
+  assertEqual(row, { admin_note: null, payment_status: 'refunded' }, 'nothing on the order row');
+  const [note] = await sql(`SELECT note FROM public.order_admin_notes WHERE order_id = $1`, [orderId]);
+  assertEqual(note?.note, 'Refund: Damaged in transit', 'the internal note');
+  const leak = await customer.client.from('orders').select('admin_note').eq('id', orderId);
+  assert(leak.error, `the customer could select admin_note: ${JSON.stringify(leak.data)}`);
+  const own = await customer.client.from('orders').select('order_id, payment_status').eq('id', orderId);
+  assertEqual(own.data, [{ order_id: 'ST-REFUND-046', payment_status: 'refunded' }], 'the customer still reads their order');
+  return 'reason in order_admin_notes; admin_note refused to the customer';
+});
+
 const ok = t.finish();
 await stack.close();
 fs.rmSync(outDir, { recursive: true, force: true });

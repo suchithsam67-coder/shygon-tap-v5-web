@@ -193,6 +193,49 @@ await check('the remaining migrations apply on top, and 022 re-runs cleanly (ide
   return `${later.length} later migration(s) applied; re-run kept 2 notes`;
 });
 
+console.log('\n=== B-1 parity: the note column is closed to customers; one way to add a note (migration 046) ===');
+
+await check('the customer cannot read orders.admin_note at all, but still reads their orders', () =>
+  as(db, 'authenticated', CUST, async () => {
+    const col = await attempt(() => db.query(`SELECT admin_note FROM public.orders WHERE user_id = $1`, [CUST]));
+    assert(col.err?.code === '42501', `admin_note was readable (${col.err ? col.err.code : json(col.res.rows)})`);
+    const star = await attempt(() => db.query(`SELECT * FROM public.orders WHERE user_id = $1`, [CUST]));
+    assert(star.err?.code === '42501', 'select * still worked: every client read must name its columns');
+    const mine = (await db.query(`SELECT order_id, payment_status FROM public.orders WHERE user_id = $1 ORDER BY order_id`, [CUST])).rows;
+    assert(json(mine) === json([{ order_id: 'ST-N1', payment_status: 'paid' }, { order_id: 'ST-N2', payment_status: 'paid' }]), json(mine));
+    return 'column refused (42501); named columns still read, own rows only';
+  }));
+
+await check('anonymous callers cannot select orders at all', () =>
+  as(db, 'anon', null, async () => {
+    const r = await attempt(() => db.query(`SELECT order_id FROM public.orders`));
+    assert(r.err?.code === '42501', `anon read orders (${r.err ? r.err.code : r.res.rows.length})`);
+    return 'refused';
+  }));
+
+await check('order_admin_note_append adds a line to the note (never the order row) and is server only', async () => {
+  await db.query(`SELECT public.order_admin_note_append($1, '  Refund: damaged in transit  ', $2)`, [O1, ADMIN]);
+  await db.query(`SELECT public.order_admin_note_append($1, '   ', $2)`, [O1, ADMIN]);
+  await db.query(`SELECT public.order_admin_note_append($1, 'Refund: duplicate payment', NULL)`, ['dd000000-0000-4000-8000-000000000002']);
+  const n1 = (await db.query(`SELECT note, updated_by FROM public.order_admin_notes WHERE order_id = $1`, [O1])).rows[0];
+  assert(n1.note === `${NOTE}\nRefund: damaged in transit` && n1.updated_by === ADMIN, json(n1));
+  const n2 = (await db.query(`SELECT note FROM public.order_admin_notes WHERE order_id = $1`, ['dd000000-0000-4000-8000-000000000002'])).rows[0];
+  assert(n2?.note === 'Refund: duplicate payment', json(n2));
+  const left = (await db.query(`SELECT count(*)::int AS n FROM public.orders WHERE admin_note IS NOT NULL`)).rows[0].n;
+  assert(left === 0, `${left} order row(s) carry a note`);
+  const callable = (await db.query(`SELECT has_function_privilege('authenticated', 'public.order_admin_note_append(uuid, text, uuid)', 'EXECUTE') AS a,
+    has_function_privilege('anon', 'public.order_admin_note_append(uuid, text, uuid)', 'EXECUTE') AS b`)).rows[0];
+  assert(!callable.a && !callable.b, json(callable));
+  return 'appended on a new line; a blank line is ignored; a first note is created; no client may call it';
+});
+
+await check('admin_get_order shows the appended note to the administrator', () =>
+  as(db, 'authenticated', ADMIN, async () => {
+    const o = (await db.query(`SELECT public.admin_get_order($1) AS o`, [O1])).rows[0].o;
+    assert(o.order.admin_note === `${NOTE}\nRefund: damaged in transit`, json(o.order.admin_note));
+    return 'the refund reason reaches the admin app, not the customer';
+  }));
+
 console.log('\n=== rollback (022 header) ===');
 
 await check('the ROLLBACK block restores the live bodies and puts every note back', async () => {

@@ -1136,3 +1136,42 @@ The two admin edge functions check access on their own.
 - any hosted check.
 
 **Verdict unchanged:** release BLOCKED (§18).
+
+## 33. 2026-11-17: V5 release-audit parity (migration 046, contract v0.18.1) and CI (T-20)
+
+**Approval:** the owner, in session on 2026-11-16: "Approve all three". That covers the hardening, the CI update and the rebase plan, all local only. The coordinator relayed the V5 audit (`audit/2026-11-15` on `shygon-tap-website`).
+
+**Verdicts** (also sent to the coordinator):
+- **B-1, a gap in V6.** admin-refund wrote the refund reason onto `orders.admin_note`, which customers could read.
+- **The card-otp race,** found in V6 and confirmed on V5 (their 057).
+- **B-8:** the `&&` chains.
+- **Do not apply:** B-2, B-3/B-4 and B-7 (V6 has no phone sign-in) and npm high (none).
+
+**Built:**
+- **Migration 046:**
+  - customers lose SELECT on `orders.admin_note`, the same as V5's 054;
+  - `order_admin_note_append` is the one way to add an internal note;
+  - V5's 057 functions, unchanged except that there is no `channel` column before the rebase.
+- **admin-refund** writes the reason to `order_admin_notes`.
+- **card-otp** calls `card_otp_begin` and `card_otp_take_attempt`. Its API and messages are unchanged.
+- **`scripts/run-tests.mjs`:** `npm run ci`, `test:db` and `test:payments*` now run every step and list every failure.
+- **CI (T-20):** the workflow runs the same 45 steps as the local `ci`, plus e2e, with the new `test:card-otp-limits`. The timeout went from 30 to 60 minutes.
+
+**Evidence** [OBSERVED, Node 20.18.0; network denied for the stack suites]:
+
+| Group | Results |
+|---|---|
+| New and changed | `test:card-otp-limits` **8** (V5's verify-057 checks, on V6); `test:admin-notes` **16** (4 new: the column refused to customers, anon refused, `order_admin_note_append`, the admin sees the appended note); `test:admin-edge` **17** (1 new: a refund through a stubbed gateway leaves the reason in `order_admin_notes` and nothing the customer can read) |
+| Negative controls | `card-otp-limits --without-046`: 7 failed, and only the replay of the old interleaved sequence passed (as on V5). admin-refund put back to writing `orders.admin_note`: the refund check failed ("admin_note": "Damaged in transit"). The runner: a failing step followed by a passing one ran both and exited 1, where the `&&` chain stopped at the first |
+| `test:db` (now through the runner, 13 steps) | verify 21; adversarial 64; RLS matrix **1754** (62 tables; `orders` probed by id, anon refused 42501); identity 69; admin-notes 16; card-otp-limits 8; golden **27**; admin-contract 21 (the `orders` grant change approved exactly: SELECT taken from anon and authenticated, nothing else); rollbacks **26** (046 restores the grants and drops its functions); account-deletion 9; bundle current; history 2. In the first run the runner reported both gate failures (the matrix and admin-contract, before their updates) instead of stopping at the first |
+| Full regression, each exit 0 | lint; build; bundle; bundle-secrets; seo; push-guard 18; payments:ci 16, and 13 + 1 known Node-20-only BLOCKED (card-otp's flows included); payment-chain 30; public-tap 25; suspension 46; emergency 49; rescue 18; connect 17; prive 12; modes 28; bq1-production 16; sun 27; verified-tap 20; account-export 12; phone-verify 12 (card-otp's verified-phone rules); admin-mfa 9; card-lifecycle 10; age-gate 11; local-host 9; admin-edge 17; observability 10; security 12; components 23/23; preview-checks 13; `npm audit --audit-level=high` exit 0 |
+| `test:secrets` | gitleaks 8.30.1: only the known V6-014 finding (`9c8caa7`) |
+| CI parity (T-20) | `.github/workflows/ci.yml` runs the same 45 steps as the local `ci` (test:db expanded), plus the e2e job. The set is identical; inside the database group the order differs, as before |
+
+**Not run:**
+- the CI workflow on GitHub (nothing is pushed);
+- Node 22 locally (the portable copy is gone with the old scratchpad; CI uses `.nvmrc` 22);
+- real concurrency on PostgreSQL 17 (PGlite has one connection, so the race is shown by replay, as on V5);
+- any hosted check. Realtime on `orders` with column grants is UNVERIFIED, as on V5.
+
+**Verdict unchanged:** release BLOCKED (§18).

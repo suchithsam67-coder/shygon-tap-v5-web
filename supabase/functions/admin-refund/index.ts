@@ -190,12 +190,23 @@ Deno.serve(async (request: Request) => {
         refund_amount_in_paise: amountInPaise,
         refunded_at: new Date().toISOString(),
         payment_status: fullyRefunded ? 'refunded' : 'paid',
-        admin_note: reason,
       })
       .eq('id', order.id);
 
     if (updateError) {
       log.error('refund.order-update-failed', { code: 'order-update-failed', orderId: order.id });
+    }
+
+    // The reason is the administrator's internal note. It goes to
+    // order_admin_notes (022), which no customer can read, never onto the order
+    // row (V5 release audit B-1; migration 046).
+    const { error: noteError } = await service.rpc('order_admin_note_append', {
+      p_order: order.id,
+      p_line: `Refund: ${reason.slice(0, 500)}`,
+      p_by: admin.userId,
+    });
+    if (noteError) {
+      log.error('refund.note-failed', { code: 'refund-note-failed', orderId: order.id });
     }
 
     // Upsert on the unique provider_payment_id so a retried invocation records
