@@ -16,26 +16,31 @@ Session A, 2026-11-17.
 
 **The branch:** a new local `v6/rebase-live`, cut from `v6/aaroh-backend`. `v6/aaroh-backend` stays untouched until the new branch is green.
 
-**The number map:** V6's 25 migrations move to 058 onwards, in the same order. 042 is the Admin APK session's (see §4), and 027 is held aside under DEC-037.
+**The number map** (coordinator's numbering decision, 2026-11-17):
+- The Admin APK session's 042 becomes **058** on the live line. It serves the live V5 database and ships before V6.
+- V6's 25 migrations then follow from **059**, in the same order. 027 stays held aside under DEC-037.
+- **Not hard-coded.** At rebase time, a small mapping script takes "the last migration number on the live line + 1" as V6's first number. A late V5 fix therefore shifts the map instead of forcing another manual renumber.
+- The same script fails if any two files share a number, or if a V6 file would land on or below the live line's last number.
+- The table below is the map with today's line, which ends at 058 once the Admin APK's file lands.
 
 | V6 | Live line | | V6 | Live line | | V6 | Live line |
 |---|---|---|---|---|---|---|---|
-| 020 | 058 | | 029 | 066 | | 037 | 074 |
-| 021 | 059 | | 030 | 067 | | 038 | 075 |
-| 022 | 060 | | 031 | 068 | | 039 | 076 |
-| 023 | 061 | | 032 | 069 | | 040 | 077 |
-| 024 | 062 | | 033 | 070 | | 041 | 078 |
-| 025 | 063 | | 034 | 071 | | 043 | 079 |
-| 026 | 064 | | 035 | 072 | | 044 | 080 |
-| 028 | 065 | | 036 | 073 | | 045 | 081 |
-| | | | | | | 046 | 082 (only `order_admin_note_append` survives; §2) |
+| 020 | 059 | | 029 | 067 | | 037 | 075 |
+| 021 | 060 | | 030 | 068 | | 038 | 076 |
+| 022 | 061 | | 031 | 069 | | 039 | 077 |
+| 023 | 062 | | 032 | 070 | | 040 | 078 |
+| 024 | 063 | | 033 | 071 | | 041 | 079 |
+| 025 | 064 | | 034 | 072 | | 043 | 080 |
+| 026 | 065 | | 035 | 073 | | 044 | 081 |
+| 028 | 066 | | 036 | 074 | | 045 | 082 |
+| | | | | | | 046 | 083 (only `order_admin_note_append` survives; §2) |
 
 **Everything that pins a number or a body is updated with it:**
 - every header (Origin, ROLLBACK);
-- `FIRST_NEW_MIGRATION` (020 → 058) and `newMigrations()`;
+- `FIRST_NEW_MIGRATION` (020 → the first V6 number from the mapping script; 059 today) and `newMigrations()`;
 - the frozen-contract hashes in `admin-contract.mjs` (FROZEN_NAMES, APPROVED_BODY_CHANGES), re-pinned to the live line's bodies;
 - the generators that edit a live function from its text;
-- `APPLY_ALL.sql` (058 onwards);
+- `APPLY_ALL.sql` (V6's numbers only, 059 onwards today);
 - the migrations README;
 - every "migration 0NN" reference in the contract (AAROH-API), the DEC records and the readiness report. The contract becomes **v0.19**, with no shape change, and Session B is told.
 
@@ -56,6 +61,11 @@ Session A, 2026-11-17.
 - 046's column grant is **dropped**, because 054 already does it.
 - `order_admin_note_append` (from 046) stays, because admin-refund needs it.
 - 054's rule carries over: any V6 migration that adds a column to `orders` must `GRANT SELECT (col) ON public.orders TO authenticated`. The rebase checks every V6 migration that touches `orders`.
+- **Realtime** (Session B's question, 2026-11-17). `orders` is in the `supabase_realtime` publication, and customers subscribe to their own UPDATEs.
+  - Whether Realtime drops a column the subscribing role cannot SELECT from `postgres_changes` payloads is **UNVERIFIED**: no local Realtime server, and no clear public statement found.
+  - In V6 nothing writes `orders.admin_note` any more (022, 046; the tests prove both writers). So a payload carries NULL there today.
+  - On the rebased line, the rebase checks that no live-line function writes `orders.admin_note` either.
+  - **Proposed as defence in depth,** a decision for the release track: a publication column list (PostgreSQL 15+; live is 17.6) that leaves out `admin_note`. Session B's hook uses the event only as a signal, so it needs no payload.
 
 **3. The card one-time codes.** V5's 057 is the same design as V6's 046 card-code part, so that part is **dropped**.
 - V6's `card-otp.mjs` keeps its calls; they match 057's signature.
@@ -86,11 +96,12 @@ They are recorded and not merged, because they live in different apps.
 - **A schema-equivalence check:**
   - the live line's 001–053, replayed, against the 2026-09-30 dump plus the seven drift migrations of 2026-10-11 to 10-15;
   - every difference is listed.
-- **A negative control:** drop one renumbered migration (078, card pairing). `test:card-lifecycle` and the export-parity gate must fail.
+- **A negative control:** drop one renumbered migration (card pairing, 079 today). `test:card-lifecycle` and the export-parity gate must fail.
+- **The numbering check:** the mapping script's duplicate-number and ordering checks pass, and fail on a planted duplicate.
 
 ## 4. Open before or alongside the rebase
 
-- **The Admin APK session's migration 042** (on `feat/admin-v5-coverage`, off V5's 8becea3) also needs a slot on the live line. Two lines must not both claim 058. The coordinator should assign numbers: V6 takes 058–082, and the Admin APK takes the next free slot after that, or before it if it ships first.
+- **The Admin APK session's migration 042** (on `feat/admin-v5-coverage`, off V5's 8becea3) is **settled**. The coordinator assigned it **058** on the live line on 2026-11-17, so V6 follows from 059. The mapping script recomputes V6's numbers from whatever the live line ends at when the rebase runs.
 - **027** (the AAROH catalogue) stays held aside (DEC-037).
 - **The production order:**
   1. V5 applies 054–057 on live;
