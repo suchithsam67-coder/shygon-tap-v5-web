@@ -38,6 +38,18 @@ Session A, 2026-11-17.
 3. The steps below follow, with the same number rule.
 4. 024 and 041 are adapted, and 021, 025 and 035 are regenerated, to whatever production actually has.
 
+**The tool for step 2** (built 2026-11-17 at the coordinator's request; V6-139).
+- `npm run rebase:compare -- --dump <file> --v5 <V5 repo> [--extra <the Admin APK's 058>]`. It runs in in-memory databases only, opens no network connection, and refuses a dump that holds table data.
+- It writes `report.json` and, for every function V6 replaces whose body has moved since 2026-09-30, a three-way merge of V6's change onto the new body as a **PROPOSAL**. A conflict stops that function's chain and is left marked for a human. Nothing under `supabase/` is written.
+- `npm run test:rebase-compare`: 25 checks, including planted differences and a conflict.
+
+**A dry run on the 2026-09-30 dump as a stand-in** (V5 at `12ad050`) [OBSERVED]:
+- The comparison reproduces the counts above. The extra kinds add: the replay has 73 column grants that the dump lacks, and 81 function grants differ. The latter probably means V5's test baseline does not carry production's function grants [INFERRED].
+- **V5's 055 fails on the dump:** `relation "public.phone_login_attempts" does not exist`. V5's own 046 creates that table, and the 2026-09-30 dump does not have it. Either V5's 046 reached live after that date, or it never did. The fresh dump answers this. It is a concrete signal for V5's "step 0".
+- 054, 056 and 057 apply. Then all 25 V6 migrations apply.
+- No function V6 replaces was changed by 054, 056 or 057. Both 057 and V6's 046 define `card_otp_begin` (different bodies: the `channel` column) and `card_otp_take_attempt` (the same body). §2.3 already drops 046's part.
+
+
 ## 1. What moves where
 
 **The base (the live line):**

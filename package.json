@@ -52,6 +52,8 @@
     "test:rls-matrix": "node supabase/tests/rls-matrix.mjs",
     "test:admin-notes": "node supabase/tests/admin-notes.mjs",
     "test:card-otp-limits": "node supabase/tests/card-otp-limits.mjs",
+    "rebase:compare": "node --import ./scripts/ci/deny-network.mjs scripts/rebase/compare-dump.mjs",
+    "test:rebase-compare": "node --import ./scripts/ci/deny-network.mjs scripts/rebase/compare-dump.selftest.mjs",
     "test:rollbacks": "node supabase/tests/migration-rollbacks.mjs",
     "db:bundle:check": "node supabase/tests/bundle.mjs --check",
     "test:db:history": "node supabase/tests/history-seed.mjs",
